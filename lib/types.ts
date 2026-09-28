@@ -43,6 +43,10 @@ export interface RaffleSummaryDTO {
   availableCount: number;
   occupiedCount: number;
   paidCount: number;
+  /** Grid theme overrides — null means "use the app's default gold/black look". */
+  themeBackground?: string | null;
+  themeNumberColor?: string | null;
+  themeTextColor?: string | null;
 }
 
 export interface RaffleDTO {
@@ -54,6 +58,10 @@ export interface RaffleDTO {
   drawDate: string | null;
   status: "active" | "closed";
   numbers: RaffleNumberDTO[];
+  /** Grid theme overrides — null means "use the app's default gold/black look". */
+  themeBackground?: string | null;
+  themeNumberColor?: string | null;
+  themeTextColor?: string | null;
 }
 
 export interface CreateRaffleInput {
@@ -62,6 +70,21 @@ export interface CreateRaffleInput {
   numberPrice: number;
   totalNumbers?: number; // defaults to 100
   drawDate?: string | null;
+  themeBackground?: string | null;
+  themeNumberColor?: string | null;
+  themeTextColor?: string | null;
+}
+
+// Editing an existing raffle. `totalNumbers` is intentionally absent — changing
+// it after creation would desync the already-created RaffleNumber rows.
+export interface UpdateRaffleInput {
+  name?: string;
+  prizeLabel?: string | null;
+  numberPrice?: number;
+  drawDate?: string | null;
+  themeBackground?: string | null;
+  themeNumberColor?: string | null;
+  themeTextColor?: string | null;
 }
 
 export interface UpdateNumberInput {

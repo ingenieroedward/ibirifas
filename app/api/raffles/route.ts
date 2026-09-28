@@ -6,12 +6,21 @@ import type { CreateRaffleInput, RaffleSummaryDTO } from "@/lib/types";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido")
+  .nullable()
+  .optional();
+
 const createRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   numberPrice: z.number().int().positive(),
   totalNumbers: z.number().int().min(10).max(1000).optional(),
   drawDate: z.string().datetime().nullable().optional(),
+  themeBackground: hexColorSchema,
+  themeNumberColor: hexColorSchema,
+  themeTextColor: hexColorSchema,
 });
 
 export async function GET(req: NextRequest) {
@@ -65,6 +74,9 @@ export async function GET(req: NextRequest) {
       availableCount: counts.available,
       occupiedCount: counts.occupied,
       paidCount: counts.paid,
+      themeBackground: r.themeBackground,
+      themeNumberColor: r.themeNumberColor,
+      themeTextColor: r.themeTextColor,
     };
   });
 
@@ -105,6 +117,9 @@ export async function POST(req: NextRequest) {
       totalNumbers,
       drawDate: input.drawDate ? new Date(input.drawDate) : null,
       status: "active",
+      themeBackground: input.themeBackground ?? null,
+      themeNumberColor: input.themeNumberColor ?? null,
+      themeTextColor: input.themeTextColor ?? null,
     },
   });
 
@@ -127,6 +142,9 @@ export async function POST(req: NextRequest) {
     availableCount: totalNumbers,
     occupiedCount: 0,
     paidCount: 0,
+    themeBackground: raffle.themeBackground,
+    themeNumberColor: raffle.themeNumberColor,
+    themeTextColor: raffle.themeTextColor,
   };
 
   return NextResponse.json(dto, { status: 201 });

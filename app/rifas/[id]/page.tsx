@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
 import { ApiError, getRaffleById, getRaffles, updateNumber } from "@/lib/api-client";
+import { downloadBlob, generateRaffleShareImage } from "@/lib/shareImage";
 import type { RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -29,6 +30,7 @@ export default function RaffleDashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Only used to decide whether the "back to picker" link is worth showing.
   const [raffleCount, setRaffleCount] = useState(1);
+  const [downloadingImage, setDownloadingImage] = useState(false);
 
   // Middleware already redirects unauthenticated requests server-side; this
   // is the client-side fallback for when the session expires in-app.
@@ -93,6 +95,21 @@ export default function RaffleDashboardPage() {
     router.push("/login");
   }, [signOut, router]);
 
+  const handleDownloadImage = useCallback(async () => {
+    if (!raffle || downloadingImage) return;
+    setDownloadingImage(true);
+    try {
+      const blob = await generateRaffleShareImage(raffle);
+      const safeName = raffle.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      downloadBlob(blob, `rifa-${safeName || raffle.id}.png`);
+      show("Imagen descargada", "success");
+    } catch {
+      show("No se pudo generar la imagen. Inténtalo de nuevo.", "error");
+    } finally {
+      setDownloadingImage(false);
+    }
+  }, [raffle, downloadingImage, show]);
+
   const selected = raffle?.numbers.find((n) => n.id === selectedId) ?? null;
 
   const handleSave = useCallback(
@@ -140,7 +157,10 @@ export default function RaffleDashboardPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col pb-10">
+    <div
+      className="flex min-h-dvh flex-1 flex-col pb-10"
+      style={raffle?.themeBackground ? { backgroundColor: raffle.themeBackground } : undefined}
+    >
       {raffle && (
         <DashboardHeader
           raffle={raffle}
@@ -148,6 +168,8 @@ export default function RaffleDashboardPage() {
           role={user.role}
           showBackToPicker={raffleCount > 1}
           onLogout={handleLogout}
+          onDownloadImage={handleDownloadImage}
+          downloadingImage={downloadingImage}
         />
       )}
 
@@ -169,7 +191,12 @@ export default function RaffleDashboardPage() {
           )}
 
           {!raffleLoading && !raffleError && raffle && (
-            <NumberGrid numbers={raffle.numbers} onSelect={(n) => setSelectedId(n.id)} />
+            <NumberGrid
+              numbers={raffle.numbers}
+              onSelect={(n) => setSelectedId(n.id)}
+              themeNumberColor={raffle.themeNumberColor}
+              themeTextColor={raffle.themeTextColor}
+            />
           )}
         </div>
       </main>

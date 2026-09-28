@@ -47,7 +47,10 @@ producción.
   organizador) y `plan` (placeholder para futuros planes de pago, hoy sin
   límites reales).
 - `Raffle`: pertenece a un organizador (`ownerId`); premio, precio por
-  número y fecha del sorteo.
+  número, fecha del sorteo, y colores de tema opcionales
+  (`themeBackground`/`themeNumberColor`/`themeTextColor`) — si están vacíos
+  se usa el look dorado/negro por defecto. Editable desde `/rifas/[id]/editar`
+  (no se puede cambiar `totalNumbers` una vez creada).
 - `RaffleNumber`: cada número con su estado (`available` / `occupied` /
   `paid`), datos del comprador y foto del comprobante en base64.
   `paymentMethod` (`cash` / `nequi` / `transfer` / `other`) registra cómo se

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
+import { Spinner } from "@/components/Spinner";
 
 interface DashboardHeaderProps {
   raffle: RaffleDTO;
@@ -10,6 +11,8 @@ interface DashboardHeaderProps {
   /** True when the signed-in user has more than one raffle (so "back to picker" makes sense). */
   showBackToPicker: boolean;
   onLogout: () => void;
+  onDownloadImage: () => void;
+  downloadingImage: boolean;
 }
 
 export function DashboardHeader({
@@ -18,6 +21,8 @@ export function DashboardHeader({
   role,
   showBackToPicker,
   onLogout,
+  onDownloadImage,
+  downloadingImage,
 }: DashboardHeaderProps) {
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
@@ -71,9 +76,20 @@ export function DashboardHeader({
           </div>
         )}
 
-        <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
-          {raffle.name}
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="min-w-0 flex-1 font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
+            {raffle.name}
+          </h1>
+          {role === "ORGANIZER" && (
+            <Link
+              href={`/rifas/${raffle.id}/editar`}
+              aria-label="Editar rifa"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
+            >
+              <EditIcon className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
           <div className="flex divide-x divide-line">
@@ -125,8 +141,55 @@ export function DashboardHeader({
             recaudados hasta ahora
           </p>
         )}
+
+        <button
+          type="button"
+          onClick={onDownloadImage}
+          disabled={downloadingImage}
+          className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:w-auto sm:px-5"
+        >
+          {downloadingImage ? (
+            <>
+              <Spinner size={16} />
+              Generando imagen…
+            </>
+          ) : (
+            <>
+              <DownloadIcon className="h-4 w-4" />
+              Descargar imagen para compartir
+            </>
+          )}
+        </button>
       </div>
     </header>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

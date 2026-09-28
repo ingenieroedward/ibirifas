@@ -62,6 +62,12 @@ model Raffle {
   createdAt    DateTime       @default(now())
   numbers      RaffleNumber[]
 
+  // Per-raffle grid theme override (hex strings like "#0b0b0f"). Null means
+  // "use the app's default gold/black look" — these are opt-in, not required.
+  themeBackground   String?
+  themeNumberColor  String?
+  themeTextColor    String?
+
   @@index([ownerId])
 }
 

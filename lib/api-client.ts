@@ -7,6 +7,7 @@ import type {
   RaffleNumberDTO,
   RaffleSummaryDTO,
   UpdateNumberInput,
+  UpdateRaffleInput,
   UpdateUserInput,
 } from "@/lib/types";
 
@@ -165,6 +166,13 @@ export async function createRaffle(input: CreateRaffleInput): Promise<RaffleSumm
 
 export async function getRaffleById(id: string): Promise<RaffleDTO> {
   return request<RaffleDTO>(`/api/raffles/${id}`);
+}
+
+export async function updateRaffle(id: string, input: UpdateRaffleInput): Promise<RaffleDTO> {
+  return request<RaffleDTO>(`/api/raffles/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function updateNumber(
