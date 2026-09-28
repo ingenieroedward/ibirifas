@@ -125,11 +125,6 @@ html {
 html,
 body {
   overflow-x: hidden;
-  /* `contain` stops pull-to-refresh/scroll-chaining to the browser chrome —
-     the same goal `none` was set for — without it. `none` has a known WebKit
-     bug on iOS Safari where it can disable touch scrolling on the page
-     entirely rather than just the overscroll bounce. */
-  overscroll-behavior-y: contain;
 }
 
 * {
