@@ -138,58 +138,60 @@ export default function UsersPage() {
         backLabel="Volver a tus rifas"
       />
 
-      <main className="mt-4 flex-1 px-4">
-        {loading && (
-          <div className="flex flex-1 items-center justify-center py-24">
-            <Spinner size={32} className="text-gold-400" />
-          </div>
-        )}
+      <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-2xl">
+          {loading && (
+            <div className="flex flex-1 items-center justify-center py-24">
+              <Spinner size={32} className="text-gold-400" />
+            </div>
+          )}
 
-        {!loading && error && (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-            <p className="max-w-xs text-text-muted">{error}</p>
-            <button
-              type="button"
-              onClick={loadUsers}
-              className="rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-5 py-2.5 text-sm font-semibold text-[#241a02] shadow-gold active:scale-95"
-            >
-              Reintentar
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && users && users.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-            <p className="max-w-xs text-text-muted">
-              Aún no has creado ningún {targetRoleLabel}.
-            </p>
-          </div>
-        )}
-
-        {!loading && !error && users && users.length > 0 && (
-          <ul className="flex flex-col gap-2.5">
-            {users.map((u) => (
-              <li
-                key={u.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-bg-elevated px-4 py-3.5 shadow-card"
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <p className="max-w-xs text-text-muted">{error}</p>
+              <button
+                type="button"
+                onClick={loadUsers}
+                className="rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-5 py-2.5 text-sm font-semibold text-[#241a02] shadow-gold active:scale-95"
               >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-text">{u.name}</p>
-                  <p className="truncate text-xs text-text-muted">
-                    Desde {formatDate(u.createdAt)} · Plan {u.plan}
-                  </p>
-                </div>
-                <ActiveToggle active={u.active} onToggle={() => handleToggleActive(u)} />
-              </li>
-            ))}
-          </ul>
-        )}
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && users && users.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <p className="max-w-xs text-text-muted">
+                Aún no has creado ningún {targetRoleLabel}.
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && users && users.length > 0 && (
+            <ul className="flex flex-col gap-2.5">
+              {users.map((u) => (
+                <li
+                  key={u.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-bg-elevated px-4 py-3.5 shadow-card"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-text">{u.name}</p>
+                    <p className="truncate text-xs text-text-muted">
+                      Desde {formatDate(u.createdAt)} · Plan {u.plan}
+                    </p>
+                  </div>
+                  <ActiveToggle active={u.active} onToggle={() => handleToggleActive(u)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </main>
 
       <button
         type="button"
         onClick={() => setSheetOpen(true)}
-        className="fixed bottom-6 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-gold-300 to-gold-500 text-2xl font-bold text-[#241a02] shadow-gold-lg transition active:scale-90"
+        className="fixed bottom-6 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-gold-300 to-gold-500 text-2xl font-bold text-[#241a02] shadow-gold-lg transition active:scale-90 sm:right-6 lg:right-8"
         aria-label={newButtonLabel}
       >
         +

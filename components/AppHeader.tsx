@@ -29,58 +29,60 @@ export function AppHeader({
   links = [],
 }: AppHeaderProps) {
   return (
-    <header className="px-4 pt-safe">
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2">
-          {backHref && (
-            <Link
-              href={backHref}
-              aria-label={backLabel}
+    <header className="px-4 pt-safe sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-2">
+            {backHref && (
+              <Link
+                href={backHref}
+                aria-label={backLabel}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
+              >
+                <BackIcon className="h-4 w-4" />
+              </Link>
+            )}
+            <CrownIcon className="h-5 w-8 text-gold-400" />
+            <span className="font-[family-name:var(--font-heading)] text-lg font-bold text-gold-400">
+              Ibirifas
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="max-w-[8rem] truncate text-sm font-medium text-text-muted">
+              {userName}
+            </span>
+            <button
+              type="button"
+              onClick={onLogout}
+              aria-label="Cerrar sesión"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
             >
-              <BackIcon className="h-4 w-4" />
-            </Link>
-          )}
-          <CrownIcon className="h-5 w-8 text-gold-400" />
-          <span className="font-[family-name:var(--font-heading)] text-lg font-bold text-gold-400">
-            Ibirifas
-          </span>
+              <LogoutIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="max-w-[8rem] truncate text-sm font-medium text-text-muted">
-            {userName}
-          </span>
-          <button
-            type="button"
-            onClick={onLogout}
-            aria-label="Cerrar sesión"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
-          >
-            <LogoutIcon className="h-4 w-4" />
-          </button>
-        </div>
+
+        {title && (
+          <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
+            {title}
+          </h1>
+        )}
+        {subtitle && <p className="mt-1 text-sm text-text-muted">{subtitle}</p>}
+
+        {links.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
-
-      {title && (
-        <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
-          {title}
-        </h1>
-      )}
-      {subtitle && <p className="mt-1 text-sm text-text-muted">{subtitle}</p>}
-
-      {links.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      )}
     </header>
   );
 }

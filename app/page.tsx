@@ -162,8 +162,10 @@ export default function HomePage() {
             : []
         }
       />
-      <main className="mt-4 flex-1 px-4">
-        <RafflePicker raffles={raffles} />
+      <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-2xl">
+          <RafflePicker raffles={raffles} />
+        </div>
       </main>
     </div>
   );

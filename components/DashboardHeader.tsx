@@ -25,105 +25,107 @@ export function DashboardHeader({
   const collected = paid * raffle.numberPrice;
 
   return (
-    <header className="px-4 pt-safe">
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2">
-          <CrownIcon className="h-5 w-8 text-gold-400" />
-          <span className="font-[family-name:var(--font-heading)] text-lg font-bold text-gold-400">
-            Ibirifas
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="max-w-[9rem] truncate text-sm font-medium text-text-muted">
-            {userName}
-          </span>
-          <button
-            type="button"
-            onClick={onLogout}
-            aria-label="Cerrar sesión"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
-          >
-            <LogoutIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {(showBackToPicker || role === "ORGANIZER") && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {showBackToPicker && (
-            <Link
-              href="/"
-              className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
-            >
-              <BackIcon className="h-3.5 w-3.5" />
-              Mis rifas
-            </Link>
-          )}
-          {role === "ORGANIZER" && (
-            <Link
-              href="/usuarios"
-              className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
-            >
-              Mi equipo
-            </Link>
-          )}
-        </div>
-      )}
-
-      <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
-        {raffle.name}
-      </h1>
-
-      <div className="mt-4 overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
-        <div className="flex divide-x divide-line">
-          <div className="flex-1 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              Premio
-            </p>
-            <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-              {raffle.prizeLabel || "Por definir"}
-            </p>
+    <header className="px-4 pt-safe sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-2">
+            <CrownIcon className="h-5 w-8 text-gold-400" />
+            <span className="font-[family-name:var(--font-heading)] text-lg font-bold text-gold-400">
+              Ibirifas
+            </span>
           </div>
-          <div className="flex-1 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              Valor del número
-            </p>
-            <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-              {formatCurrency(raffle.numberPrice)}
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="max-w-[9rem] truncate text-sm font-medium text-text-muted">
+              {userName}
+            </span>
+            <button
+              type="button"
+              onClick={onLogout}
+              aria-label="Cerrar sesión"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
+            >
+              <LogoutIcon className="h-4 w-4" />
+            </button>
           </div>
         </div>
-        {raffle.drawDate && (
-          <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
-            <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
-            <span>Sorteo el {formatDate(raffle.drawDate)}</span>
+
+        {(showBackToPicker || role === "ORGANIZER") && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {showBackToPicker && (
+              <Link
+                href="/"
+                className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+              >
+                <BackIcon className="h-3.5 w-3.5" />
+                Mis rifas
+              </Link>
+            )}
+            {role === "ORGANIZER" && (
+              <Link
+                href="/usuarios"
+                className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+              >
+                Mi equipo
+              </Link>
+            )}
           </div>
         )}
-      </div>
 
-      <div className="mt-4 flex items-center gap-3 text-sm">
-        <span className="flex items-center gap-1.5 font-medium text-text">
-          <span className="h-2.5 w-2.5 rounded-full bg-gold-400" />
-          {available} disponibles
-        </span>
-        <span className="flex items-center gap-1.5 font-medium text-text">
-          <span className="h-2.5 w-2.5 rounded-full bg-surface-2 ring-1 ring-line" />
-          {occupied} ocupados
-        </span>
-        {paid > 0 && (
+        <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
+          {raffle.name}
+        </h1>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
+          <div className="flex divide-x divide-line">
+            <div className="flex-1 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                Premio
+              </p>
+              <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
+                {raffle.prizeLabel || "Por definir"}
+              </p>
+            </div>
+            <div className="flex-1 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                Valor del número
+              </p>
+              <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
+                {formatCurrency(raffle.numberPrice)}
+              </p>
+            </div>
+          </div>
+          {raffle.drawDate && (
+            <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
+              <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
+              <span>Sorteo el {formatDate(raffle.drawDate)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center gap-3 text-sm">
           <span className="flex items-center gap-1.5 font-medium text-text">
-            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-            {paid} pagados
+            <span className="h-2.5 w-2.5 rounded-full bg-gold-400" />
+            {available} disponibles
           </span>
+          <span className="flex items-center gap-1.5 font-medium text-text">
+            <span className="h-2.5 w-2.5 rounded-full bg-surface-2 ring-1 ring-line" />
+            {occupied} ocupados
+          </span>
+          {paid > 0 && (
+            <span className="flex items-center gap-1.5 font-medium text-text">
+              <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              {paid} pagados
+            </span>
+          )}
+        </div>
+
+        {paid > 0 && (
+          <p className="mt-2 text-sm text-text-muted">
+            <span className="font-semibold text-green-400">{formatCurrency(collected)}</span>{" "}
+            recaudados hasta ahora
+          </p>
         )}
       </div>
-
-      {paid > 0 && (
-        <p className="mt-2 text-sm text-text-muted">
-          <span className="font-semibold text-green-400">{formatCurrency(collected)}</span>{" "}
-          recaudados hasta ahora
-        </p>
-      )}
     </header>
   );
 }

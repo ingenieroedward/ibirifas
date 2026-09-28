@@ -17,17 +17,19 @@ interface CreateUserSheetProps {
 const CODE_LENGTH = 6;
 
 export function CreateUserSheet({ open, targetRoleLabel, onClose, onCreated }: CreateUserSheetProps) {
+  if (!open) return null;
+
   return (
-    <>
-      {open && (
-        <div
-          className="fixed inset-0 z-40 animate-fade-in bg-black/70 backdrop-blur-sm"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-      {open && <SheetContent targetRoleLabel={targetRoleLabel} onClose={onClose} onCreated={onCreated} />}
-    </>
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 animate-fade-in bg-black/70 backdrop-blur-sm"
+      />
+      <SheetContent targetRoleLabel={targetRoleLabel} onClose={onClose} onCreated={onCreated} />
+    </div>
   );
 }
 
@@ -81,7 +83,7 @@ function SheetContent({
       aria-modal="true"
       aria-label={`Nuevo ${targetRoleLabel}`}
       onClick={(e) => e.stopPropagation()}
-      className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] animate-sheet-up overflow-y-auto scrollbar-thin rounded-t-3xl border-t border-line bg-surface pb-safe shadow-card"
+      className="relative z-10 max-h-[92dvh] w-full animate-sheet-up overflow-y-auto scrollbar-thin rounded-t-3xl border-t border-line bg-surface pb-safe shadow-card sm:max-h-[85vh] sm:max-w-md sm:rounded-3xl sm:border"
     >
       <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-line" />
 

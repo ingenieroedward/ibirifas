@@ -29,25 +29,25 @@ const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 const PAYMENT_METHODS: PaymentMethod[] = ["cash", "nequi", "transfer", "other"];
 
 export function NumberSheet({ number, numberPrice, onClose, onSave }: NumberSheetProps) {
+  if (!number) return null;
+
   return (
-    <>
-      {number && (
-        <div
-          className="fixed inset-0 z-40 animate-fade-in bg-black/70 backdrop-blur-sm"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-      {number && (
-        <SheetContent
-          key={number.id}
-          number={number}
-          numberPrice={numberPrice}
-          onClose={onClose}
-          onSave={onSave}
-        />
-      )}
-    </>
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 animate-fade-in bg-black/70 backdrop-blur-sm"
+      />
+      <SheetContent
+        key={number.id}
+        number={number}
+        numberPrice={numberPrice}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    </div>
   );
 }
 
@@ -154,7 +154,7 @@ function SheetContent({
       aria-modal="true"
       aria-label={`Número ${formatNumberValue(number.value)}`}
       onClick={(e) => e.stopPropagation()}
-      className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] animate-sheet-up overflow-y-auto scrollbar-thin rounded-t-3xl border-t border-line bg-surface pb-safe shadow-card"
+      className="relative z-10 max-h-[92dvh] w-full animate-sheet-up overflow-y-auto scrollbar-thin rounded-t-3xl border-t border-line bg-surface pb-safe shadow-card sm:max-h-[85vh] sm:max-w-lg sm:rounded-3xl sm:border"
     >
       <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-line" />
 

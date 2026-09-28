@@ -151,25 +151,27 @@ export default function RaffleDashboardPage() {
         />
       )}
 
-      <main className="mt-2 flex-1 px-4">
-        {raffleLoading && <FullScreenSpinner />}
+      <main className="mt-2 flex-1 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-3xl">
+          {raffleLoading && <FullScreenSpinner />}
 
-        {!raffleLoading && raffleError && (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-            <p className="max-w-xs text-text-muted">{raffleError}</p>
-            <button
-              type="button"
-              onClick={loadRaffle}
-              className="rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-5 py-2.5 text-sm font-semibold text-[#241a02] shadow-gold active:scale-95"
-            >
-              Reintentar
-            </button>
-          </div>
-        )}
+          {!raffleLoading && raffleError && (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <p className="max-w-xs text-text-muted">{raffleError}</p>
+              <button
+                type="button"
+                onClick={loadRaffle}
+                className="rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-5 py-2.5 text-sm font-semibold text-[#241a02] shadow-gold active:scale-95"
+              >
+                Reintentar
+              </button>
+            </div>
+          )}
 
-        {!raffleLoading && !raffleError && raffle && (
-          <NumberGrid numbers={raffle.numbers} onSelect={(n) => setSelectedId(n.id)} />
-        )}
+          {!raffleLoading && !raffleError && raffle && (
+            <NumberGrid numbers={raffle.numbers} onSelect={(n) => setSelectedId(n.id)} />
+          )}
+        </div>
       </main>
 
       <NumberSheet

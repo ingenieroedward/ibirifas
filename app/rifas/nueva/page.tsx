@@ -96,8 +96,8 @@ export default function NewRafflePage() {
         backLabel="Volver a tus rifas"
       />
 
-      <main className="mt-4 flex-1 px-4">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-xl flex-col gap-5">
           <Field label="Nombre de la rifa" htmlFor="name" required>
             <input
               id="name"
