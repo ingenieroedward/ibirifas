@@ -7,14 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// role: "SUPERADMIN" | "ORGANIZER" | "SELLER" (plain string, validated in code —
+// matches the existing convention for status/paymentStatus rather than a Prisma enum).
+//
+// Tenancy: a SUPERADMIN has no owner. An ORGANIZER is a tenant root (ownerId
+// null) and owns Raffles directly. A SELLER belongs to exactly one ORGANIZER
+// via ownerId and inherits access to all of that organizer's raffles — there
+// is no separate per-raffle assignment yet.
 model AdminUser {
   id            String         @id @default(cuid())
   name          String
   codeHash      String
+  role          String
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
+
+  ownerId       String?
+  owner         AdminUser?     @relation("OwnedUsers", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownedUsers    AdminUser[]    @relation("OwnedUsers")
+
+  // Only meaningful for ORGANIZER; a placeholder for a future paid-plans
+  // system the superadmin will configure — unused/unenforced today.
+  plan          String         @default("free")
+
   refreshTokens RefreshToken[]
+  raffles       Raffle[]       @relation("RaffleOwner")
   updates       RaffleNumber[] @relation("UpdatedBy")
+
+  @@index([ownerId])
 }
 
 model RefreshToken {
@@ -31,6 +51,8 @@ model RefreshToken {
 
 model Raffle {
   id           String         @id @default(cuid())
+  ownerId      String
+  owner        AdminUser      @relation("RaffleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   name         String
   prizeLabel   String?
   numberPrice  Int
@@ -39,6 +61,8 @@ model Raffle {
   status       String         @default("active")
   createdAt    DateTime       @default(now())
   numbers      RaffleNumber[]
+
+  @@index([ownerId])
 }
 
 // paymentStatus/paymentRef are unused placeholders today; they exist so a future

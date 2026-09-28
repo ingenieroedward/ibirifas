@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 
 const BCRYPT_ROUNDS = 10;
 
-// In production, never fall back to the well-known dev codes (123456/654321) —
-// use SEED_*_CODE if set, otherwise generate a random one and print it once.
+// In production, never fall back to the well-known dev codes — use SEED_*_CODE
+// if set, otherwise generate a random one and print it once.
 function resolveCode(envVar: string, devFallback: string): { code: string; generated: boolean } {
   const fromEnv = process.env[envVar];
   if (fromEnv) {
@@ -23,17 +23,51 @@ function resolveCode(envVar: string, devFallback: string): { code: string; gener
 }
 
 async function main() {
-  const existingRaffle = await prisma.raffle.findFirst();
-  if (existingRaffle) {
-    console.log("Seed skipped: a Raffle already exists in the database.");
+  const existingSuperadmin = await prisma.adminUser.findFirst({ where: { role: "SUPERADMIN" } });
+  if (existingSuperadmin) {
+    console.log("Seed skipped: a SUPERADMIN already exists in the database.");
     return;
   }
+
+  const printable: { name: string; code: string; generated: boolean }[] = [];
+  const hash = (code: string) => bcrypt.hash(code, BCRYPT_ROUNDS);
+
+  const superadmin = resolveCode("SEED_SUPERADMIN_CODE", "999999");
+  printable.push({ name: "Superadmin", ...superadmin });
+  await prisma.adminUser.create({
+    data: { name: "Superadmin", codeHash: await hash(superadmin.code), role: "SUPERADMIN", active: true },
+  });
+
+  const organizer = resolveCode("SEED_ORGANIZER_CODE", "123456");
+  printable.push({ name: "Organizador", ...organizer });
+  const organizerUser = await prisma.adminUser.create({
+    data: {
+      name: "Organizador Demo",
+      codeHash: await hash(organizer.code),
+      role: "ORGANIZER",
+      plan: "free",
+      active: true,
+    },
+  });
+
+  const seller = resolveCode("SEED_SELLER_CODE", "654321");
+  printable.push({ name: "Vendedor", ...seller });
+  await prisma.adminUser.create({
+    data: {
+      name: "Vendedor Demo",
+      codeHash: await hash(seller.code),
+      role: "SELLER",
+      ownerId: organizerUser.id,
+      active: true,
+    },
+  });
 
   const drawDate = new Date();
   drawDate.setDate(drawDate.getDate() + 14);
 
   const raffle = await prisma.raffle.create({
     data: {
+      ownerId: organizerUser.id,
       name: "Gran Rifa Sinuano Noche",
       prizeLabel: "Premio $500.000",
       numberPrice: 10000,
@@ -51,21 +85,9 @@ async function main() {
     })),
   });
 
-  const credentials = [
-    { name: "Organizador", ...resolveCode("SEED_ORGANIZER_CODE", "123456") },
-    { name: "Vendedor", ...resolveCode("SEED_SELLER_CODE", "654321") },
-  ];
-
-  for (const { name, code } of credentials) {
-    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-    await prisma.adminUser.create({
-      data: { name, codeHash, active: true },
-    });
-  }
-
   console.log("Seed complete.");
   console.log("Login codes:");
-  for (const { name, code, generated } of credentials) {
+  for (const { name, code, generated } of printable) {
     console.log(`  ${name}: ${code}${generated ? "  (auto-generated — save it, won't be shown again)" : ""}`);
   }
 }
