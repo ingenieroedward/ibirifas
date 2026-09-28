@@ -1,14 +1,24 @@
+import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { RaffleDTO } from "@/lib/types";
+import type { RaffleDTO, Role } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
 
 interface DashboardHeaderProps {
   raffle: RaffleDTO;
   userName: string;
+  role: Role;
+  /** True when the signed-in user has more than one raffle (so "back to picker" makes sense). */
+  showBackToPicker: boolean;
   onLogout: () => void;
 }
 
-export function DashboardHeader({ raffle, userName, onLogout }: DashboardHeaderProps) {
+export function DashboardHeader({
+  raffle,
+  userName,
+  role,
+  showBackToPicker,
+  onLogout,
+}: DashboardHeaderProps) {
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
@@ -36,6 +46,28 @@ export function DashboardHeader({ raffle, userName, onLogout }: DashboardHeaderP
           </button>
         </div>
       </div>
+
+      {(showBackToPicker || role === "ORGANIZER") && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {showBackToPicker && (
+            <Link
+              href="/"
+              className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+            >
+              <BackIcon className="h-3.5 w-3.5" />
+              Mis rifas
+            </Link>
+          )}
+          {role === "ORGANIZER" && (
+            <Link
+              href="/usuarios"
+              className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+            >
+              Mi equipo
+            </Link>
+          )}
+        </div>
+      )}
 
       <h1 className="font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
         {raffle.name}
@@ -93,6 +125,20 @@ function LogoutIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
       <path
         d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BackIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M15 5l-7 7 7 7"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"

@@ -1,8 +1,13 @@
 import type {
-  AdminUserDTO,
+  CreateRaffleInput,
+  CreateUserInput,
+  ManagedUserDTO,
+  MeDTO,
   RaffleDTO,
   RaffleNumberDTO,
+  RaffleSummaryDTO,
   UpdateNumberInput,
+  UpdateUserInput,
 } from "@/lib/types";
 
 /**
@@ -112,8 +117,8 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
-export async function login(code: string): Promise<AdminUserDTO> {
-  const { user } = await request<{ user: AdminUserDTO }>(
+export async function login(code: string): Promise<MeDTO> {
+  const { user } = await request<{ user: MeDTO }>(
     "/api/auth/login",
     { method: "POST", body: JSON.stringify({ code }) },
     { skipRefresh: true, skipRedirectOn401: true },
@@ -134,9 +139,9 @@ export async function logout(): Promise<void> {
  * but never force-navigates — resolves to `null` when there's no valid
  * session so callers (AuthContext) can decide what to render.
  */
-export async function getMe(): Promise<AdminUserDTO | null> {
+export async function getMe(): Promise<MeDTO | null> {
   try {
-    return await request<AdminUserDTO>(
+    return await request<MeDTO>(
       "/api/auth/me",
       {},
       { skipRedirectOn401: true },
@@ -147,8 +152,19 @@ export async function getMe(): Promise<AdminUserDTO | null> {
   }
 }
 
-export async function getRaffle(): Promise<RaffleDTO> {
-  return request<RaffleDTO>("/api/raffle");
+export async function getRaffles(): Promise<RaffleSummaryDTO[]> {
+  return request<RaffleSummaryDTO[]>("/api/raffles");
+}
+
+export async function createRaffle(input: CreateRaffleInput): Promise<RaffleSummaryDTO> {
+  return request<RaffleSummaryDTO>("/api/raffles", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getRaffleById(id: string): Promise<RaffleDTO> {
+  return request<RaffleDTO>(`/api/raffles/${id}`);
 }
 
 export async function updateNumber(
@@ -156,6 +172,27 @@ export async function updateNumber(
   input: UpdateNumberInput,
 ): Promise<RaffleNumberDTO> {
   return request<RaffleNumberDTO>(`/api/numbers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getUsers(): Promise<ManagedUserDTO[]> {
+  return request<ManagedUserDTO[]>("/api/users");
+}
+
+export async function createUser(input: CreateUserInput): Promise<ManagedUserDTO> {
+  return request<ManagedUserDTO>("/api/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateUser(
+  id: string,
+  input: UpdateUserInput,
+): Promise<ManagedUserDTO> {
+  return request<ManagedUserDTO>(`/api/users/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });

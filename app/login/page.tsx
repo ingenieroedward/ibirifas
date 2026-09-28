@@ -1,17 +1,11 @@
 "use client";
 
-import {
-  useCallback,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, login } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CrownIcon } from "@/components/icons/Crown";
+import { CodeInput } from "@/components/CodeInput";
 import { Spinner } from "@/components/Spinner";
 
 const CODE_LENGTH = 6;
@@ -19,77 +13,17 @@ const CODE_LENGTH = 6;
 export default function LoginPage() {
   const router = useRouter();
   const { refresh } = useAuth();
-  const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
+  const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const [resetSignal, setResetSignal] = useState(0);
 
-  const code = digits.join("");
   const isComplete = code.length === CODE_LENGTH;
 
-  const focusInput = (index: number) => {
-    inputsRef.current[index]?.focus();
-    inputsRef.current[index]?.select();
-  };
-
-  const handleChange = (index: number, raw: string) => {
-    const value = raw.replace(/\D/g, "");
+  const handleCodeChange = useCallback((next: string) => {
+    setCode(next);
     setError(null);
-
-    if (value.length === 0) {
-      setDigits((prev) => {
-        const next = [...prev];
-        next[index] = "";
-        return next;
-      });
-      return;
-    }
-
-    // Handles both a single keystroke and a fast multi-digit autofill.
-    const chars = value.split("");
-    setDigits((prev) => {
-      const next = [...prev];
-      let cursor = index;
-      for (const char of chars) {
-        if (cursor >= CODE_LENGTH) break;
-        next[cursor] = char;
-        cursor += 1;
-      }
-      const lastFilled = Math.min(cursor, CODE_LENGTH - 1);
-      requestAnimationFrame(() => focusInput(lastFilled));
-      return next;
-    });
-  };
-
-  const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace") {
-      if (digits[index] === "" && index > 0) {
-        e.preventDefault();
-        setDigits((prev) => {
-          const next = [...prev];
-          next[index - 1] = "";
-          return next;
-        });
-        focusInput(index - 1);
-      }
-      return;
-    }
-    if (e.key === "ArrowLeft" && index > 0) {
-      e.preventDefault();
-      focusInput(index - 1);
-    }
-    if (e.key === "ArrowRight" && index < CODE_LENGTH - 1) {
-      e.preventDefault();
-      focusInput(index + 1);
-    }
-  };
-
-  const handlePaste = (index: number, e: ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData("text");
-    if (!text) return;
-    e.preventDefault();
-    handleChange(index, text);
-  };
+  }, []);
 
   const handleSubmit = useCallback(
     async (e?: FormEvent) => {
@@ -98,9 +32,9 @@ export default function LoginPage() {
       setSubmitting(true);
       setError(null);
       try {
-        await login(code);
+        const user = await login(code);
         await refresh();
-        router.push("/");
+        router.push(user.role === "SUPERADMIN" ? "/usuarios" : "/");
       } catch (err) {
         const message =
           err instanceof ApiError
@@ -112,8 +46,7 @@ export default function LoginPage() {
             : "No se pudo conectar. Inténtalo de nuevo.";
         setError(message);
         setSubmitting(false);
-        setDigits(Array(CODE_LENGTH).fill(""));
-        focusInput(0);
+        setResetSignal((n) => n + 1);
       }
     },
     [code, isComplete, submitting, refresh, router],
@@ -144,32 +77,12 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="mt-10 flex w-full flex-col items-center gap-6"
         >
-          <div>
-            <div className="flex gap-2 sm:gap-3" role="group" aria-label="Código de acceso de 6 dígitos">
-              {digits.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(el) => {
-                    inputsRef.current[index] = el;
-                  }}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete={index === 0 ? "one-time-code" : "off"}
-                  maxLength={CODE_LENGTH}
-                  value={digit}
-                  autoFocus={index === 0}
-                  disabled={submitting}
-                  onChange={(e) => handleChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  onPaste={(e) => handlePaste(index, e)}
-                  onFocus={(e) => e.target.select()}
-                  aria-label={`Dígito ${index + 1}`}
-                  className="h-14 w-11 rounded-2xl border-2 border-line bg-surface text-center text-2xl font-bold text-text outline-none transition-colors focus:border-gold-400 focus:bg-surface-2 disabled:opacity-50 sm:h-16 sm:w-12"
-                />
-              ))}
-            </div>
-          </div>
+          <CodeInput
+            disabled={submitting}
+            onChange={handleCodeChange}
+            resetSignal={resetSignal}
+            ariaLabel="Código de acceso de 6 dígitos"
+          />
 
           {error && (
             <p role="alert" className="animate-fade-in text-center text-sm font-medium text-red-400">

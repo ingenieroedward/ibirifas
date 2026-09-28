@@ -10,10 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import { getMe, logout as apiLogout } from "@/lib/api-client";
-import type { AdminUserDTO } from "@/lib/types";
+import type { MeDTO } from "@/lib/types";
 
 interface AuthContextValue {
-  user: AdminUserDTO | null;
+  user: MeDTO | null;
   /** True only while the initial session bootstrap is in flight. */
   loading: boolean;
   /** Re-checks the session against the server (e.g. after logging in). */
@@ -24,7 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AdminUserDTO | null>(null);
+  const [user, setUser] = useState<MeDTO | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
