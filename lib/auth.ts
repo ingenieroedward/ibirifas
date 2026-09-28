@@ -2,8 +2,8 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import type { NextResponse } from "next/server";
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER;
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
+const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER as string;
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_PEPPER) {
   throw new Error(
