@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id            String         @id @default(cuid())
+  name          String
+  codeHash      String
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  refreshTokens RefreshToken[]
+  updates       RaffleNumber[] @relation("UpdatedBy")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Raffle {
+  id           String         @id @default(cuid())
+  name         String
+  prizeLabel   String?
+  numberPrice  Int
+  totalNumbers Int            @default(100)
+  drawDate     DateTime?
+  status       String         @default("active")
+  createdAt    DateTime       @default(now())
+  numbers      RaffleNumber[]
+}
+
+// paymentStatus/paymentRef are unused placeholders today; they exist so a future
+// payment gateway integration only needs to populate them, not migrate the schema.
+model RaffleNumber {
+  id            String     @id @default(cuid())
+  raffleId      String
+  raffle        Raffle     @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  value         Int
+  status        String     @default("available")
+  buyerName     String?
+  buyerPhone    String?
+  photoDataUrl  String?
+  paymentStatus String     @default("pending")
+  paymentRef    String?
+  notes         String?
+  updatedById   String?
+  updatedBy     AdminUser? @relation("UpdatedBy", fields: [updatedById], references: [id])
+  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime   @default(now())
+
+  @@unique([raffleId, value])
+  @@index([raffleId, status])
+}
