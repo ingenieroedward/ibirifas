@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getCurrentUserId } from "@/lib/session";
+import { getCurrentUser } from "@/lib/session";
+import type { MeDTO } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
-  const userId = getCurrentUserId(req);
-  if (!userId) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const user = await prisma.adminUser.findUnique({ where: { id: userId } });
-  if (!user || !user.active) {
-    return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
-  }
-
-  return NextResponse.json({ id: user.id, name: user.name });
+  const dto: MeDTO = { id: user.id, name: user.name, role: user.role, plan: user.plan };
+  return NextResponse.json(dto);
 }

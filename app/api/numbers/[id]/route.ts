@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserId } from "@/lib/session";
+import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import type { NumberStatus, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
@@ -32,15 +32,23 @@ const updateNumberSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = getCurrentUserId(req);
-  if (!userId) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
   const { id } = await params;
 
-  const existing = await prisma.raffleNumber.findUnique({ where: { id } });
+  const existing = await prisma.raffleNumber.findUnique({
+    where: { id },
+    include: { raffle: { select: { ownerId: true } } },
+  });
   if (!existing) {
+    return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
+  }
+
+  const tenantId = tenantIdFor(user);
+  if (!tenantId || existing.raffle.ownerId !== tenantId) {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
   }
 
@@ -77,7 +85,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       photoDataUrl: null,
       notes: null,
       paymentStatus: "pending" satisfies PaymentStatus,
-      updatedBy: { connect: { id: userId } },
+      updatedBy: { connect: { id: user.id } },
     };
   } else {
     const resultingBuyerName =
@@ -95,7 +103,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data = {
       status,
       paymentStatus,
-      updatedBy: { connect: { id: userId } },
+      updatedBy: { connect: { id: user.id } },
     };
 
     if (input.buyerName !== undefined) data.buyerName = input.buyerName;

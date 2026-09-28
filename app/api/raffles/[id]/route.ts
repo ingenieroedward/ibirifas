@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserId } from "@/lib/session";
+import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import type {
   NumberStatus,
   PaymentStatus,
@@ -8,19 +8,26 @@ import type {
   RaffleNumberDTO,
 } from "@/lib/types";
 
-export async function GET(req: NextRequest) {
-  const userId = getCurrentUserId(req);
-  if (!userId) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const raffle = await prisma.raffle.findFirst({
-    where: { status: "active" },
+  const { id } = await params;
+
+  const raffle = await prisma.raffle.findUnique({
+    where: { id },
     include: { numbers: { orderBy: { value: "asc" } } },
   });
 
   if (!raffle) {
-    return NextResponse.json({ error: "No hay una rifa activa" }, { status: 404 });
+    return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
+  }
+
+  const tenantId = tenantIdFor(user);
+  if (!tenantId || raffle.ownerId !== tenantId) {
+    return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
 
   const numbers: RaffleNumberDTO[] = raffle.numbers.map((n) => ({

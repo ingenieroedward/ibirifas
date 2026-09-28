@@ -10,6 +10,7 @@ import {
   signAccessToken,
 } from "@/lib/auth";
 import { checkLoginRateLimit, getClientIp } from "@/lib/rateLimit";
+import type { MeDTO, Role } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -59,7 +60,14 @@ export async function POST(req: NextRequest) {
 
   const accessToken = signAccessToken(matchedUser.id);
 
-  const res = NextResponse.json({ user: { id: matchedUser.id, name: matchedUser.name } });
+  const user: MeDTO = {
+    id: matchedUser.id,
+    name: matchedUser.name,
+    role: matchedUser.role as Role,
+    plan: matchedUser.plan,
+  };
+
+  const res = NextResponse.json({ user });
   setAuthCookies(res, { accessToken, refreshToken });
   return res;
 }
