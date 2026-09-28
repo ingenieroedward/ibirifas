@@ -144,6 +144,16 @@ button {
   touch-action: manipulation;
 }
 
+/* iOS Safari auto-zooms the page when a focused form control renders text
+   under 16px — this is a floor, not a design size; every input in the app
+   already uses text-base (16px) or larger, this just guards against a future
+   field being added without one. */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
 /* Safe-area aware spacing utilities for notches / home indicators. */
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);

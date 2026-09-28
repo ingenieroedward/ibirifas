@@ -26,6 +26,18 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Ibirifas",
   },
+  // Declaring `icons` here replaces Next's file-convention auto-detection
+  // entirely (it doesn't merge with it), so every icon tag we want in <head>
+  // — including app/icon.svg and app/apple-icon.png, both otherwise
+  // auto-wired — has to be listed explicitly, or it silently disappears.
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
