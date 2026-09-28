@@ -9,6 +9,6 @@
   <g transform="translate(256,266) scale(0.62) translate(-256,-296)">
     <circle cx="256" cy="296" r="140" fill="url(#g)"/>
     <text x="256" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="150" fill="#0b0b0f">7</text>
-    <path d="M120 150l35 50 62-72 39 58 39-58 62 72 35-50-25 112H145z" fill="url(#g)"/>
+    <path d="M120 105l35 50 62-72 39 58 39-58 62 72 35-50-25 112H145z" fill="url(#g)"/>
   </g>
 </svg>

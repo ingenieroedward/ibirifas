@@ -8,5 +8,5 @@
   <rect width="64" height="64" rx="16" fill="#0b0b0f"/>
   <circle cx="32" cy="36" r="18" fill="url(#g)"/>
   <text x="32" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="18" fill="#0b0b0f">7</text>
-  <path d="M16 20l4 6 8-9 4 7 4-7 8 9 4-6-3 14H19z" fill="url(#g)"/>
+  <path d="M16 12l4 6 8-9 4 7 4-7 8 9 4-6-3 14H19z" fill="url(#g)"/>
 </svg>
