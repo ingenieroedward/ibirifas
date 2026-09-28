@@ -79,10 +79,11 @@ de tipo **Docker Compose** en Dokploy.
      iniciales. Si no los defines, el primer arranque genera códigos
      aleatorios y los imprime una sola vez en los logs del contenedor —
      revísalos ahí antes de que se pierdan.
-   - Opcional: `APP_PORT` si quieres publicar el contenedor en un puerto de
-     host distinto de 3000 (Dokploy puede enrutar por dominio sin esto).
-3. Configura el dominio/puerto de la app en Dokploy apuntando al puerto
-   interno **3000** del servicio `app`.
+3. Configura el dominio de la app en Dokploy apuntando al puerto **interno**
+   3000 del servicio `app` (el `docker-compose.yml` del repo no publica
+   ningún puerto del host a propósito — Dokploy enruta por su propio proxy
+   directo al contenedor, así que nunca compite con otras apps del mismo
+   servidor por un puerto). No necesitas tocar nada de puertos aquí.
 4. Despliega. El contenedor, al arrancar, aplica las migraciones de Prisma y
    siembra la rifa de 100 números si la base de datos está vacía (es
    idempotente: en despliegues posteriores no vuelve a tocar los datos).
@@ -95,10 +96,15 @@ migraciones; el resto de la app no cambia.
 
 ### Probarlo en local con Docker
 
+`docker-compose.override.yml` publica el puerto 3000 al host — Compose lo
+mezcla automáticamente cuando corres `docker compose` sin `-f` explícito (así
+es como lo invoca Dokploy, así que a él nunca le llega este archivo, y por
+lo tanto nunca choca con otro puerto ocupado en el servidor):
+
 ```bash
 cp .env.example .env   # o exporta ACCESS_TOKEN_SECRET/REFRESH_TOKEN_PEPPER
 docker compose up --build
-# app disponible en http://localhost:3000
+# app disponible en http://localhost:3000 (o el puerto que pongas en APP_PORT)
 ```
 
 ## Notas conocidas

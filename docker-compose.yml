@@ -9,12 +9,13 @@ services:
       DATABASE_URL: file:/app/data/prod.db
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?set ACCESS_TOKEN_SECRET in Dokploy's environment variables}
       REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?set REFRESH_TOKEN_PEPPER in Dokploy's environment variables}
+      SEED_SUPERADMIN_CODE: ${SEED_SUPERADMIN_CODE:-}
       SEED_ORGANIZER_CODE: ${SEED_ORGANIZER_CODE:-}
       SEED_SELLER_CODE: ${SEED_SELLER_CODE:-}
     volumes:
       - ibirifas_data:/app/data
-    ports:
-      - "${APP_PORT:-3000}:3000"
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
