@@ -116,6 +116,21 @@ export function DashboardHeader({
               <span>Sorteo el {formatDate(raffle.drawDate)}</span>
             </div>
           )}
+          {raffle.accounts.length > 0 && (
+            <div className="space-y-1 border-t border-line px-4 py-2.5 text-sm text-text-muted">
+              {raffle.accounts.map((account) => (
+                <div key={account.id} className="flex items-start gap-2">
+                  <WalletIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
+                  <span>
+                    <span className="font-medium text-text">{account.label}</span> {account.number}
+                    {account.holderName && (
+                      <span className="text-text-muted"> · Responsable: {account.holderName}</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex items-center gap-3 text-sm">
@@ -226,6 +241,26 @@ function CalendarIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
       <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" />
       <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3M3 7v0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 13.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M13 11h6a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-6a2.5 2.5 0 0 1 0-5Z" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }

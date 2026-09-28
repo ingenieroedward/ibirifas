@@ -68,7 +68,26 @@ model Raffle {
   themeNumberColor  String?
   themeTextColor    String?
 
+  accounts     RaffleAccount[]
+
   @@index([ownerId])
+}
+
+// A payment account the organizer publishes on the raffle (Nequi, Bancolombia,
+// etc.) so buyers know where to pay. `holderName` ("responsable") is optional —
+// Colombian informal transfers often need the account-holder's name confirmed,
+// but not every organizer wants to disclose it.
+model RaffleAccount {
+  id         String   @id @default(cuid())
+  raffleId   String
+  raffle     Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  label      String   // e.g. "Nequi", "Bancolombia", "Daviplata"
+  number     String   // free text — phone numbers, account numbers, etc. vary in format
+  holderName String?  // "responsable" — optional, shown only when set
+  position   Int      @default(0) // preserves the order the organizer entered them in
+  createdAt  DateTime @default(now())
+
+  @@index([raffleId])
 }
 
 // Payments are collected manually today (cash/Nequi/transfer in person) —

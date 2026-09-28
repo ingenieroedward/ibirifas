@@ -12,6 +12,14 @@ const hexColorSchema = z
   .nullable()
   .optional();
 
+const MAX_ACCOUNTS = 5;
+
+const accountSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  number: z.string().trim().min(1).max(60),
+  holderName: z.string().trim().max(80).nullable().optional(),
+});
+
 const createRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
@@ -21,6 +29,7 @@ const createRaffleSchema = z.object({
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
+  accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -108,27 +117,43 @@ export async function POST(req: NextRequest) {
   const input: CreateRaffleInput = parsed.data;
   const totalNumbers = input.totalNumbers ?? DEFAULT_TOTAL_NUMBERS;
 
-  const raffle = await prisma.raffle.create({
-    data: {
-      ownerId: user.id,
-      name: input.name,
-      prizeLabel: input.prizeLabel ?? null,
-      numberPrice: input.numberPrice,
-      totalNumbers,
-      drawDate: input.drawDate ? new Date(input.drawDate) : null,
-      status: "active",
-      themeBackground: input.themeBackground ?? null,
-      themeNumberColor: input.themeNumberColor ?? null,
-      themeTextColor: input.themeTextColor ?? null,
-    },
-  });
+  const raffle = await prisma.$transaction(async (tx) => {
+    const created = await tx.raffle.create({
+      data: {
+        ownerId: user.id,
+        name: input.name,
+        prizeLabel: input.prizeLabel ?? null,
+        numberPrice: input.numberPrice,
+        totalNumbers,
+        drawDate: input.drawDate ? new Date(input.drawDate) : null,
+        status: "active",
+        themeBackground: input.themeBackground ?? null,
+        themeNumberColor: input.themeNumberColor ?? null,
+        themeTextColor: input.themeTextColor ?? null,
+      },
+    });
 
-  await prisma.raffleNumber.createMany({
-    data: Array.from({ length: totalNumbers }, (_, value) => ({
-      raffleId: raffle.id,
-      value,
-      status: "available",
-    })),
+    await tx.raffleNumber.createMany({
+      data: Array.from({ length: totalNumbers }, (_, value) => ({
+        raffleId: created.id,
+        value,
+        status: "available",
+      })),
+    });
+
+    if (input.accounts && input.accounts.length > 0) {
+      await tx.raffleAccount.createMany({
+        data: input.accounts.map((account, position) => ({
+          raffleId: created.id,
+          label: account.label,
+          number: account.number,
+          holderName: account.holderName || null,
+          position,
+        })),
+      });
+    }
+
+    return created;
   });
 
   const dto: RaffleSummaryDTO = {

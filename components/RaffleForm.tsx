@@ -6,10 +6,30 @@ import { ApiError, createRaffle, updateRaffle } from "@/lib/api-client";
 import { formatNumberValue } from "@/lib/format";
 import { lighten } from "@/lib/color";
 import { DEFAULT_THEME } from "@/lib/theme";
-import type { RaffleDTO } from "@/lib/types";
+import type { RaffleAccountInput, RaffleDTO } from "@/lib/types";
 import { Spinner } from "@/components/Spinner";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
+const MAX_ACCOUNTS = 5;
+
+/** A payment-account row being edited in the form, before submit. */
+interface AccountRow {
+  key: string;
+  label: string;
+  number: string;
+  holderName: string;
+}
+
+let nextRowKey = 0;
+function newAccountRow(source?: Partial<AccountRow>): AccountRow {
+  nextRowKey += 1;
+  return {
+    key: `row-${nextRowKey}`,
+    label: source?.label ?? "",
+    number: source?.number ?? "",
+    holderName: source?.holderName ?? "",
+  };
+}
 
 interface RaffleFormProps {
   mode: "create" | "edit";
@@ -31,6 +51,12 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
+
+  const [accounts, setAccounts] = useState<AccountRow[]>(() =>
+    raffle?.accounts && raffle.accounts.length > 0
+      ? raffle.accounts.map((a) => newAccountRow({ label: a.label, number: a.number, holderName: a.holderName ?? "" }))
+      : [],
+  );
 
   const [background, setBackground] = useState(raffle?.themeBackground || DEFAULT_THEME.background);
   const [numberColor, setNumberColor] = useState(raffle?.themeNumberColor || DEFAULT_THEME.numberColor);
@@ -65,6 +91,20 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       return;
     }
 
+    // Blank rows (never filled in) are dropped silently; a row with only one
+    // of label/number filled in is a real mistake, so we ask for it to be fixed.
+    const nonEmptyAccounts = accounts.filter((a) => a.label.trim() || a.number.trim());
+    const incomplete = nonEmptyAccounts.some((a) => !a.label.trim() || !a.number.trim());
+    if (incomplete) {
+      setError("Cada cuenta de pago necesita un nombre (ej. Nequi) y un número.");
+      return;
+    }
+    const accountsPayload: RaffleAccountInput[] = nonEmptyAccounts.map((a) => ({
+      label: a.label.trim(),
+      number: a.number.trim(),
+      holderName: a.holderName.trim() || null,
+    }));
+
     setSubmitting(true);
     setError(null);
     try {
@@ -80,6 +120,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           prizeLabel: prizeLabel.trim() || null,
           numberPrice: Math.round(price),
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
+          accounts: accountsPayload,
           ...themePayload,
         });
         router.push(`/rifas/${raffle.id}`);
@@ -90,6 +131,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           numberPrice: Math.round(price),
           totalNumbers: total,
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
+          accounts: accountsPayload,
           ...themePayload,
         });
         router.push(`/rifas/${created.id}`);
@@ -174,6 +216,97 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
+
+      <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
+        <div>
+          <p className="text-sm font-semibold text-text">Cuentas de pago (opcional)</p>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Agrega dónde pueden pagarte tus compradores (Nequi, Bancolombia, etc.). El responsable
+            es opcional y solo se muestra si lo llenas.
+          </p>
+        </div>
+
+        {accounts.length > 0 && (
+          <div className="space-y-3">
+            {accounts.map((row, index) => (
+              <div
+                key={row.key}
+                className="space-y-2 rounded-xl border border-line bg-surface-2 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                    Cuenta {index + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAccounts((rows) => rows.filter((r) => r.key !== row.key))}
+                    disabled={submitting}
+                    aria-label="Quitar cuenta"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90 disabled:opacity-60"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={row.label}
+                    onChange={(e) =>
+                      setAccounts((rows) =>
+                        rows.map((r) => (r.key === row.key ? { ...r, label: e.target.value } : r)),
+                      )
+                    }
+                    placeholder="Ej. Nequi"
+                    disabled={submitting}
+                    aria-label="Nombre de la cuenta"
+                    className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                  />
+                  <input
+                    type="text"
+                    value={row.number}
+                    onChange={(e) =>
+                      setAccounts((rows) =>
+                        rows.map((r) => (r.key === row.key ? { ...r, number: e.target.value } : r)),
+                      )
+                    }
+                    placeholder="Ej. 300 123 4567"
+                    disabled={submitting}
+                    aria-label="Número de la cuenta"
+                    className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  value={row.holderName}
+                  onChange={(e) =>
+                    setAccounts((rows) =>
+                      rows.map((r) => (r.key === row.key ? { ...r, holderName: e.target.value } : r)),
+                    )
+                  }
+                  placeholder="Responsable (opcional)"
+                  disabled={submitting}
+                  aria-label="Responsable de la cuenta"
+                  className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {accounts.length < MAX_ACCOUNTS && (
+          <button
+            type="button"
+            onClick={() => setAccounts((rows) => [...rows, newAccountRow()])}
+            disabled={submitting}
+            className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Agregar cuenta
+          </button>
+        )}
+      </div>
 
       <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
         <div>
@@ -316,5 +449,27 @@ function Field({
       {children}
       {hint && <p className="text-xs text-text-muted">{hint}</p>}
     </div>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0v12.5A1.5 1.5 0 0 1 15.5 21h-7A1.5 1.5 0 0 1 7 19.5V7h10Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }

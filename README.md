@@ -51,6 +51,9 @@ producción.
   (`themeBackground`/`themeNumberColor`/`themeTextColor`) — si están vacíos
   se usa el look dorado/negro por defecto. Editable desde `/rifas/[id]/editar`
   (no se puede cambiar `totalNumbers` una vez creada).
+- `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
+  (label + número + "responsable" opcional), visibles en el dashboard y en
+  la imagen para compartir — para que el comprador sepa dónde consignar.
 - `RaffleNumber`: cada número con su estado (`available` / `occupied` /
   `paid`), datos del comprador y foto del comprobante en base64.
   `paymentMethod` (`cash` / `nequi` / `transfer` / `other`) registra cómo se

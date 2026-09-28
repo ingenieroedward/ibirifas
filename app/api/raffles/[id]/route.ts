@@ -6,16 +6,20 @@ import type {
   NumberStatus,
   PaymentMethod,
   PaymentStatus,
+  RaffleAccountDTO,
   RaffleDTO,
   RaffleNumberDTO,
 } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
+
+const MAX_ACCOUNTS = 5;
 
 type RaffleWithNumbers = Prisma.RaffleGetPayload<{
   include: {
     numbers: {
       include: { updatedBy: { select: { name: true } } };
     };
+    accounts: true;
   };
 }>;
 
@@ -35,6 +39,16 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     updatedAt: n.updatedAt.toISOString(),
   }));
 
+  const accounts: RaffleAccountDTO[] = raffle.accounts
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((a) => ({
+      id: a.id,
+      label: a.label,
+      number: a.number,
+      holderName: a.holderName,
+    }));
+
   return {
     id: raffle.id,
     name: raffle.name,
@@ -44,6 +58,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
     status: raffle.status as "active" | "closed",
     numbers,
+    accounts,
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,
     themeTextColor: raffle.themeTextColor,
@@ -56,6 +71,12 @@ const hexColorSchema = z
   .nullable()
   .optional();
 
+const accountSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  number: z.string().trim().min(1).max(60),
+  holderName: z.string().trim().max(80).nullable().optional(),
+});
+
 const updateRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
@@ -64,6 +85,7 @@ const updateRaffleSchema = z.object({
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
+  accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -81,6 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         orderBy: { value: "asc" },
         include: { updatedBy: { select: { name: true } } },
       },
+      accounts: true,
     },
   });
 
@@ -144,7 +167,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.themeNumberColor !== undefined) data.themeNumberColor = input.themeNumberColor;
   if (input.themeTextColor !== undefined) data.themeTextColor = input.themeTextColor;
 
-  await prisma.raffle.update({ where: { id }, data });
+  await prisma.$transaction(async (tx) => {
+    await tx.raffle.update({ where: { id }, data });
+
+    // `accounts` follows the same "undefined vs provided" convention as the
+    // other optional fields: absent means "leave untouched", present means
+    // "this is the complete desired list" (full replace).
+    if (input.accounts !== undefined) {
+      await tx.raffleAccount.deleteMany({ where: { raffleId: id } });
+      if (input.accounts.length > 0) {
+        await tx.raffleAccount.createMany({
+          data: input.accounts.map((account, position) => ({
+            raffleId: id,
+            label: account.label,
+            number: account.number,
+            holderName: account.holderName || null,
+            position,
+          })),
+        });
+      }
+    }
+  });
 
   const updated = await prisma.raffle.findUniqueOrThrow({
     where: { id },
@@ -153,6 +196,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         orderBy: { value: "asc" },
         include: { updatedBy: { select: { name: true } } },
       },
+      accounts: true,
     },
   });
 

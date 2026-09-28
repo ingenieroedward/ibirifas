@@ -1,5 +1,5 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDate, formatNumberValue } from "@/lib/format";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import type { RaffleDTO } from "@/lib/types";
 
@@ -107,30 +107,51 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
 
   // Header block heights are fixed regardless of content length (long titles
   // shrink/truncate instead of wrapping), so total canvas height is fully
-  // computable up front.
-  const HEADER_TOP = 56;
-  const CROWN_HEIGHT = 92;
-  const TITLE_GAP = 26;
-  const TITLE_HEIGHT = 66;
-  const PRIZE_GAP = 18;
-  const PRIZE_HEIGHT = raffle.prizeLabel ? 44 : 0;
-  const PRICE_GAP = raffle.prizeLabel ? 10 : 18;
-  const PRICE_HEIGHT = 38;
-  const DIVIDER_GAP = 30;
-  const LEGEND_HEIGHT = 34;
-  const GRID_TOP_GAP = 34;
-  const GRID_BOTTOM_GAP = 48;
-  const FOOTER_HEIGHT = 46;
+  // computable up front. Optional bands (facts-per-column, accounts) still
+  // add a deterministic amount of height based only on *counts*, never on
+  // measured text, so this stays fully predictable before anything is drawn.
+  const HEADER_TOP = 40;
+  const CROWN_WIDTH = 96;
+  const CROWN_HEIGHT = (40 * CROWN_WIDTH) / 64;
+  const TITLE_GAP = 16;
+  const TITLE_MAX_SIZE = 44;
+  const TITLE_MIN_SIZE = 26;
+  const TITLE_HEIGHT = 52;
+  const FACTS_GAP = 18;
+  const FACTS_HEIGHT = 84;
+  const ACCOUNTS_GAP = 16;
+  // 2 per row (not 3): a chip carrying "Label number · Responsable: Name" needs
+  // real width to stay legible instead of truncating the one detail — the
+  // payee's name — that buyers actually need to read.
+  const ACCOUNTS_PER_ROW = 2;
+  const ACCOUNT_CHIP_HEIGHT = 38;
+  const ACCOUNT_ROW_GAP = 10;
+  const DIVIDER_GAP = 20;
+  const LEGEND_HEIGHT = 30;
+  const GRID_TOP_GAP = 28;
+  const GRID_BOTTOM_GAP = 40;
+  const FOOTER_HEIGHT = 40;
+
+  // "Key facts" band: premio · valor · fecha as short badge-style columns in
+  // one compact card, instead of separate full-width centered lines.
+  const factsColumns: { label: string; value: string }[] = [];
+  if (raffle.prizeLabel) factsColumns.push({ label: "Premio", value: raffle.prizeLabel });
+  factsColumns.push({ label: "Valor", value: formatCurrency(raffle.numberPrice) });
+  if (raffle.drawDate) factsColumns.push({ label: "Fecha", value: formatDate(raffle.drawDate) });
+
+  const accountsCount = raffle.accounts.length;
+  const accountsRows = accountsCount > 0 ? Math.ceil(accountsCount / ACCOUNTS_PER_ROW) : 0;
+  const accountsHeight =
+    accountsRows > 0 ? accountsRows * ACCOUNT_CHIP_HEIGHT + (accountsRows - 1) * ACCOUNT_ROW_GAP : 0;
 
   const headerHeight =
     HEADER_TOP +
     CROWN_HEIGHT +
     TITLE_GAP +
     TITLE_HEIGHT +
-    PRIZE_GAP +
-    PRIZE_HEIGHT +
-    PRICE_GAP +
-    PRICE_HEIGHT +
+    FACTS_GAP +
+    FACTS_HEIGHT +
+    (accountsRows > 0 ? ACCOUNTS_GAP + accountsHeight : 0) +
     DIVIDER_GAP +
     LEGEND_HEIGHT;
 
@@ -169,30 +190,102 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
 
   let cursorY = HEADER_TOP;
 
-  drawCrown(ctx, CANVAS_WIDTH / 2, cursorY, 150, theme.numberColor);
+  drawCrown(ctx, CANVAS_WIDTH / 2, cursorY, CROWN_WIDTH, theme.numberColor);
   cursorY += CROWN_HEIGHT + TITLE_GAP;
 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   const titleMaxWidth = CANVAS_WIDTH - SIDE_PADDING * 2;
-  const { fontSize: titleSize, text: titleText } = fitFontSize(ctx, raffle.name, titleMaxWidth, 56, 30, "800");
+  const { fontSize: titleSize, text: titleText } = fitFontSize(
+    ctx,
+    raffle.name,
+    titleMaxWidth,
+    TITLE_MAX_SIZE,
+    TITLE_MIN_SIZE,
+    "800",
+  );
   ctx.font = `800 ${titleSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
   ctx.fillStyle = theme.numberColor;
   ctx.fillText(titleText, CANVAS_WIDTH / 2, cursorY + titleSize * 0.78);
-  cursorY += TITLE_HEIGHT + PRIZE_GAP;
+  cursorY += TITLE_HEIGHT + FACTS_GAP;
 
-  if (raffle.prizeLabel) {
-    const { fontSize, text } = fitFontSize(ctx, `Premio: ${raffle.prizeLabel}`, titleMaxWidth, 30, 20, "700");
-    ctx.font = `700 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.fillStyle = dark ? "#f5f3ff" : "#131218";
-    ctx.fillText(text, CANVAS_WIDTH / 2, cursorY + fontSize * 0.8);
-    cursorY += PRIZE_HEIGHT + PRICE_GAP;
+  // Facts card: premio / valor / fecha as unified badge-style columns, echoing
+  // the divided-card look of the on-screen prize/price info block instead of
+  // reading as a stack of separate centered lines.
+  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, FACTS_HEIGHT, 20);
+  ctx.fillStyle = soldTileFill;
+  ctx.fill();
+  ctx.strokeStyle = withAlpha(theme.numberColor, 0.3);
+  ctx.lineWidth = 1.5;
+  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, FACTS_HEIGHT, 20);
+  ctx.stroke();
+
+  const colWidth = gridWidth / factsColumns.length;
+  const colPaddingX = 16;
+  ctx.textAlign = "center";
+  factsColumns.forEach((col, i) => {
+    const colCenterX = gridStartX + colWidth * i + colWidth / 2;
+    if (i > 0) {
+      ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(gridStartX + colWidth * i, cursorY + 14);
+      ctx.lineTo(gridStartX + colWidth * i, cursorY + FACTS_HEIGHT - 14);
+      ctx.stroke();
+    }
+
+    ctx.font = `700 15px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText(col.label.toUpperCase(), colCenterX, cursorY + 28);
+
+    const maxValueWidth = colWidth - colPaddingX * 2;
+    const { fontSize, text } = fitFontSize(ctx, col.value, maxValueWidth, 24, 14, "800");
+    ctx.font = `800 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.fillStyle = theme.numberColor;
+    ctx.fillText(text, colCenterX, cursorY + FACTS_HEIGHT - 20);
+  });
+
+  cursorY += FACTS_HEIGHT;
+
+  // Payment accounts: compact pill chips, wrapped at a fixed count per row so
+  // the reserved height only ever depends on how many accounts there are —
+  // omitted entirely (no gap reserved) when the raffle has none.
+  if (accountsRows > 0) {
+    cursorY += ACCOUNTS_GAP;
+    const chipGap = 10;
+    const chipWidth = (gridWidth - chipGap * (ACCOUNTS_PER_ROW - 1)) / ACCOUNTS_PER_ROW;
+
+    raffle.accounts.forEach((account, index) => {
+      const row = Math.floor(index / ACCOUNTS_PER_ROW);
+      const indexInRow = index % ACCOUNTS_PER_ROW;
+      const itemsInRow = Math.min(ACCOUNTS_PER_ROW, accountsCount - row * ACCOUNTS_PER_ROW);
+      const rowWidth = itemsInRow * chipWidth + (itemsInRow - 1) * chipGap;
+      const rowStartX = gridStartX + (gridWidth - rowWidth) / 2;
+      const x = rowStartX + indexInRow * (chipWidth + chipGap);
+      const y = cursorY + row * (ACCOUNT_CHIP_HEIGHT + ACCOUNT_ROW_GAP);
+
+      drawRoundedRect(ctx, x, y, chipWidth, ACCOUNT_CHIP_HEIGHT, ACCOUNT_CHIP_HEIGHT / 2);
+      ctx.fillStyle = withAlpha(theme.numberColor, dark ? 0.14 : 0.1);
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(theme.numberColor, 0.4);
+      ctx.lineWidth = 1.3;
+      drawRoundedRect(ctx, x, y, chipWidth, ACCOUNT_CHIP_HEIGHT, ACCOUNT_CHIP_HEIGHT / 2);
+      ctx.stroke();
+
+      const label = account.holderName
+        ? `${account.label} ${account.number} · Responsable: ${account.holderName}`
+        : `${account.label} ${account.number}`;
+      const { fontSize, text } = fitFontSize(ctx, label, chipWidth - 24, 18, 13, "600");
+      ctx.font = `600 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+      ctx.fillStyle = dark ? "#f5f3ff" : "#131218";
+      ctx.textAlign = "center";
+      ctx.fillText(text, x + chipWidth / 2, y + ACCOUNT_CHIP_HEIGHT / 2 + fontSize * 0.32);
+    });
+
+    cursorY += accountsHeight;
   }
 
-  ctx.font = `600 26px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillStyle = mutedText;
-  ctx.fillText(`Valor por número: ${formatCurrency(raffle.numberPrice)}`, CANVAS_WIDTH / 2, cursorY + 20);
-  cursorY += PRICE_HEIGHT + DIVIDER_GAP;
+  cursorY += DIVIDER_GAP;
 
   // Divider.
   ctx.strokeStyle = withAlpha(theme.numberColor, 0.35);

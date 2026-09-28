@@ -49,6 +49,15 @@ export interface RaffleSummaryDTO {
   themeTextColor?: string | null;
 }
 
+// A payment account the organizer publishes on the raffle (Nequi, Bancolombia,
+// etc.), ordered as entered. `holderName` ("responsable") is shown only when set.
+export interface RaffleAccountDTO {
+  id: string;
+  label: string;
+  number: string;
+  holderName: string | null;
+}
+
 export interface RaffleDTO {
   id: string;
   name: string;
@@ -58,10 +67,20 @@ export interface RaffleDTO {
   drawDate: string | null;
   status: "active" | "closed";
   numbers: RaffleNumberDTO[];
+  accounts: RaffleAccountDTO[];
   /** Grid theme overrides — null means "use the app's default gold/black look". */
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+}
+
+// Full-replace semantics: when `accounts` is present in a create/update
+// request, it's the complete desired list (the organizer adds/removes/reorders
+// freely in the UI and the whole list is sent on save), not a partial patch.
+export interface RaffleAccountInput {
+  label: string;
+  number: string;
+  holderName?: string | null;
 }
 
 export interface CreateRaffleInput {
@@ -73,10 +92,13 @@ export interface CreateRaffleInput {
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  accounts?: RaffleAccountInput[];
 }
 
 // Editing an existing raffle. `totalNumbers` is intentionally absent — changing
 // it after creation would desync the already-created RaffleNumber rows.
+// `accounts`, when present, fully replaces the raffle's payment accounts —
+// omit the field entirely to leave existing accounts untouched.
 export interface UpdateRaffleInput {
   name?: string;
   prizeLabel?: string | null;
@@ -85,6 +107,7 @@ export interface UpdateRaffleInput {
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  accounts?: RaffleAccountInput[];
 }
 
 export interface UpdateNumberInput {
