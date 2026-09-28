@@ -213,15 +213,11 @@ function ActiveToggle({ active, onToggle }: { active: boolean; onToggle: () => v
       role="switch"
       aria-checked={active}
       aria-label={active ? "Desactivar" : "Activar"}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition active:scale-95 ${
-        active ? "bg-gold-400" : "bg-surface-2 ring-1 ring-line"
+      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition active:scale-95 ${
+        active ? "justify-end bg-gold-400" : "justify-start bg-surface-2 ring-1 ring-line"
       }`}
     >
-      <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-          active ? "translate-x-[22px]" : "translate-x-0.5"
-        }`}
-      />
+      <span className="h-6 w-6 shrink-0 rounded-full bg-white shadow transition-transform" />
     </button>
   );
 }
