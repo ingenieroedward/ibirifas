@@ -53,6 +53,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     id: raffle.id,
     name: raffle.name,
     prizeLabel: raffle.prizeLabel,
+    lottery: raffle.lottery,
     numberPrice: raffle.numberPrice,
     totalNumbers: raffle.totalNumbers,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
@@ -80,6 +81,7 @@ const accountSchema = z.object({
 const updateRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
+  lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive().optional(),
   drawDate: z.string().datetime().nullable().optional(),
   themeBackground: hexColorSchema,
@@ -159,6 +161,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (input.name !== undefined) data.name = input.name;
   if (input.prizeLabel !== undefined) data.prizeLabel = input.prizeLabel;
+  if (input.lottery !== undefined) data.lottery = input.lottery;
   if (input.numberPrice !== undefined) data.numberPrice = input.numberPrice;
   if (input.drawDate !== undefined) {
     data.drawDate = input.drawDate ? new Date(input.drawDate) : null;

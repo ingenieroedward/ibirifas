@@ -36,6 +36,7 @@ export interface RaffleSummaryDTO {
   id: string;
   name: string;
   prizeLabel: string | null;
+  lottery: string | null;
   numberPrice: number;
   totalNumbers: number;
   drawDate: string | null;
@@ -62,6 +63,7 @@ export interface RaffleDTO {
   id: string;
   name: string;
   prizeLabel: string | null;
+  lottery: string | null;
   numberPrice: number;
   totalNumbers: number;
   drawDate: string | null;
@@ -86,6 +88,7 @@ export interface RaffleAccountInput {
 export interface CreateRaffleInput {
   name: string;
   prizeLabel?: string | null;
+  lottery?: string | null;
   numberPrice: number;
   totalNumbers?: number; // defaults to 100
   drawDate?: string | null;
@@ -102,6 +105,7 @@ export interface CreateRaffleInput {
 export interface UpdateRaffleInput {
   name?: string;
   prizeLabel?: string | null;
+  lottery?: string | null;
   numberPrice?: number;
   drawDate?: string | null;
   themeBackground?: string | null;

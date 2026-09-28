@@ -70,6 +70,7 @@ async function main() {
       ownerId: organizerUser.id,
       name: "Gran Rifa Sinuano Noche",
       prizeLabel: "Premio $500.000",
+      lottery: "Sinuano Noche",
       numberPrice: 10000,
       totalNumbers: 100,
       drawDate,

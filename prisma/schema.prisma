@@ -55,6 +55,11 @@ model Raffle {
   owner        AdminUser      @relation("RaffleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   name         String
   prizeLabel   String?
+  // The official lottery draw the winning number is taken from (e.g. "Sinuano
+  // Noche", "Baloto") — how informal Colombian raffles actually determine a
+  // winner: the last digits of that lottery's real result on drawDate.
+  // Optional free text; null when the raffle runs its own independent draw.
+  lottery      String?
   numberPrice  Int
   totalNumbers Int            @default(100)
   drawDate     DateTime?
