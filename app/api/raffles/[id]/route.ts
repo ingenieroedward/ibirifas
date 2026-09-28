@@ -19,7 +19,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const raffle = await prisma.raffle.findUnique({
     where: { id },
-    include: { numbers: { orderBy: { value: "asc" } } },
+    include: {
+      numbers: {
+        orderBy: { value: "asc" },
+        include: { updatedBy: { select: { name: true } } },
+      },
+    },
   });
 
   if (!raffle) {
@@ -41,6 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     paymentStatus: n.paymentStatus as PaymentStatus,
     paymentMethod: n.paymentMethod as PaymentMethod | null,
     notes: n.notes,
+    updatedByName: n.updatedBy?.name ?? null,
     updatedAt: n.updatedAt.toISOString(),
   }));
 

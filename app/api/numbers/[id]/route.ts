@@ -132,6 +132,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     paymentStatus: updated.paymentStatus as PaymentStatus,
     paymentMethod: updated.paymentMethod as PaymentMethod | null,
     notes: updated.notes,
+    // We just set updatedBy to the caller in this same request, so no extra
+    // join is needed to know the name.
+    updatedByName: status === "available" ? null : user.name,
     updatedAt: updated.updatedAt.toISOString(),
   };
 

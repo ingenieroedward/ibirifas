@@ -26,6 +26,8 @@ export interface RaffleNumberDTO {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
   notes: string | null;
+  /** Name of whoever last sold/registered this number — useful when a raffle has several sellers. */
+  updatedByName: string | null;
   updatedAt: string;
 }
 
