@@ -34,6 +34,38 @@ export default function HomePage() {
     }
   }, [authLoading, user, router]);
 
+  // Local to this effect on purpose (not the shared useCallback below): the
+  // initial load runs from an effect, and the retry button fetches separately.
+  useEffect(() => {
+    if (!user || user.role === "SUPERADMIN") return;
+    let cancelled = false;
+
+    async function bootstrapRaffles() {
+      try {
+        const data = await getRaffles();
+        if (!cancelled) {
+          setRaffles(data);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "No se pudieron cargar tus rifas. Verifica tu conexión.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingRaffles(false);
+      }
+    }
+
+    bootstrapRaffles();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const loadRaffles = useCallback(async () => {
     setLoadingRaffles(true);
     setError(null);
@@ -50,11 +82,6 @@ export default function HomePage() {
       setLoadingRaffles(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (!user || user.role === "SUPERADMIN") return;
-    loadRaffles();
-  }, [user, loadRaffles]);
 
   // Exactly one raffle: skip the picker entirely.
   useEffect(() => {

@@ -1,8 +1,23 @@
 # Ibirifas
 
-Panel móvil para gestionar rifas: cuadrícula de números disponibles/ocupados,
-registro del comprador con foto del comprobante, y acceso simple por código de
-6 dígitos.
+Plataforma móvil multi-organizador para gestionar rifas: cuadrícula de
+números disponibles/ocupados, registro del comprador con foto del
+comprobante, y acceso simple por código de 6 dígitos.
+
+## Roles
+
+- **Superadmin**: crea cuentas de organizador (y su plan). No administra
+  rifas directamente — pantalla `/usuarios`.
+- **Organizador**: dueño de sus propias rifas. Las crea (`/rifas/nueva`) y
+  crea/gestiona sus propios vendedores (`/usuarios`, mostrada como "Mi
+  equipo").
+- **Vendedor**: creado por un organizador, hereda acceso a *todas* las rifas
+  de ese organizador (aún no hay asignación fina por rifa individual). Solo
+  puede marcar números — no crea rifas ni usuarios.
+
+Cada usuario solo ve los datos de su propio organizador (tenant); el acceso
+cruzado entre organizadores está bloqueado a nivel de API (404, no 403, para
+no filtrar ni la existencia de datos ajenos).
 
 ## Stack
 
@@ -20,19 +35,25 @@ npm run db:seed        # crea la rifa de ejemplo (100 números) y los códigos d
 npm run dev
 ```
 
-El seed imprime dos códigos de acceso de 6 dígitos (organizador y vendedor) —
-cámbialos o crea los tuyos directamente en la base de datos antes de usar la
-app en producción.
+El seed imprime tres códigos de acceso de 6 dígitos (superadmin, organizador
+y vendedor) — úsalos para el primer login y luego crea tus propias cuentas
+desde la app (`/usuarios`); no dependas de estos códigos de ejemplo en
+producción.
 
 ## Modelo de datos
 
-- `Raffle`: una rifa activa con premio, precio por número y fecha del sorteo.
-- `RaffleNumber`: cada número (00-99) con su estado (`available` / `occupied`
-  / `paid`), datos del comprador y foto del comprobante en base64.
-  Incluye `paymentStatus` / `paymentRef`, hoy sin usar más allá de "pending" /
-  "paid" manuales, pensados para conectar una pasarela de pago (Wompi, PSE,
-  Stripe, etc.) sin tener que migrar el esquema.
-- `AdminUser` / `RefreshToken`: usuarios con código de acceso y sus sesiones.
+- `AdminUser`: usuario con código de acceso, `role` (`SUPERADMIN` /
+  `ORGANIZER` / `SELLER`), `ownerId` (un vendedor pertenece a su
+  organizador) y `plan` (placeholder para futuros planes de pago, hoy sin
+  límites reales).
+- `Raffle`: pertenece a un organizador (`ownerId`); premio, precio por
+  número y fecha del sorteo.
+- `RaffleNumber`: cada número con su estado (`available` / `occupied` /
+  `paid`), datos del comprador y foto del comprobante en base64. Incluye
+  `paymentStatus` / `paymentRef`, hoy sin usar más allá de "pending"/"paid"
+  manuales, pensados para conectar una pasarela de pago (Wompi, PSE, Stripe,
+  etc.) sin tener que migrar el esquema.
+- `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Seguridad del login
 
@@ -52,10 +73,11 @@ de tipo **Docker Compose** en Dokploy.
 2. En **Environment Variables** de la app, define al menos:
    - `ACCESS_TOKEN_SECRET` — string aleatorio largo (`openssl rand -hex 32`).
    - `REFRESH_TOKEN_PEPPER` — otro string aleatorio largo, distinto al anterior.
-   - Opcional: `SEED_ORGANIZER_CODE` / `SEED_SELLER_CODE` (6 dígitos cada uno)
-     para fijar los códigos de acceso iniciales. Si no los defines, el primer
-     arranque genera códigos aleatorios y los imprime una sola vez en los
-     logs del contenedor — revísalos ahí antes de que se pierdan.
+   - Opcional: `SEED_SUPERADMIN_CODE` / `SEED_ORGANIZER_CODE` /
+     `SEED_SELLER_CODE` (6 dígitos cada uno) para fijar los códigos de acceso
+     iniciales. Si no los defines, el primer arranque genera códigos
+     aleatorios y los imprime una sola vez en los logs del contenedor —
+     revísalos ahí antes de que se pierdan.
    - Opcional: `APP_PORT` si quieres publicar el contenedor en un puerto de
      host distinto de 3000 (Dokploy puede enrutar por dominio sin esto).
 3. Configura el dominio/puerto de la app en Dokploy apuntando al puerto
