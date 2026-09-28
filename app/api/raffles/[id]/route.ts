@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import type {
   NumberStatus,
+  PaymentMethod,
   PaymentStatus,
   RaffleDTO,
   RaffleNumberDTO,
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     buyerPhone: n.buyerPhone,
     photoDataUrl: n.photoDataUrl,
     paymentStatus: n.paymentStatus as PaymentStatus,
+    paymentMethod: n.paymentMethod as PaymentMethod | null,
     notes: n.notes,
     updatedAt: n.updatedAt.toISOString(),
   }));

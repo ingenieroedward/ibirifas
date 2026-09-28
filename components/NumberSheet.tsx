@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import type { RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
+import type { PaymentMethod, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
 import { fileToCompressedDataUrl } from "@/lib/image";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { Spinner } from "@/components/Spinner";
@@ -18,6 +18,15 @@ const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
   occupied: "Ocupado",
   paid: "Pagado",
 };
+
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: "Efectivo",
+  nequi: "Nequi",
+  transfer: "Transferencia",
+  other: "Otro",
+};
+
+const PAYMENT_METHODS: PaymentMethod[] = ["cash", "nequi", "transfer", "other"];
 
 export function NumberSheet({ number, numberPrice, onClose, onSave }: NumberSheetProps) {
   return (
@@ -61,6 +70,9 @@ function SheetContent({
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    (number.paymentMethod as PaymentMethod | null) ?? "cash",
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAvailable = number.status === "available";
@@ -111,6 +123,7 @@ function SheetContent({
         buyerPhone: number.buyerPhone,
         photoDataUrl: number.photoDataUrl,
         notes: number.notes,
+        paymentMethod,
       });
       onClose();
     } catch {
@@ -286,7 +299,13 @@ function SheetContent({
               )}
               <InfoRow
                 label="Pago"
-                value={number.status === "paid" ? "Pagado" : "Pendiente"}
+                value={
+                  number.status === "paid"
+                    ? number.paymentMethod
+                      ? `Pagado · ${PAYMENT_METHOD_LABEL[number.paymentMethod]}`
+                      : "Pagado"
+                    : "Pendiente"
+                }
               />
             </div>
 
@@ -305,14 +324,36 @@ function SheetContent({
 
             <div className="space-y-2.5">
               {number.status === "occupied" && (
-                <button
-                  type="button"
-                  onClick={handleMarkPaid}
-                  disabled={saving}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-green-400 to-green-600 text-base font-bold text-[#052012] shadow-green transition active:scale-[0.98] disabled:opacity-50"
-                >
-                  {saving ? <Spinner size={20} /> : "Marcar como pagado"}
-                </button>
+                <>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-text-muted">Método de pago</span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {PAYMENT_METHODS.map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          disabled={saving}
+                          className={`h-11 rounded-xl text-xs font-semibold transition active:scale-[0.97] ${
+                            paymentMethod === method
+                              ? "bg-gold-400 text-[#241a02]"
+                              : "border border-line bg-surface-2 text-text-muted"
+                          }`}
+                        >
+                          {PAYMENT_METHOD_LABEL[method]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMarkPaid}
+                    disabled={saving}
+                    className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-green-400 to-green-600 text-base font-bold text-[#052012] shadow-green transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {saving ? <Spinner size={20} /> : "Marcar como pagado"}
+                  </button>
+                </>
               )}
 
               {!confirmingRelease ? (

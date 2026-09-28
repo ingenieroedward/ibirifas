@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
-import type { NumberStatus, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
+import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
 // decoding, but we just need a sane upper bound to protect the DB/response).
@@ -23,6 +23,7 @@ const updateNumberSchema = z.object({
   buyerName: trimmedString(120),
   buyerPhone: trimmedString(120),
   notes: trimmedString(120),
+  paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]).nullable().optional(),
   photoDataUrl: z
     .string()
     .startsWith("data:image/", { message: "photoDataUrl debe ser una imagen data URL" })
@@ -85,6 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       photoDataUrl: null,
       notes: null,
       paymentStatus: "pending" satisfies PaymentStatus,
+      paymentMethod: null,
       updatedBy: { connect: { id: user.id } },
     };
   } else {
@@ -99,10 +101,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const paymentStatus: PaymentStatus = status === "paid" ? "paid" : "pending";
+    // paymentMethod only makes sense once paid; going back to "occupied"
+    // (e.g. undoing a mistaken "pagado") clears it rather than leaving a
+    // stale method behind.
+    const paymentMethod: PaymentMethod | null =
+      status === "paid" ? (input.paymentMethod ?? (existing.paymentMethod as PaymentMethod | null)) : null;
 
     data = {
       status,
       paymentStatus,
+      paymentMethod,
       updatedBy: { connect: { id: user.id } },
     };
 
@@ -122,6 +130,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     buyerPhone: updated.buyerPhone,
     photoDataUrl: updated.photoDataUrl,
     paymentStatus: updated.paymentStatus as PaymentStatus,
+    paymentMethod: updated.paymentMethod as PaymentMethod | null,
     notes: updated.notes,
     updatedAt: updated.updatedAt.toISOString(),
   };

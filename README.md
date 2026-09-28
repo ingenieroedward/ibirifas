@@ -49,10 +49,11 @@ producción.
 - `Raffle`: pertenece a un organizador (`ownerId`); premio, precio por
   número y fecha del sorteo.
 - `RaffleNumber`: cada número con su estado (`available` / `occupied` /
-  `paid`), datos del comprador y foto del comprobante en base64. Incluye
-  `paymentStatus` / `paymentRef`, hoy sin usar más allá de "pending"/"paid"
-  manuales, pensados para conectar una pasarela de pago (Wompi, PSE, Stripe,
-  etc.) sin tener que migrar el esquema.
+  `paid`), datos del comprador y foto del comprobante en base64.
+  `paymentMethod` (`cash` / `nequi` / `transfer` / `other`) registra cómo se
+  cobró en persona. `paymentRef` sigue sin usarse, reservado para cuando se
+  conecte una pasarela de pago (Wompi, PSE, Stripe, etc.) sin tener que
+  migrar el esquema — hoy el cobro es 100% manual por decisión de producto.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Seguridad del login

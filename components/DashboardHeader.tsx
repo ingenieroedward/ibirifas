@@ -22,6 +22,7 @@ export function DashboardHeader({
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
+  const collected = paid * raffle.numberPrice;
 
   return (
     <header className="px-4 pt-safe">
@@ -116,6 +117,13 @@ export function DashboardHeader({
           </span>
         )}
       </div>
+
+      {paid > 0 && (
+        <p className="mt-2 text-sm text-text-muted">
+          <span className="font-semibold text-green-400">{formatCurrency(collected)}</span>{" "}
+          recaudados hasta ahora
+        </p>
+      )}
     </header>
   );
 }

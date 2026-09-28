@@ -70,6 +70,15 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
           {occupied} ocupados
         </span>
       </div>
+
+      {raffle.paidCount > 0 && (
+        <p className="px-4 pb-3 text-xs text-text-muted">
+          <span className="font-semibold text-green-400">
+            {formatCurrency(raffle.paidCount * raffle.numberPrice)}
+          </span>{" "}
+          recaudados
+        </p>
+      )}
     </Link>
   );
 }

@@ -65,8 +65,11 @@ model Raffle {
   @@index([ownerId])
 }
 
-// paymentStatus/paymentRef are unused placeholders today; they exist so a future
-// payment gateway integration only needs to populate them, not migrate the schema.
+// Payments are collected manually today (cash/Nequi/transfer in person) —
+// paymentMethod records how, set by the organizer/seller when marking a
+// number "paid". paymentRef stays an unused placeholder for a future
+// payment-gateway integration (a transaction/reference id), so that
+// integration only needs to populate existing fields, not migrate the schema.
 model RaffleNumber {
   id            String     @id @default(cuid())
   raffleId      String
@@ -77,6 +80,7 @@ model RaffleNumber {
   buyerPhone    String?
   photoDataUrl  String?
   paymentStatus String     @default("pending")
+  paymentMethod String?
   paymentRef    String?
   notes         String?
   updatedById   String?

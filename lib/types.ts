@@ -1,6 +1,8 @@
 export type NumberStatus = "available" | "occupied" | "paid";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 export type Role = "SUPERADMIN" | "ORGANIZER" | "SELLER";
+// How a manual payment was collected in person — no gateway involved yet.
+export type PaymentMethod = "cash" | "nequi" | "transfer" | "other";
 
 export interface AdminUserDTO {
   id: string;
@@ -22,6 +24,7 @@ export interface RaffleNumberDTO {
   buyerPhone: string | null;
   photoDataUrl: string | null;
   paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod | null;
   notes: string | null;
   updatedAt: string;
 }
@@ -64,6 +67,7 @@ export interface UpdateNumberInput {
   buyerName?: string | null;
   buyerPhone?: string | null;
   photoDataUrl?: string | null;
+  paymentMethod?: PaymentMethod | null; // only meaningful when status is "paid"
   notes?: string | null;
 }
 
