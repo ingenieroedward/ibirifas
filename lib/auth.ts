@@ -2,13 +2,19 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import type { NextResponse } from "next/server";
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET as string;
-const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER as string;
+// Read lazily (not at module load) so `next build` can statically evaluate
+// this module for page-data collection without the runtime secrets being
+// set yet — they're only required once a request actually needs them.
+function getAccessTokenSecret(): string {
+  const value = process.env.ACCESS_TOKEN_SECRET;
+  if (!value) throw new Error("ACCESS_TOKEN_SECRET must be set (see .env.example)");
+  return value;
+}
 
-if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_PEPPER) {
-  throw new Error(
-    "ACCESS_TOKEN_SECRET and REFRESH_TOKEN_PEPPER must be set (see .env.example)",
-  );
+function getRefreshTokenPepper(): string {
+  const value = process.env.REFRESH_TOKEN_PEPPER;
+  if (!value) throw new Error("REFRESH_TOKEN_PEPPER must be set (see .env.example)");
+  return value;
 }
 
 export { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "./authCookies";
@@ -22,14 +28,14 @@ export interface AccessTokenPayload {
 }
 
 export function signAccessToken(userId: string): string {
-  return jwt.sign({ sub: userId } satisfies AccessTokenPayload, ACCESS_TOKEN_SECRET, {
+  return jwt.sign({ sub: userId } satisfies AccessTokenPayload, getAccessTokenSecret(), {
     expiresIn: ACCESS_TOKEN_TTL_SECONDS,
   });
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
+    const decoded = jwt.verify(token, getAccessTokenSecret());
     if (typeof decoded === "object" && decoded && typeof decoded.sub === "string") {
       return { sub: decoded.sub };
     }
@@ -45,7 +51,7 @@ export function generateRefreshToken(): string {
 }
 
 export function hashRefreshToken(token: string): string {
-  return crypto.createHmac("sha256", REFRESH_TOKEN_PEPPER as string).update(token).digest("hex");
+  return crypto.createHmac("sha256", getRefreshTokenPepper()).update(token).digest("hex");
 }
 
 /** bcrypt-verified 6-digit login code. Kept separate from token hashing on purpose. */

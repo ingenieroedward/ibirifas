@@ -1,9 +1,26 @@
+import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 const BCRYPT_ROUNDS = 10;
+
+// In production, never fall back to the well-known dev codes (123456/654321) —
+// use SEED_*_CODE if set, otherwise generate a random one and print it once.
+function resolveCode(envVar: string, devFallback: string): { code: string; generated: boolean } {
+  const fromEnv = process.env[envVar];
+  if (fromEnv) {
+    if (!/^\d{6}$/.test(fromEnv)) {
+      throw new Error(`${envVar} must be exactly 6 digits`);
+    }
+    return { code: fromEnv, generated: false };
+  }
+  if (process.env.NODE_ENV === "production") {
+    return { code: crypto.randomInt(0, 1_000_000).toString().padStart(6, "0"), generated: true };
+  }
+  return { code: devFallback, generated: false };
+}
 
 async function main() {
   const existingRaffle = await prisma.raffle.findFirst();
@@ -35,8 +52,8 @@ async function main() {
   });
 
   const credentials = [
-    { name: "Organizador", code: "123456" },
-    { name: "Vendedor", code: "654321" },
+    { name: "Organizador", ...resolveCode("SEED_ORGANIZER_CODE", "123456") },
+    { name: "Vendedor", ...resolveCode("SEED_SELLER_CODE", "654321") },
   ];
 
   for (const { name, code } of credentials) {
@@ -48,8 +65,8 @@ async function main() {
 
   console.log("Seed complete.");
   console.log("Login codes:");
-  for (const { name, code } of credentials) {
-    console.log(`  ${name}: ${code}`);
+  for (const { name, code, generated } of credentials) {
+    console.log(`  ${name}: ${code}${generated ? "  (auto-generated — save it, won't be shown again)" : ""}`);
   }
 }
 
