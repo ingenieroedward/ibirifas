@@ -44,7 +44,12 @@ function refreshSession(): Promise<boolean> {
 }
 
 function redirectToLogin() {
+  // A hard navigation, not a Next.js client transition: this module runs
+  // outside the component tree (no useRouter available) and a full reload
+  // guarantees every bit of in-memory client state is thrown away alongside
+  // the now-invalid session.
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/login";
   }
 }

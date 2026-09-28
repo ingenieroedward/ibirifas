@@ -91,11 +91,6 @@ export default function LoginPage() {
     handleChange(index, text);
   };
 
-  const resetCode = () => {
-    setDigits(Array(CODE_LENGTH).fill(""));
-    focusInput(0);
-  };
-
   const handleSubmit = useCallback(
     async (e?: FormEvent) => {
       e?.preventDefault();
@@ -117,7 +112,8 @@ export default function LoginPage() {
             : "No se pudo conectar. Inténtalo de nuevo.";
         setError(message);
         setSubmitting(false);
-        resetCode();
+        setDigits(Array(CODE_LENGTH).fill(""));
+        focusInput(0);
       }
     },
     [code, isComplete, submitting, refresh, router],

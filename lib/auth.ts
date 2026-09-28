@@ -11,8 +11,8 @@ if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_PEPPER) {
   );
 }
 
-export const ACCESS_TOKEN_COOKIE = "ibirifas_at";
-export const REFRESH_TOKEN_COOKIE = "ibirifas_rt";
+export { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "./authCookies";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "./authCookies";
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
