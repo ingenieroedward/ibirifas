@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
@@ -12,7 +12,8 @@ import {
   updateNumbersBulk,
 } from "@/lib/api-client";
 import { downloadBlob, generateRaffleShareImage } from "@/lib/shareImage";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { useRaffleLive } from "@/lib/useRaffleLive";
 import type { PaymentMethod, RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -21,6 +22,13 @@ import { ParticipantsList } from "@/components/ParticipantsList";
 import { PayManySheet } from "@/components/PayManySheet";
 import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
+
+/** The newest `updatedAt` among the numbers — where a full load leaves the board in sync with the server. */
+function newestUpdate(numbers: RaffleNumberDTO[]): string | null {
+  let newest: string | null = null;
+  for (const n of numbers) if (!newest || n.updatedAt > newest) newest = n.updatedAt;
+  return newest;
+}
 
 /** `undefined` in a PATCH input means "leave unchanged"; `null` means "clear". */
 function resolveField<T>(input: T | null | undefined, current: T | null): T | null {
@@ -47,6 +55,20 @@ export default function RaffleDashboardPage() {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sellingMany, setSellingMany] = useState(false);
   const [payTarget, setPayTarget] = useState<{ buyerName: string; numbers: RaffleNumberDTO[] } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // How far this board is known to be in sync with the server (see useRaffleLive).
+  const syncCursor = useRef<string | null>(null);
+  // Mirrors `raffle` for handlers that need "what did the board look like just before".
+  const raffleRef = useRef<RaffleDTO | null>(null);
+  useEffect(() => {
+    raffleRef.current = raffle;
+  }, [raffle]);
+
+  /** Replace the whole board from a full load and mark it in sync. */
+  const applyFullLoad = useCallback((data: RaffleDTO) => {
+    syncCursor.current = newestUpdate(data.numbers);
+    setRaffle(data);
+  }, []);
 
   // Middleware already redirects unauthenticated requests server-side; this
   // is the client-side fallback for when the session expires in-app.
@@ -76,7 +98,7 @@ export default function RaffleDashboardPage() {
           getRaffles().catch(() => []),
         ]);
         if (!cancelled) {
-          setRaffle(data);
+          applyFullLoad(data);
           setRaffleCount(summaries.length || 1);
           setRaffleError(null);
         }
@@ -91,20 +113,20 @@ export default function RaffleDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, raffleId]);
+  }, [user, raffleId, applyFullLoad]);
 
   const loadRaffle = useCallback(async () => {
     setRaffleLoading(true);
     setRaffleError(null);
     try {
       const data = await getRaffleById(raffleId);
-      setRaffle(data);
+      applyFullLoad(data);
     } catch (err) {
       setRaffleError(raffleErrorMessage(err));
     } finally {
       setRaffleLoading(false);
     }
-  }, [raffleId]);
+  }, [raffleId, applyFullLoad]);
 
   const handleLogout = useCallback(async () => {
     await signOut();
@@ -186,13 +208,71 @@ export default function RaffleDashboardPage() {
   const refreshAfterConflict = useCallback(async () => {
     try {
       const fresh = await getRaffleById(raffleId);
-      setRaffle(fresh);
+      applyFullLoad(fresh);
       const stillFree = new Set(fresh.numbers.filter((n) => n.status === "available").map((n) => n.id));
       setPickedIds((current) => new Set([...current].filter((id) => stillFree.has(id))));
     } catch {
       // The toast already explains the conflict; a failed refresh just leaves stale data.
     }
-  }, [raffleId]);
+  }, [raffleId, applyFullLoad]);
+
+  // The reload button: a full, silent refresh (board stays on screen).
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const fresh = await getRaffleById(raffleId);
+      applyFullLoad(fresh);
+      const stillFree = new Set(fresh.numbers.filter((n) => n.status === "available").map((n) => n.id));
+      const kept = [...pickedIds].filter((id) => stillFree.has(id));
+      setPickedIds(new Set(kept));
+      if (kept.length === 0) setSellingMany(false);
+      show("Tablero actualizado", "success");
+    } catch {
+      show("No se pudo actualizar. Revisa tu conexión.", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, raffleId, applyFullLoad, pickedIds, show]);
+
+  // Changes made by other people, arriving live.
+  const handleLiveChanges = useCallback(
+    (changed: RaffleNumberDTO[]) => {
+      const before = new Map((raffleRef.current?.numbers ?? []).map((n) => [n.id, n]));
+      mergeNumbers(changed);
+
+      // Only announce what someone else did (our own saves come back through
+      // here too, already applied locally, so their status doesn't differ).
+      const byOthers = changed.filter((n) => {
+        const was = before.get(n.id);
+        return was !== undefined && was.status !== n.status && n.updatedByName !== user?.name;
+      });
+
+      // Numbers we had picked that just got taken can't be sold any more.
+      const taken = changed.filter((n) => pickedIds.has(n.id) && n.status !== "available");
+      if (taken.length > 0) {
+        const remaining = [...pickedIds].filter((id) => !taken.some((n) => n.id === id));
+        setPickedIds(new Set(remaining));
+        if (remaining.length === 0) setSellingMany(false);
+      }
+
+      const messages: string[] = [];
+      if (byOthers.length === 1) {
+        const n = byOthers[0]!;
+        const who = n.updatedByName ?? "Alguien";
+        const verb = n.status === "paid" ? "cobró" : n.status === "occupied" ? "vendió" : "liberó";
+        messages.push(`${who} ${verb} el ${formatNumberValue(n.value)}`);
+      } else if (byOthers.length > 1) {
+        messages.push(`${byOthers.length} números actualizados por el equipo`);
+      }
+      if (taken.length > 0) {
+        const list = taken.map((n) => formatNumberValue(n.value)).join(", ");
+        messages.push(`${taken.length === 1 ? "El" : "Los"} ${list} ya no ${taken.length === 1 ? "está disponible" : "están disponibles"}`);
+      }
+      if (messages.length > 0) show(messages.join(" · "), "info");
+    },
+    [mergeNumbers, pickedIds, show, user?.name],
+  );
 
   const handleSellMany = useCallback(
     async (input: { buyerName: string; buyerPhone: string | null; photoDataUrl: string | null }) => {
@@ -243,8 +323,8 @@ export default function RaffleDashboardPage() {
 
   const handleSave = useCallback(
     async (id: string, input: UpdateNumberInput) => {
-      const previous = raffle;
-      if (!previous) return;
+      const original = raffle?.numbers.find((n) => n.id === id);
+      if (!original) return;
 
       const applyInput = (n: RaffleNumberDTO): RaffleNumberDTO => ({
         ...n,
@@ -254,23 +334,22 @@ export default function RaffleDashboardPage() {
         photoDataUrl: resolveField(input.photoDataUrl, n.photoDataUrl),
         notes: resolveField(input.notes, n.notes),
       });
+      // Functional updates touch only this number, so changes other people made
+      // while the request is in flight aren't overwritten by a stale snapshot.
+      const replace = (next: (n: RaffleNumberDTO) => RaffleNumberDTO) =>
+        setRaffle((current) =>
+          current ? { ...current, numbers: current.numbers.map((n) => (n.id === id ? next(n) : n)) } : current,
+        );
 
       // Optimistic update so the tap feels instant.
-      setRaffle({
-        ...previous,
-        numbers: previous.numbers.map((n) => (n.id === id ? applyInput(n) : n)),
-      });
+      replace(applyInput);
 
       try {
         const updated = await updateNumber(id, input);
-        setRaffle((current) =>
-          current
-            ? { ...current, numbers: current.numbers.map((n) => (n.id === id ? updated : n)) }
-            : current,
-        );
+        replace(() => updated);
         show(successMessage(updated), "success");
       } catch (err) {
-        setRaffle(previous);
+        replace(() => original);
         show(
           err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.",
           "error",
@@ -280,6 +359,13 @@ export default function RaffleDashboardPage() {
     },
     [raffle, show],
   );
+
+  const live = useRaffleLive({
+    raffleId,
+    enabled: Boolean(raffle) && Boolean(user) && user?.role !== "SUPERADMIN",
+    cursorRef: syncCursor,
+    onChanges: handleLiveChanges,
+  });
 
   if (authLoading || !user || user.role === "SUPERADMIN") {
     return <FullScreenSpinner />;
@@ -321,24 +407,52 @@ export default function RaffleDashboardPage() {
 
           {!raffleLoading && !raffleError && raffle && (
             <>
-              <div
-                role="tablist"
-                aria-label="Vista de la rifa"
-                className="mb-4 grid grid-cols-2 gap-1 rounded-2xl border border-line bg-bg-elevated p-1"
-              >
-                <ViewTab active={view === "board"} onClick={() => setView("board")}>
-                  Tablero
-                </ViewTab>
-                <ViewTab
-                  active={view === "participants"}
-                  onClick={() => {
-                    exitSelection();
-                    setView("participants");
-                  }}
+              <div className="mb-4 flex items-stretch gap-2">
+                <div
+                  role="tablist"
+                  aria-label="Vista de la rifa"
+                  className="grid flex-1 grid-cols-2 gap-1 rounded-2xl border border-line bg-bg-elevated p-1"
                 >
-                  Participantes
-                </ViewTab>
+                  <ViewTab active={view === "board"} onClick={() => setView("board")}>
+                    Tablero
+                  </ViewTab>
+                  <ViewTab
+                    active={view === "participants"}
+                    onClick={() => {
+                      exitSelection();
+                      setView("participants");
+                    }}
+                  >
+                    Participantes
+                  </ViewTab>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  aria-label="Recargar tablero"
+                  title={live.status === "live" ? "En vivo · toca para recargar" : "Recargar tablero"}
+                  className="relative flex w-14 shrink-0 items-center justify-center rounded-2xl border border-line bg-bg-elevated text-text-muted transition active:scale-95 disabled:opacity-70"
+                >
+                  <RefreshIcon className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+                  <span
+                    aria-hidden="true"
+                    className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-bg-elevated ${
+                      live.status === "live"
+                        ? "bg-green-400"
+                        : live.status === "reconnecting"
+                          ? "animate-pulse bg-gold-400"
+                          : "bg-line"
+                    }`}
+                  />
+                </button>
               </div>
+
+              {live.status === "reconnecting" && (
+                <p role="status" className="-mt-2 mb-3 text-xs font-medium text-gold-400">
+                  Sin conexión en vivo. Reconectando… puedes seguir usando el tablero.
+                </p>
+              )}
 
               {view === "board" ? (
                 <>
@@ -474,6 +588,20 @@ function ViewTab({
     >
       {children}
     </button>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

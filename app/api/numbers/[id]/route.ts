@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam, type SaleEvent } from "@/lib/push";
+import { publishRaffleChange } from "@/lib/realtime";
 import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
@@ -122,6 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updated = await prisma.raffleNumber.update({ where: { id }, data });
+  publishRaffleChange(existing.raffleId);
 
   // Tell the rest of the team, but only for real changes of state — re-saving a
   // buyer's name on an already-sold number isn't news.

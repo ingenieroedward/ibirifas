@@ -217,6 +217,23 @@ export async function sendTestPush(): Promise<void> {
   await request<{ sent: number }>("/api/push/test", { method: "POST" });
 }
 
+/** Numbers changed after `since` (ISO timestamp) — how a board catches up without a full reload. */
+export async function getNumbersSince(raffleId: string, since: string): Promise<RaffleNumberDTO[]> {
+  const { numbers } = await request<{ numbers: RaffleNumberDTO[] }>(
+    `/api/raffles/${raffleId}/numbers?since=${encodeURIComponent(since)}`,
+  );
+  return numbers;
+}
+
+/**
+ * True while there is a valid session, refreshing an expired access token on
+ * the way. Used to recover a dropped live connection without forcing a login
+ * screen; rejects only on network trouble.
+ */
+export async function hasValidSession(): Promise<boolean> {
+  return (await getMe()) !== null;
+}
+
 export async function getUsers(): Promise<ManagedUserDTO[]> {
   return request<ManagedUserDTO[]>("/api/users");
 }
