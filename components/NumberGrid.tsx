@@ -5,6 +5,8 @@ import { NumberCell } from "@/components/NumberCell";
 interface NumberGridProps {
   numbers: RaffleNumberDTO[];
   onSelect: (number: RaffleNumberDTO) => void;
+  /** Hold an available number to start picking several. Leave undefined once already picking. */
+  onLongPress?: (number: RaffleNumberDTO) => void;
   /** Custom grid theme colors, when the raffle has set any — omit to use the default gold look. */
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
@@ -12,7 +14,14 @@ interface NumberGridProps {
   selectedIds?: Set<string>;
 }
 
-export function NumberGrid({ numbers, onSelect, themeNumberColor, themeTextColor, selectedIds }: NumberGridProps) {
+export function NumberGrid({
+  numbers,
+  onSelect,
+  onLongPress,
+  themeNumberColor,
+  themeTextColor,
+  selectedIds,
+}: NumberGridProps) {
   const sorted = useMemo(
     () => [...numbers].sort((a, b) => a.value - b.value),
     [numbers],
@@ -25,6 +34,7 @@ export function NumberGrid({ numbers, onSelect, themeNumberColor, themeTextColor
           key={number.id}
           number={number}
           onTap={onSelect}
+          onLongPress={onLongPress}
           themeNumberColor={themeNumberColor}
           themeTextColor={themeTextColor}
           selected={selectedIds ? selectedIds.has(number.id) : undefined}

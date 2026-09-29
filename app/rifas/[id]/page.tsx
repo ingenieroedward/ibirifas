@@ -168,6 +168,12 @@ export default function RaffleDashboardPage() {
     [selecting],
   );
 
+  const handleLongPress = useCallback((n: RaffleNumberDTO) => {
+    if (n.status !== "available") return;
+    setSelecting(true);
+    setPickedIds(new Set([n.id]));
+  }, []);
+
   const mergeNumbers = useCallback((updated: RaffleNumberDTO[]) => {
     const byId = new Map(updated.map((n) => [n.id, n]));
     setRaffle((current) =>
@@ -340,7 +346,7 @@ export default function RaffleDashboardPage() {
                     <p className="text-sm text-text-muted">
                       {selecting
                         ? "Toca los números que se lleva el comprador."
-                        : "¿Alguien se lleva varios? Selecciónalos juntos."}
+                        : "¿Alguien se lleva varios? Mantén presionado un número."}
                     </p>
                     <button
                       type="button"
@@ -357,6 +363,7 @@ export default function RaffleDashboardPage() {
                   <NumberGrid
                     numbers={raffle.numbers}
                     onSelect={handleGridSelect}
+                    onLongPress={selecting ? undefined : handleLongPress}
                     themeNumberColor={raffle.themeNumberColor}
                     themeTextColor={raffle.themeTextColor}
                     selectedIds={selecting ? pickedIds : undefined}
