@@ -124,6 +124,8 @@ export interface ReserveResultDTO {
   holdDays: number;
   numbers: number[];
   sets: string[];
+  /** Secret that lets this visitor attach their payment receipt to the reservation afterwards. */
+  receiptKey: string;
 }
 
 export type PublicLinkAction = "enable" | "disable" | "regenerate";

@@ -177,6 +177,18 @@ producción. El superadmin entra **sin** código de organización.
   reservas por hora por IP; un número tomado entre tanto responde 409 y no se
   aparta nada. La respuesta pública solo trae lo mismo que antes (nada de
   compradores ni teléfonos ajenos). Endpoint: `POST /api/public/raffles/[token]/reserve`.
+  **Comprobante de pago**: al terminar la reserva, el visitante puede subir su
+  comprobante ("¿Ya pagaste? Sube tu comprobante"): elige una foto o una captura
+  de la galería (sin forzar la cámara) y el navegador la **comprime antes de
+  enviarla** (lado mayor 1000 px, JPEG al 72 %: una foto de varios MB queda en
+  unos cientos de KB, y se muestra el peso final). Se adjunta a todos los números
+  de esa reserva (`RaffleNumber.photoDataUrl`, como en una venta hecha por el
+  equipo), el equipo recibe un aviso y ve la imagen en el número o conjunto y la
+  marca "Con comprobante" en Participantes. Solo quien hizo la reserva puede
+  subirlo: recibe una clave secreta (`holdToken`) que solo sirve para esa
+  reserva y deja de servir cuando los números se liberan o se revenden. Solo
+  acepta JPEG/PNG/WebP (nada de SVG) y hasta 1,5 MB.
+  Endpoint: `POST /api/public/raffles/[token]/receipt`.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso
