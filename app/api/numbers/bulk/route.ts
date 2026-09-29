@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   const found = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
-    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true } } },
+    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true, status: true } } },
   });
 
   const tenantId = tenantIdFor(user);
@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
   }
   if (new Set(found.map((n) => n.raffleId)).size !== 1) {
     return NextResponse.json({ error: "Los números deben ser de la misma rifa" }, { status: 400 });
+  }
+
+  // A closed raffle no longer changes hands; collecting payments and fixing buyer details still works.
+  if (found[0]!.raffle.status === "closed" && (input.action === "sell" || input.action === "release")) {
+    return NextResponse.json({ error: "La rifa está cerrada: ya no se venden ni se liberan números." }, { status: 409 });
   }
 
   // A set is all or nothing.

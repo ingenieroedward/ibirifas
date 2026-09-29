@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { formatCurrency, formatDrawDate } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
 import type { RaffleDTO, Role } from "@/lib/types";
+import { describeHolder } from "@/components/CloseRaffleSheet";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
 import { Spinner } from "@/components/Spinner";
@@ -15,6 +16,12 @@ interface DashboardHeaderProps {
   onLogout: () => void;
   onDownloadImage: () => void;
   downloadingImage: boolean;
+  /** This browser can open the system share sheet with the image (phones), so the button says "Compartir". */
+  canShareImage: boolean;
+  /** Organizer actions on the raffle's life cycle. */
+  onCloseRaffle: () => void;
+  onReopenRaffle: () => void;
+  onDeleteRaffle: () => void;
 }
 
 export function DashboardHeader({
@@ -25,7 +32,12 @@ export function DashboardHeader({
   onLogout,
   onDownloadImage,
   downloadingImage,
+  canShareImage,
+  onCloseRaffle,
+  onReopenRaffle,
+  onDeleteRaffle,
 }: DashboardHeaderProps) {
+  const closed = raffle.status === "closed";
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
@@ -90,7 +102,52 @@ export function DashboardHeader({
                 >
                   Mi equipo
                 </Link>
+                {!closed && (
+                  <button
+                    type="button"
+                    onClick={onCloseRaffle}
+                    className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+                  >
+                    Cerrar rifa
+                  </button>
+                )}
               </>
+            )}
+          </div>
+        )}
+
+        {closed && (
+          <div className="mb-3 rounded-2xl border border-gold-600/50 bg-gold-400/10 p-4" role="status">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Rifa cerrada</p>
+            {raffle.winnerValue !== null ? (
+              <>
+                <p className="mt-1 font-[family-name:var(--font-heading)] text-lg font-extrabold text-text">
+                  Ganó el{" "}
+                  <span className="text-2xl text-gold-400">{formatNumberValue(raffle.winnerValue)}</span>
+                </p>
+                <p className="text-sm text-text-muted">{describeHolder(raffle, raffle.winnerValue)}</p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-text-muted">Se cerró sin registrar un número ganador.</p>
+            )}
+            <p className="mt-1 text-xs text-text-muted">Ya no se venden ni se liberan números; los pagos sí se pueden registrar.</p>
+            {role === "ORGANIZER" && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={onReopenRaffle}
+                  className="h-10 flex-1 rounded-xl border border-gold-600/50 text-sm font-semibold text-gold-400 transition active:scale-[0.98]"
+                >
+                  Reabrir rifa
+                </button>
+                <button
+                  type="button"
+                  onClick={onDeleteRaffle}
+                  className="h-10 flex-1 rounded-xl border border-red-500/40 text-sm font-semibold text-red-400 transition active:scale-[0.98]"
+                >
+                  Eliminar rifa
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -201,7 +258,7 @@ export function DashboardHeader({
           ) : (
             <>
               <DownloadIcon className="h-4 w-4" />
-              Descargar imagen para compartir
+              {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
             </>
           )}
         </button>

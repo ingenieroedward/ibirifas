@@ -92,6 +92,12 @@ model Raffle {
   createdAt    DateTime       @default(now())
   numbers      RaffleNumber[]
 
+  // Set when the organizer closes the raffle after the draw. `winnerValue` is
+  // the winning number (null when it was closed without a draw); it is only
+  // meaningful while status is "closed".
+  winnerValue  Int?
+  closedAt     DateTime?
+
   // Per-raffle grid theme override (hex strings like "#0b0b0f"). Null means
   // "use the app's default gold/black look" — these are opt-in, not required.
   themeBackground   String?

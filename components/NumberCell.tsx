@@ -17,6 +17,8 @@ interface NumberCellProps {
   selected?: boolean;
   /** In selection mode, numbers that can't be picked (already taken) are dimmed. */
   dimmed?: boolean;
+  /** This is the winning number of a closed raffle. */
+  winner?: boolean;
 }
 
 const LONG_PRESS_MS = 450;
@@ -39,6 +41,7 @@ export function NumberCell({
   themeTextColor,
   selected,
   dimmed,
+  winner,
 }: NumberCellProps) {
   const hasPhoto = Boolean(number.photoDataUrl);
 
@@ -102,12 +105,20 @@ export function NumberCell({
         }
         onTap(number);
       }}
-      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}${selected ? ", seleccionado" : ""}`}
+      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}${selected ? ", seleccionado" : ""}${winner ? ", ganador" : ""}`}
       aria-pressed={selected === undefined ? undefined : selected}
       style={style}
-      className={`relative flex aspect-square select-none [-webkit-touch-callout:none] items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 sm:text-lg ${useCustomTheme ? "" : STATUS_CLASSES[number.status]} ${dimmed ? "opacity-30" : ""} ${selected ? "scale-95 ring-4 ring-white ring-offset-2 ring-offset-bg" : ""}`}
+      className={`relative flex aspect-square select-none [-webkit-touch-callout:none] items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 sm:text-lg ${useCustomTheme ? "" : STATUS_CLASSES[number.status]} ${dimmed ? "opacity-30" : ""} ${selected ? "scale-95 ring-4 ring-white ring-offset-2 ring-offset-bg" : ""} ${winner ? "ring-4 ring-gold-300 ring-offset-2 ring-offset-bg" : ""}`}
     >
       {formatNumberValue(number.value)}
+      {winner && (
+        <span
+          aria-hidden="true"
+          className="absolute -left-1.5 -top-2 rounded-full bg-gold-300 px-1.5 text-[9px] font-black uppercase leading-4 text-[#241a02] shadow-sm"
+        >
+          Ganó
+        </span>
+      )}
       {selected && (
         <span
           aria-hidden="true"

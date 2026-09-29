@@ -56,6 +56,12 @@ producción. El superadmin entra **sin** código de organización.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.
+- **Imagen para compartir**: en el celular el botón "Compartir imagen" abre
+  directo el menú del sistema (Guardar imagen en Fotos, WhatsApp, etc.) usando
+  la Web Share API con archivos. Si el navegador lo rechaza (por ejemplo, pasó
+  mucho tiempo desde el toque), o no puede compartir archivos, se abre una hoja
+  con la imagen para compartirla, descargarla o guardarla manteniéndola
+  presionada. En computador sigue siendo una descarga directa.
 - `RaffleNumber`: cada número con su estado (`available` / `occupied` /
   `paid`), datos del comprador y foto del comprobante en base64.
   `paymentMethod` (`cash` / `nequi` / `transfer` / `other`) registra cómo se
@@ -74,6 +80,17 @@ producción. El superadmin entra **sin** código de organización.
   de un conjunto y `/api/numbers/[id]` rechaza tocar un número que es de un
   conjunto. Además de `sell` y `pay`, el endpoint acepta `unpay`, `release` y
   `edit` (corregir nombre/teléfono del comprador), todos atómicos.
+- **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
+  con el número ganador (o sin él si terminó sin sorteo). Se guardan
+  `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación
+  ("Ganó el 47: María Pérez") y el ganador queda marcado en el tablero, en las
+  letras, en Participantes y en el listado. Una rifa cerrada **no vende ni
+  libera** números (el servidor responde 409), pero sí deja registrar,
+  deshacer o corregir pagos y datos del comprador. "Reabrir rifa" la vuelve a
+  abrir y olvida al ganador. "Eliminar rifa" solo existe para rifas cerradas,
+  pide escribir el nombre de la rifa y borra todo (números, compradores,
+  comprobantes) sin vuelta atrás. Los tableros abiertos se enteran en vivo:
+  `/api/raffles/[id]/numbers` devuelve también el estado de la rifa.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso

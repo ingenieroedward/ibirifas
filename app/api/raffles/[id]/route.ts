@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { toNumberDTO } from "@/lib/numberDto";
+import { formatNumberValue } from "@/lib/format";
+import { notifyTeam } from "@/lib/push";
+import { publishRaffleChange } from "@/lib/realtime";
 import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 
@@ -46,6 +49,8 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     totalNumbers: raffle.totalNumbers,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
     status: raffle.status as "active" | "closed",
+    winnerValue: raffle.winnerValue,
+    closedAt: raffle.closedAt ? raffle.closedAt.toISOString() : null,
     numbers,
     accounts,
     groups,
@@ -68,6 +73,8 @@ const accountSchema = z.object({
 });
 
 const updateRaffleSchema = z.object({
+  status: z.enum(["active", "closed"]).optional(),
+  winnerValue: z.number().int().min(0).nullable().optional(),
   name: z.string().trim().min(1).max(120).optional(),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   lottery: z.string().trim().max(80).nullable().optional(),
@@ -160,6 +167,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.themeNumberColor !== undefined) data.themeNumberColor = input.themeNumberColor;
   if (input.themeTextColor !== undefined) data.themeTextColor = input.themeTextColor;
 
+  // Closing and reopening. Closing records the winner (or none) and the moment;
+  // reopening forgets both. The winner can also be corrected while it's closed.
+  const wasClosed = existing.status === "closed";
+  const nextStatus = input.status ?? existing.status;
+  if (nextStatus === "active") {
+    if (input.winnerValue !== undefined && input.winnerValue !== null) {
+      return NextResponse.json({ error: "Solo una rifa cerrada puede tener ganador" }, { status: 400 });
+    }
+    if (wasClosed) {
+      data.status = "active";
+      data.winnerValue = null;
+      data.closedAt = null;
+    }
+  } else {
+    if (input.winnerValue !== undefined && input.winnerValue !== null && input.winnerValue >= existing.totalNumbers) {
+      return NextResponse.json({ error: `El número ${input.winnerValue} no existe en esta rifa` }, { status: 400 });
+    }
+    if (!wasClosed) {
+      data.status = "closed";
+      data.closedAt = new Date();
+      data.winnerValue = input.winnerValue ?? null;
+    } else if (input.winnerValue !== undefined) {
+      data.winnerValue = input.winnerValue;
+    }
+  }
+  const justClosed = !wasClosed && nextStatus === "closed";
+
   await prisma.$transaction(async (tx) => {
     await tx.raffle.update({ where: { id }, data });
 
@@ -194,5 +228,54 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     },
   });
 
+  // Every open board learns the raffle closed (or reopened) right away.
+  if (justClosed || (wasClosed && nextStatus === "active")) publishRaffleChange(id);
+
+  if (justClosed) {
+    const winnerNumber =
+      updated.winnerValue === null ? null : (updated.numbers.find((n) => n.value === updated.winnerValue) ?? null);
+    const setLabel = winnerNumber?.groupId
+      ? (updated.groups.find((g) => g.id === winnerNumber.groupId)?.label ?? null)
+      : null;
+    let body: string;
+    if (updated.winnerValue === null) {
+      body = `${user.name} cerró la rifa`;
+    } else if (winnerNumber && winnerNumber.status !== "available") {
+      const who = winnerNumber.buyerName ?? "un comprador";
+      body = `Ganó el ${formatNumberValue(updated.winnerValue)}${setLabel ? ` (conjunto ${setLabel})` : ""}: ${who}`;
+    } else {
+      body = `Ganó el ${formatNumberValue(updated.winnerValue)}: nadie lo compró`;
+    }
+    void notifyTeam(tenantId, user.id, { title: `${updated.name} · rifa cerrada`, body, url: `/rifas/${id}` });
+  }
+
   return NextResponse.json(toRaffleDTO(updated));
+}
+
+/**
+ * Deletes a raffle for good — its numbers, buyers, receipts and payment
+ * accounts go with it. Only a closed raffle can be deleted, so a raffle that is
+ * still selling can't disappear by a slip of the finger.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+  if (user.role !== "ORGANIZER") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const existing = await prisma.raffle.findUnique({ where: { id }, select: { ownerId: true, status: true } });
+  const tenantId = tenantIdFor(user);
+  if (!existing || !tenantId || existing.ownerId !== tenantId) {
+    return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
+  }
+  if (existing.status !== "closed") {
+    return NextResponse.json({ error: "Cierra la rifa antes de eliminarla." }, { status: 409 });
+  }
+
+  await prisma.raffle.delete({ where: { id } });
+  return new NextResponse(null, { status: 204 });
 }

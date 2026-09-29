@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
-import { getNumbersSince, hasValidSession } from "@/lib/api-client";
+import { getNumbersSince, hasValidSession, type NumbersSince } from "@/lib/api-client";
 import type { RaffleNumberDTO } from "@/lib/types";
 
 export type LiveStatus = "connecting" | "live" | "reconnecting";
@@ -25,6 +25,8 @@ interface Options {
   cursorRef: RefObject<string | null>;
   /** Called with numbers that changed since the cursor. */
   onChanges: (numbers: RaffleNumberDTO[]) => void;
+  /** Called after every catch-up with the raffle's own state (open/closed, winner); the caller ignores what it already knows. */
+  onRaffleState?: (state: NumbersSince["raffle"]) => void;
 }
 
 /**
@@ -36,14 +38,16 @@ interface Options {
  * the network returns, and every 30s as a safety net — so a missed signal
  * delays an update but never loses it.
  */
-export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges }: Options) {
+export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges, onRaffleState }: Options) {
   const router = useRouter();
   const [status, setStatus] = useState<LiveStatus>("connecting");
 
   // Latest callback, so the connection isn't torn down on every render.
   const onChangesRef = useRef(onChanges);
+  const onRaffleStateRef = useRef(onRaffleState);
   useEffect(() => {
     onChangesRef.current = onChanges;
+    onRaffleStateRef.current = onRaffleState;
   });
 
   const syncing = useRef(false);
@@ -64,7 +68,8 @@ export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges }: Optio
         // Strictly-after: two different numbers changed in the very same
         // millisecond, straddling one client's read, could be missed. The
         // reload button always recovers that.
-        const changed = await getNumbersSince(raffleId, cursor);
+        const { numbers: changed, raffle } = await getNumbersSince(raffleId, cursor);
+        onRaffleStateRef.current?.(raffle);
         if (changed.length > 0) {
           cursorRef.current = changed.reduce((max, n) => (n.updatedAt > max ? n.updatedAt : max), cursor);
           onChangesRef.current(changed);

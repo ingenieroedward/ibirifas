@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const raffle = await prisma.raffle.findUnique({ where: { id }, select: { ownerId: true } });
+  const raffle = await prisma.raffle.findUnique({ where: { id }, select: { ownerId: true, status: true, winnerValue: true } });
   const tenantId = tenantIdFor(user);
   // 404 for missing and for someone else's raffle alike, so existence doesn't leak.
   if (!raffle || !tenantId || raffle.ownerId !== tenantId) {
@@ -34,5 +34,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     include: { updatedBy: { select: { name: true } } },
   });
 
-  return NextResponse.json({ numbers: changed.map(toNumberDTO) }, { headers: { "Cache-Control": "no-store" } });
+  // The raffle's own state rides along, so a board also learns it was closed or reopened.
+  return NextResponse.json(
+    {
+      numbers: changed.map(toNumberDTO),
+      raffle: {
+        status: raffle.status as "active" | "closed",
+        winnerValue: raffle.status === "closed" ? raffle.winnerValue : null,
+      },
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
