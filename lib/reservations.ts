@@ -33,3 +33,10 @@ export function reservationsOpen(input: {
 export function phoneDigits(phone: string | null | undefined): string {
   return (phone ?? "").replace(/\D/g, "");
 }
+
+/** Same person's phone with or without the country code: "3001234567" and "+57 300 123 4567" match. */
+export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
+  const tail = (p: string | null | undefined) => phoneDigits(p).slice(-10);
+  const x = tail(a);
+  return x.length >= 7 && x === tail(b);
+}
