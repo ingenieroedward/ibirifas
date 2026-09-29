@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
 import type { RaffleDTO, Role } from "@/lib/types";
+import { CopyButton } from "@/components/CopyButton";
 import { describeHolder } from "@/components/CloseRaffleSheet";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
@@ -307,14 +308,15 @@ export function DashboardHeader({
             {raffle.accounts.length > 0 && (
               <div className="space-y-1 border-t border-line px-4 py-2.5 text-sm text-text-muted">
                 {raffle.accounts.map((account) => (
-                  <div key={account.id} className="flex items-start gap-2">
-                    <WalletIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
-                    <span>
+                  <div key={account.id} className="flex items-center gap-2">
+                    <WalletIcon className="h-4 w-4 shrink-0 text-gold-400" />
+                    <span className="min-w-0 flex-1">
                       <span className="font-medium text-text">{account.label}</span> {account.number}
                       {account.holderName && (
                         <span className="text-text-muted"> · Responsable: {account.holderName}</span>
                       )}
                     </span>
+                    <CopyButton text={account.number} label={`número de ${account.label}`} />
                   </div>
                 ))}
               </div>
