@@ -45,6 +45,8 @@ export interface RaffleSummaryDTO {
   totalNumbers: number;
   drawDate: string | null;
   status: "active" | "closed";
+  /** The winning number of a closed raffle (null: still open, or closed without a draw). */
+  winnerValue: number | null;
   availableCount: number;
   occupiedCount: number;
   paidCount: number;
@@ -83,6 +85,9 @@ export interface RaffleDTO {
   totalNumbers: number;
   drawDate: string | null;
   status: "active" | "closed";
+  /** The winning number once the raffle is closed; null while open or when closed without a draw. */
+  winnerValue: number | null;
+  closedAt: string | null;
   numbers: RaffleNumberDTO[];
   accounts: RaffleAccountDTO[];
   /** Lettered sets in order (A, B, C…); empty for a raffle sold number by number. */
@@ -133,6 +138,10 @@ export interface CreateRaffleInput {
 // `accounts`, when present, fully replaces the raffle's payment accounts —
 // omit the field entirely to leave existing accounts untouched.
 export interface UpdateRaffleInput {
+  /** "closed" ends the sales; "active" reopens the raffle (and forgets the winner). */
+  status?: "active" | "closed";
+  /** Only with status "closed": the number that won, or null for a raffle closed without a draw. */
+  winnerValue?: number | null;
   name?: string;
   prizeLabel?: string | null;
   lottery?: string | null;

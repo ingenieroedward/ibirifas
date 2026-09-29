@@ -12,6 +12,8 @@ interface NumberGridProps {
   themeTextColor?: string | null;
   /** When set, the grid is in "pick several" mode: these ids are the picked ones. */
   selectedIds?: Set<string>;
+  /** The winning number of a closed raffle, highlighted on the board. */
+  winnerValue?: number | null;
 }
 
 export function NumberGrid({
@@ -21,6 +23,7 @@ export function NumberGrid({
   themeNumberColor,
   themeTextColor,
   selectedIds,
+  winnerValue,
 }: NumberGridProps) {
   const sorted = useMemo(
     () => [...numbers].sort((a, b) => a.value - b.value),
@@ -39,6 +42,7 @@ export function NumberGrid({
           themeTextColor={themeTextColor}
           selected={selectedIds ? selectedIds.has(number.id) : undefined}
           dimmed={selectedIds ? number.status !== "available" : undefined}
+          winner={winnerValue === number.value}
         />
       ))}
     </div>

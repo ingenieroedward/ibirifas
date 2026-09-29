@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RaffleSummaryDTO } from "@/lib/types";
-import { formatCurrency, formatDrawDate } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 
 interface RafflePickerProps {
   raffles: RaffleSummaryDTO[];
@@ -8,11 +8,26 @@ interface RafflePickerProps {
 
 /** Card list used to choose which raffle to open, shown to ORGANIZER/SELLER with 2+ raffles. */
 export function RafflePicker({ raffles }: RafflePickerProps) {
+  const open = raffles.filter((r) => r.status !== "closed");
+  const closed = raffles.filter((r) => r.status === "closed");
+
   return (
     <div className="flex flex-col gap-3">
-      {raffles.map((raffle) => (
+      {open.map((raffle) => (
         <RaffleCard key={raffle.id} raffle={raffle} />
       ))}
+      {closed.length > 0 && (
+        <>
+          {open.length > 0 && (
+            <h2 className="mt-3 font-[family-name:var(--font-heading)] text-sm font-semibold uppercase tracking-wide text-text-muted">
+              Rifas cerradas
+            </h2>
+          )}
+          {closed.map((raffle) => (
+            <RaffleCard key={raffle.id} raffle={raffle} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -36,7 +51,7 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
         </div>
         {raffle.status === "closed" && (
           <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-            Cerrada
+            {raffle.winnerValue !== null ? `Ganó el ${formatNumberValue(raffle.winnerValue)}` : "Cerrada"}
           </span>
         )}
       </div>

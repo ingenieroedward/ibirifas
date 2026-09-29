@@ -10,6 +10,8 @@ interface ParticipantsListProps {
   groups: RaffleGroupDTO[];
   /** Worth of some numbers, counting sets at their set price. */
   priceOf: (subset: RaffleNumberDTO[]) => number;
+  /** The winning number of a closed raffle; whoever holds it is flagged. */
+  winnerValue?: number | null;
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -66,7 +68,7 @@ function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   return list;
 }
 
-export function ParticipantsList({ numbers, groups, priceOf, onSelect, onPayAll }: ParticipantsListProps) {
+export function ParticipantsList({ numbers, groups, priceOf, winnerValue, onSelect, onPayAll }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -173,6 +175,7 @@ export function ParticipantsList({ numbers, groups, priceOf, onSelect, onPayAll 
               participant={p}
               groups={groups}
               priceOf={priceOf}
+              isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
               onPayAll={onPayAll}
             />
@@ -202,12 +205,14 @@ function ParticipantCard({
   participant: p,
   groups,
   priceOf,
+  isWinner,
   onSelect,
   onPayAll,
 }: {
   participant: Participant;
   groups: RaffleGroupDTO[];
   priceOf: (subset: RaffleNumberDTO[]) => number;
+  isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
 }) {
@@ -217,7 +222,14 @@ function ParticipantCard({
   const paidItems = holdings.length - pendingItems;
 
   return (
-    <li className="rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+    <li
+      className={`rounded-2xl border bg-bg-elevated p-4 shadow-card ${isWinner ? "border-gold-300 ring-2 ring-gold-300" : "border-line"}`}
+    >
+      {isWinner && (
+        <p className="mb-2 inline-block rounded-full bg-gold-300 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#241a02]">
+          Ganador
+        </p>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words font-[family-name:var(--font-heading)] text-lg font-bold leading-tight text-text">

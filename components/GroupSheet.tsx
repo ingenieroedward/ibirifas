@@ -15,6 +15,8 @@ interface GroupSheetProps {
   members: RaffleNumberDTO[];
   /** Names already used in this raffle, offered as suggestions so one buyer isn't typed two ways. */
   knownBuyers: string[];
+  /** False once the raffle is closed: sets can no longer be freed. */
+  canRelease?: boolean;
   onClose: () => void;
   onSell: (input: { buyerName: string; buyerPhone: string | null; photoDataUrl: string | null }) => Promise<void>;
   onPay: (method: PaymentMethod) => Promise<void>;
@@ -29,7 +31,7 @@ const STATUS_LABEL = { available: "Disponible", occupied: "Vendido · pendiente 
  * Everything you can do with a lettered set. A set is one unit: it's sold to a
  * single buyer for its own price, and collected or freed as a whole.
  */
-export function GroupSheet({ group, members, knownBuyers, onClose, onSell, onPay, onUnpay, onEdit, onRelease }: GroupSheetProps) {
+export function GroupSheet({ group, members, knownBuyers, canRelease = true, onClose, onSell, onPay, onUnpay, onEdit, onRelease }: GroupSheetProps) {
   const status = groupStatus(members);
   const first = members[0];
 
@@ -292,7 +294,7 @@ export function GroupSheet({ group, members, knownBuyers, onClose, onSell, onPay
               </button>
             )}
 
-            {!confirmingRelease ? (
+            {!canRelease ? null : !confirmingRelease ? (
               <button
                 type="button"
                 onClick={() => setConfirmingRelease(true)}

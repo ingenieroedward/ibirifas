@@ -6,8 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
 import {
   ApiError,
+  deleteRaffle,
   getRaffleById,
   getRaffles,
+  setRaffleStatus,
   updateNumber,
   updateNumbersBulk,
 } from "@/lib/api-client";
@@ -24,7 +26,9 @@ import type {
   RaffleNumberDTO,
   UpdateNumberInput,
 } from "@/lib/types";
+import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { DeleteRaffleSheet } from "@/components/DeleteRaffleSheet";
 import { GroupedBoard } from "@/components/GroupedBoard";
 import { GroupSheet } from "@/components/GroupSheet";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -59,6 +63,8 @@ export default function RaffleDashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The lettered set whose sheet is open (raffles sold in sets).
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [closingRaffle, setClosingRaffle] = useState(false);
+  const [deletingRaffle, setDeletingRaffle] = useState(false);
   // Only used to decide whether the "back to picker" link is worth showing.
   const [raffleCount, setRaffleCount] = useState(1);
   const [downloadingImage, setDownloadingImage] = useState(false);
@@ -163,6 +169,8 @@ export default function RaffleDashboardPage() {
 
   const selected = raffle?.numbers.find((n) => n.id === selectedId) ?? null;
   const hasGroups = (raffle?.groups.length ?? 0) > 0;
+  const raffleClosed = raffle?.status === "closed";
+  const isOrganizer = user?.role === "ORGANIZER";
   // Numbers outside every set: sold one by one, at the raffle's number price.
   const looseNumbers = useMemo(
     () => (raffle?.numbers ?? []).filter((n) => n.groupId === null),
@@ -176,10 +184,91 @@ export default function RaffleDashboardPage() {
   );
 
   /** A number opened from anywhere (board, participants): sets open as a whole. */
-  const openNumber = useCallback((n: RaffleNumberDTO) => {
-    if (n.groupId) setOpenGroupId(n.groupId);
-    else setSelectedId(n.id);
-  }, []);
+  const openNumber = useCallback(
+    (n: RaffleNumberDTO) => {
+      // Once closed nothing new is sold; sold numbers still open (to record a payment).
+      if (raffleRef.current?.status === "closed" && n.status === "available") {
+        show("La rifa está cerrada: ya no se venden números.", "info");
+        return;
+      }
+      if (n.groupId) setOpenGroupId(n.groupId);
+      else setSelectedId(n.id);
+    },
+    [show],
+  );
+
+  const openGroupCard = useCallback(
+    (g: RaffleGroupDTO) => {
+      const members = numbersOfGroup(raffleRef.current?.numbers ?? [], g.id);
+      if (raffleRef.current?.status === "closed" && members.every((n) => n.status === "available")) {
+        show("La rifa está cerrada: ya no se venden conjuntos.", "info");
+        return;
+      }
+      setOpenGroupId(g.id);
+    },
+    [show],
+  );
+
+  const handleCloseRaffle = useCallback(
+    async (winnerValue: number | null) => {
+      try {
+        const updated = await setRaffleStatus(raffleId, { status: "closed", winnerValue });
+        setRaffle((current) =>
+          current ? { ...current, status: updated.status, winnerValue: updated.winnerValue, closedAt: updated.closedAt } : current,
+        );
+        // Nothing new can be sold any more: drop a half-made selection.
+        setSelecting(false);
+        setPickedIds(new Set());
+        setSellingMany(false);
+        setClosingRaffle(false);
+        show("Rifa cerrada", "success");
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo cerrar la rifa. Inténtalo de nuevo.", "error");
+        throw err;
+      }
+    },
+    [raffleId, show],
+  );
+
+  const handleReopenRaffle = useCallback(async () => {
+    try {
+      const updated = await setRaffleStatus(raffleId, { status: "active" });
+      setRaffle((current) =>
+        current ? { ...current, status: updated.status, winnerValue: null, closedAt: null } : current,
+      );
+      show("Rifa reabierta", "success");
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "No se pudo reabrir la rifa.", "error");
+    }
+  }, [raffleId, show]);
+
+  const handleDeleteRaffle = useCallback(async () => {
+    try {
+      await deleteRaffle(raffleId);
+      router.replace("/");
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "No se pudo eliminar la rifa.", "error");
+      throw err;
+    }
+  }, [raffleId, router, show]);
+
+  // The raffle was closed or reopened by someone else (or in another tab).
+  const handleRaffleState = useCallback(
+    (state: { status: "active" | "closed"; winnerValue: number | null }) => {
+      const current = raffleRef.current;
+      if (!current || (current.status === state.status && current.winnerValue === state.winnerValue)) return;
+      setRaffle({ ...current, status: state.status, winnerValue: state.winnerValue });
+      if (current.status !== state.status) {
+        show(state.status === "closed" ? "La rifa se cerró" : "La rifa se reabrió", "info");
+        if (state.status === "closed") {
+          setPickedIds(new Set());
+          setSelecting(false);
+          setSellingMany(false);
+        }
+      }
+    },
+    [show],
+  );
 
   const knownBuyers = useMemo(() => {
     const byKey = new Map<string, string>();
@@ -222,7 +311,7 @@ export default function RaffleDashboardPage() {
   );
 
   const handleLongPress = useCallback((n: RaffleNumberDTO) => {
-    if (n.status !== "available") return;
+    if (n.status !== "available" || raffleRef.current?.status === "closed") return;
     setSelecting(true);
     setPickedIds(new Set([n.id]));
   }, []);
@@ -427,6 +516,7 @@ export default function RaffleDashboardPage() {
     enabled: Boolean(raffle) && Boolean(user) && user?.role !== "SUPERADMIN",
     cursorRef: syncCursor,
     onChanges: handleLiveChanges,
+    onRaffleState: handleRaffleState,
   });
 
   if (authLoading || !user || user.role === "SUPERADMIN") {
@@ -447,6 +537,9 @@ export default function RaffleDashboardPage() {
           onLogout={handleLogout}
           onDownloadImage={handleDownloadImage}
           downloadingImage={downloadingImage}
+          onCloseRaffle={() => setClosingRaffle(true)}
+          onReopenRaffle={handleReopenRaffle}
+          onDeleteRaffle={() => setDeletingRaffle(true)}
         />
       )}
 
@@ -521,12 +614,15 @@ export default function RaffleDashboardPage() {
                   {hasGroups && (
                     <section aria-label="Conjuntos" className="mb-6">
                       <p className="mb-3 text-sm text-text-muted">
-                        Cada letra se vende completa a un solo comprador. Toca una para venderla o gestionarla.
+                        {raffleClosed
+                          ? "Rifa cerrada: toca una letra vendida para registrar su pago."
+                          : "Cada letra se vende completa a un solo comprador. Toca una para venderla o gestionarla."}
                       </p>
                       <GroupedBoard
                         groups={raffle.groups}
                         numbers={raffle.numbers}
-                        onOpenGroup={(g) => setOpenGroupId(g.id)}
+                        onOpenGroup={openGroupCard}
+                        winnerValue={raffle.winnerValue}
                         themeNumberColor={raffle.themeNumberColor}
                         themeTextColor={raffle.themeTextColor}
                       />
@@ -540,31 +636,34 @@ export default function RaffleDashboardPage() {
                           Números sueltos · {formatCurrency(raffle.numberPrice)} c/u
                         </h2>
                       )}
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-sm text-text-muted">
-                          {selecting
-                            ? "Toca los números que se lleva el comprador."
-                            : "¿Alguien se lleva varios? Mantén presionado un número."}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => (selecting ? exitSelection() : setSelecting(true))}
-                          className={`h-10 shrink-0 rounded-full px-4 text-xs font-semibold transition active:scale-95 ${
-                            selecting
-                              ? "border border-line text-text-muted"
-                              : "border border-gold-600/50 text-gold-400"
-                          }`}
-                        >
-                          {selecting ? "Cancelar" : "Seleccionar varios"}
-                        </button>
-                      </div>
+                      {!raffleClosed && (
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="text-sm text-text-muted">
+                            {selecting
+                              ? "Toca los números que se lleva el comprador."
+                              : "¿Alguien se lleva varios? Mantén presionado un número."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+                            className={`h-10 shrink-0 rounded-full px-4 text-xs font-semibold transition active:scale-95 ${
+                              selecting
+                                ? "border border-line text-text-muted"
+                                : "border border-gold-600/50 text-gold-400"
+                            }`}
+                          >
+                            {selecting ? "Cancelar" : "Seleccionar varios"}
+                          </button>
+                        </div>
+                      )}
                       <NumberGrid
                         numbers={looseNumbers}
                         onSelect={handleGridSelect}
-                        onLongPress={selecting ? undefined : handleLongPress}
+                        onLongPress={selecting || raffleClosed ? undefined : handleLongPress}
                         themeNumberColor={raffle.themeNumberColor}
                         themeTextColor={raffle.themeTextColor}
                         selectedIds={selecting ? pickedIds : undefined}
+                        winnerValue={raffle.winnerValue}
                       />
                     </section>
                   )}
@@ -574,6 +673,7 @@ export default function RaffleDashboardPage() {
                   numbers={raffle.numbers}
                   groups={raffle.groups}
                   priceOf={pricer}
+                  winnerValue={raffle.winnerValue}
                   onSelect={openNumber}
                   onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
                 />
@@ -610,13 +710,27 @@ export default function RaffleDashboardPage() {
         number={selected}
         numberPrice={raffle?.numberPrice ?? 0}
         knownBuyers={knownBuyers}
+        canRelease={!raffleClosed}
         onClose={() => setSelectedId(null)}
         onSave={handleSave}
       />
 
+      {closingRaffle && raffle && isOrganizer && (
+        <CloseRaffleSheet raffle={raffle} onClose={() => setClosingRaffle(false)} onConfirm={handleCloseRaffle} />
+      )}
+
+      {deletingRaffle && raffle && isOrganizer && (
+        <DeleteRaffleSheet
+          raffleName={raffle.name}
+          onClose={() => setDeletingRaffle(false)}
+          onConfirm={handleDeleteRaffle}
+        />
+      )}
+
       {openGroup && (
         <GroupSheet
           key={`${openGroup.id}-${openGroupMembers[0]?.status ?? ""}`}
+          canRelease={!raffleClosed}
           group={openGroup}
           members={openGroupMembers}
           knownBuyers={knownBuyers}

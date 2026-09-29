@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await prisma.raffleNumber.findUnique({
     where: { id },
     include: {
-      raffle: { select: { ownerId: true, name: true, numberPrice: true } },
+      raffle: { select: { ownerId: true, name: true, numberPrice: true, status: true } },
       group: { select: { label: true } },
     },
   });
@@ -89,6 +89,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const input = parsed.data;
   const status: NumberStatus = input.status;
+
+  // A closed raffle no longer changes hands: no new sales, no freeing numbers.
+  // Payments and buyer details can still be kept up to date.
+  if (existing.raffle.status === "closed" && (existing.status === "available" || status === "available")) {
+    return NextResponse.json({ error: "La rifa está cerrada: ya no se venden ni se liberan números." }, { status: 409 });
+  }
 
   let data: Prisma.RaffleNumberUpdateInput;
 

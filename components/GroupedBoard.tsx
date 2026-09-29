@@ -13,12 +13,14 @@ interface GroupedBoardProps {
   /** Custom grid theme colors, when the raffle has set any — omit to use the default gold look. */
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  /** The winning number of a closed raffle; the set that holds it is flagged. */
+  winnerValue?: number | null;
 }
 
 const STATUS_TEXT = { available: "Disponible", occupied: "Pendiente de pago", paid: "Pagado" } as const;
 
 /** One card per lettered set: its numbers, its price, and who has it. Tap to sell or manage it. */
-export function GroupedBoard({ groups, numbers, onOpenGroup, themeNumberColor, themeTextColor }: GroupedBoardProps) {
+export function GroupedBoard({ groups, numbers, onOpenGroup, themeNumberColor, themeTextColor, winnerValue }: GroupedBoardProps) {
   const membersByGroup = useMemo(() => {
     const map = new Map<string, RaffleNumberDTO[]>();
     for (const n of numbers) {
@@ -45,15 +47,18 @@ export function GroupedBoard({ groups, numbers, onOpenGroup, themeNumberColor, t
         const members = membersByGroup.get(group.id) ?? [];
         const status = groupStatus(members);
         const buyer = members.find((n) => n.buyerName)?.buyerName ?? null;
+        const wins = winnerValue !== null && winnerValue !== undefined && members.some((n) => n.value === winnerValue);
 
         return (
           <li key={group.id}>
             <button
               type="button"
               onClick={() => onOpenGroup(group)}
-              aria-label={`Conjunto ${group.label}, ${STATUS_TEXT[status].toLowerCase()}, ${formatCurrency(group.price)}`}
+              aria-label={`Conjunto ${group.label}, ${STATUS_TEXT[status].toLowerCase()}, ${formatCurrency(group.price)}${wins ? ", ganador" : ""}`}
               className={`block w-full rounded-2xl border p-3.5 text-left shadow-card transition active:scale-[0.98] ${
-                status === "available"
+                wins
+                  ? "border-gold-300 ring-2 ring-gold-300"
+                  : status === "available"
                   ? "border-gold-600/40 bg-bg-elevated"
                   : status === "paid"
                     ? "border-green-500/40 bg-bg-elevated"
@@ -81,6 +86,11 @@ export function GroupedBoard({ groups, numbers, onOpenGroup, themeNumberColor, t
                     {members.length} {members.length === 1 ? "número" : "números"}
                     {buyer && ` · ${buyer}`}
                   </p>
+                  {wins && (
+                    <p className="text-xs font-bold text-gold-300">
+                      Ganó el {formatNumberValue(winnerValue!)}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${

@@ -218,11 +218,27 @@ export async function sendTestPush(): Promise<void> {
 }
 
 /** Numbers changed after `since` (ISO timestamp) — how a board catches up without a full reload. */
-export async function getNumbersSince(raffleId: string, since: string): Promise<RaffleNumberDTO[]> {
-  const { numbers } = await request<{ numbers: RaffleNumberDTO[] }>(
-    `/api/raffles/${raffleId}/numbers?since=${encodeURIComponent(since)}`,
-  );
-  return numbers;
+export async function getNumbersSince(raffleId: string, since: string): Promise<NumbersSince> {
+  return request<NumbersSince>(`/api/raffles/${raffleId}/numbers?since=${encodeURIComponent(since)}`);
+}
+
+export interface NumbersSince {
+  numbers: RaffleNumberDTO[];
+  /** Whether the raffle is still selling, and who won once it's closed. */
+  raffle: { status: "active" | "closed"; winnerValue: number | null };
+}
+
+/** Close a raffle (optionally with the winning number) or reopen it. */
+export async function setRaffleStatus(
+  id: string,
+  input: { status: "active" } | { status: "closed"; winnerValue: number | null },
+): Promise<RaffleDTO> {
+  return request<RaffleDTO>(`/api/raffles/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+/** Permanently delete a closed raffle. */
+export async function deleteRaffle(id: string): Promise<void> {
+  await request<void>(`/api/raffles/${id}`, { method: "DELETE" });
 }
 
 /**

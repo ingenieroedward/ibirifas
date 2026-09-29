@@ -12,6 +12,8 @@ interface NumberSheetProps {
   numberPrice: number;
   /** Names already used in this raffle, offered as suggestions so one buyer isn't typed two ways. */
   knownBuyers?: string[];
+  /** False once the raffle is closed: numbers can no longer be freed. */
+  canRelease?: boolean;
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
 }
@@ -22,7 +24,7 @@ const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
   paid: "Pagado",
 };
 
-export function NumberSheet({ number, numberPrice, knownBuyers = [], onClose, onSave }: NumberSheetProps) {
+export function NumberSheet({ number, numberPrice, knownBuyers = [], canRelease = true, onClose, onSave }: NumberSheetProps) {
   if (!number) return null;
 
   return (
@@ -39,6 +41,7 @@ export function NumberSheet({ number, numberPrice, knownBuyers = [], onClose, on
         number={number}
         numberPrice={numberPrice}
         knownBuyers={knownBuyers}
+        canRelease={canRelease}
         onClose={onClose}
         onSave={onSave}
       />
@@ -50,12 +53,14 @@ function SheetContent({
   number,
   numberPrice,
   knownBuyers,
+  canRelease,
   onClose,
   onSave,
 }: {
   number: RaffleNumberDTO;
   numberPrice: number;
   knownBuyers: string[];
+  canRelease: boolean;
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
 }) {
@@ -314,7 +319,7 @@ function SheetContent({
                 </>
               )}
 
-              {!confirmingRelease ? (
+              {!canRelease ? null : !confirmingRelease ? (
                 <button
                   type="button"
                   onClick={() => setConfirmingRelease(true)}

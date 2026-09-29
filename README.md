@@ -74,6 +74,17 @@ producción. El superadmin entra **sin** código de organización.
   de un conjunto y `/api/numbers/[id]` rechaza tocar un número que es de un
   conjunto. Además de `sell` y `pay`, el endpoint acepta `unpay`, `release` y
   `edit` (corregir nombre/teléfono del comprador), todos atómicos.
+- **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
+  con el número ganador (o sin él si terminó sin sorteo). Se guardan
+  `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación
+  ("Ganó el 47: María Pérez") y el ganador queda marcado en el tablero, en las
+  letras, en Participantes y en el listado. Una rifa cerrada **no vende ni
+  libera** números (el servidor responde 409), pero sí deja registrar,
+  deshacer o corregir pagos y datos del comprador. "Reabrir rifa" la vuelve a
+  abrir y olvida al ganador. "Eliminar rifa" solo existe para rifas cerradas,
+  pide escribir el nombre de la rifa y borra todo (números, compradores,
+  comprobantes) sin vuelta atrás. Los tableros abiertos se enteran en vivo:
+  `/api/raffles/[id]/numbers` devuelve también el estado de la rifa.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso
