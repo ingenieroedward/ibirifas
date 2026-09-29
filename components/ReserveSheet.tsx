@@ -117,7 +117,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
           {items.map((item) => (
             <span
               key={item}
-              className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-[#241a02]"
+              className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-on-accent"
             >
               {item}
             </span>
@@ -173,7 +173,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
                   type="button"
                   onClick={sendReceipt}
                   disabled={sendingReceipt || preparing}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 text-sm font-bold text-[#241a02] shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 text-sm font-bold text-on-accent shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {sendingReceipt ? (
                     <>
@@ -210,7 +210,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         {items.map((item) => (
           <span
             key={item}
-            className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-[#241a02]"
+            className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-on-accent"
           >
             {item}
           </span>
@@ -264,7 +264,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         type="button"
         onClick={submit}
         disabled={saving}
-        className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 text-base font-bold text-[#241a02] shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 text-base font-bold text-on-accent shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
       >
         {saving ? (
           <>

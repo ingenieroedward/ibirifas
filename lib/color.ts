@@ -61,3 +61,33 @@ export function luminance(hex: string): number {
   };
   return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 }
+
+/** WCAG contrast ratio between two colors (1..21). */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+const DARK_INK = "#15110a";
+
+/** White or a near-black, whichever reads better on top of `background`. */
+export function readableText(background: string): string {
+  return contrastRatio("#ffffff", background) >= contrastRatio(DARK_INK, background) ? "#ffffff" : DARK_INK;
+}
+
+/**
+ * `color` nudged toward black or white (whichever direction the backgrounds call for) until it
+ * reaches `min` contrast against every one of `backgrounds`; the color itself when it already does.
+ */
+export function ensureContrast(color: string, backgrounds: string[], min = 4.5): string {
+  const ok = (c: string) => backgrounds.every((bg) => contrastRatio(c, bg) >= min);
+  if (ok(color)) return color;
+  const brightness = backgrounds.reduce((sum, bg) => sum + luminance(bg), 0) / backgrounds.length;
+  const toward = brightness > 0.4 ? -1 : 1;
+  let out = color;
+  for (let step = 1; step <= 20; step++) {
+    out = mix(color, toward * step * 0.05);
+    if (ok(out)) return out;
+  }
+  return toward > 0 ? "#ffffff" : "#000000";
+}
