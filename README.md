@@ -69,6 +69,19 @@ producción. El superadmin entra **sin** código de organización.
   en buscadores, el endpoint público limita 60 consultas por minuto por IP y
   eliminar la rifa mata el enlace. Los vendedores pueden copiarlo si está
   activo, pero solo el organizador lo administra.
+- **Instalar la app**: la pantalla de ingreso tiene un botón "Instalar app". Donde
+  el navegador lo permite (Android, Chrome, Edge) instala con un toque usando
+  `beforeinstallprompt`; en iPhone/iPad, que no tiene ese evento, abre los pasos
+  Compartir → Añadir a pantalla de inicio. No aparece si la app ya está
+  instalada ni si el navegador no puede instalarla. `public/sw.js` tiene un
+  `fetch` vacío (algunos navegadores lo piden para considerar el sitio
+  instalable) y sigue sin guardar nada en caché.
+- **Encabezado plegable**: en el tablero, el botón "Detalles / Ocultar" pliega
+  la tarjeta de premio y precio, las cuentas de pago y los botones de imagen y
+  enlace, para que en el celular el tablero de números quede a la vista. Nombre,
+  contadores, lo recaudado y el aviso de rifa cerrada siempre se ven, y una
+  flecha lleva a "Mis rifas". La elección se recuerda en el dispositivo
+  (`localStorage`); la primera vez todo aparece abierto.
 - **Cobrar por WhatsApp**: en Participantes, cada comprador que debe tiene
   "Recordar pago" y el que ya pagó algo tiene "Enviar comprobante". Abren
   WhatsApp (`wa.me`) con el mensaje escrito: sus números o letras, el total, las

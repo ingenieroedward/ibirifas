@@ -689,10 +689,8 @@ export default function RaffleDashboardPage() {
                       )}
                       {!raffleClosed && (
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <p className="text-sm text-text-muted">
-                            {selecting
-                              ? "Toca los números que se lleva el comprador."
-                              : "¿Alguien se lleva varios? Mantén presionado un número."}
+                          <p className="text-xs text-text-muted">
+                            {selecting ? "Toca los números" : "Mantén presionado un número"}
                           </p>
                           <button
                             type="button"

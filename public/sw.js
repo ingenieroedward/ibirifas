@@ -2,6 +2,12 @@
 // and shows it, even with the app closed. It deliberately caches nothing, so
 // it can never serve a stale copy of the app.
 
+// Some browsers only treat a site as installable when its service worker has a
+// fetch handler. This one does nothing (every request goes straight to the
+// network), so it still can't serve a stale copy; modern browsers skip an
+// empty handler entirely, so it costs nothing.
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
