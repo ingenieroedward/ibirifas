@@ -26,6 +26,12 @@ model AdminUser {
   owner         AdminUser?     @relation("OwnedUsers", fields: [ownerId], references: [id], onDelete: Cascade)
   ownedUsers    AdminUser[]    @relation("OwnedUsers")
 
+  // Set only on ORGANIZERs (the tenant root). The "which organization" half of
+  // logging in: an organizer's team (the organizer plus their sellers) shares
+  // it, and login codes only need to be unique inside that team. A SELLER's
+  // organization code is their organizer's; a SUPERADMIN has none.
+  orgCode       String?        @unique
+
   // Only meaningful for ORGANIZER; a placeholder for a future paid-plans
   // system the superadmin will configure — unused/unenforced today.
   plan          String         @default("free")

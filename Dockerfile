@@ -30,6 +30,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+# prisma/seed.ts runs at every start (see docker-entrypoint.sh) and imports this
+# one pure helper from lib/. If seed.ts ever imports anything else from lib/, copy it here too.
+COPY --from=builder /app/lib/orgCode.ts ./lib/orgCode.ts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

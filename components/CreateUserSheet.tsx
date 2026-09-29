@@ -4,19 +4,22 @@ import { useState } from "react";
 import { ApiError, createUser } from "@/lib/api-client";
 import type { ManagedUserDTO } from "@/lib/types";
 import { CodeInput } from "@/components/CodeInput";
+import { isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP, slugifyOrgCode } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
 interface CreateUserSheetProps {
   open: boolean;
   /** e.g. "organizador" or "vendedor" — used only in copy. */
   targetRoleLabel: string;
+  /** The superadmin creating an organizer also chooses the organization's code. */
+  askOrgCode: boolean;
   onClose: () => void;
   onCreated: (user: ManagedUserDTO) => void;
 }
 
 const CODE_LENGTH = 6;
 
-export function CreateUserSheet({ open, targetRoleLabel, onClose, onCreated }: CreateUserSheetProps) {
+export function CreateUserSheet({ open, targetRoleLabel, askOrgCode, onClose, onCreated }: CreateUserSheetProps) {
   if (!open) return null;
 
   return (
@@ -28,27 +31,33 @@ export function CreateUserSheet({ open, targetRoleLabel, onClose, onCreated }: C
         aria-hidden="true"
         className="absolute inset-0 animate-fade-in bg-black/70 backdrop-blur-sm"
       />
-      <SheetContent targetRoleLabel={targetRoleLabel} onClose={onClose} onCreated={onCreated} />
+      <SheetContent targetRoleLabel={targetRoleLabel} askOrgCode={askOrgCode} onClose={onClose} onCreated={onCreated} />
     </div>
   );
 }
 
 function SheetContent({
   targetRoleLabel,
+  askOrgCode,
   onClose,
   onCreated,
 }: {
   targetRoleLabel: string;
+  askOrgCode: boolean;
   onClose: () => void;
   onCreated: (user: ManagedUserDTO) => void;
 }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  // Follows the name until the person edits it by hand.
+  const [orgCodeInput, setOrgCodeInput] = useState<string | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isComplete = name.trim().length > 0 && code.length === CODE_LENGTH;
+  const orgCode = orgCodeInput ?? (name.trim() ? slugifyOrgCode(name) : "");
+  const orgCodeValid = !askOrgCode || isValidOrgCode(normalizeOrgCode(orgCode));
+  const isComplete = name.trim().length > 0 && code.length === CODE_LENGTH && orgCodeValid;
 
   const handleSubmit = async () => {
     const trimmedName = name.trim();
@@ -60,10 +69,18 @@ function SheetContent({
       setFormError("El código debe tener 6 dígitos.");
       return;
     }
+    if (!orgCodeValid) {
+      setFormError(`Código de organización inválido. ${ORG_CODE_HELP}`);
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
-      const created = await createUser({ name: trimmedName, code });
+      const created = await createUser({
+        name: trimmedName,
+        code,
+        ...(askOrgCode ? { orgCode: normalizeOrgCode(orgCode) } : {}),
+      });
       onCreated(created);
     } catch (err) {
       // 409 = code already in use by another user; the server message is
@@ -121,6 +138,32 @@ function SheetContent({
             className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
           />
         </div>
+
+        {askOrgCode && (
+          <div className="space-y-1.5">
+            <label htmlFor="newUserOrgCode" className="text-sm font-medium text-text-muted">
+              Código de organización <span className="text-gold-400">*</span>
+            </label>
+            <input
+              id="newUserOrgCode"
+              type="text"
+              value={orgCode}
+              onChange={(e) => setOrgCodeInput(e.target.value)}
+              placeholder="ej. rifas-norte"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
+              disabled={saving}
+              className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+            />
+            <p className="text-xs text-text-muted">
+              Es lo que esta organización y sus vendedores escriben al ingresar, junto con su código de 6 dígitos.
+              {" "}
+              {ORG_CODE_HELP}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <span className="text-sm font-medium text-text-muted">

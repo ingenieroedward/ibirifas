@@ -8,6 +8,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const dto: MeDTO = { id: user.id, name: user.name, role: user.role, plan: user.plan };
+  const dto: MeDTO = { id: user.id, name: user.name, role: user.role, plan: user.plan, orgCode: user.orgCode };
   return NextResponse.json(dto);
 }

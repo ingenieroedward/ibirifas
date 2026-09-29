@@ -9,6 +9,7 @@ services:
       DATABASE_URL: file:/app/data/prod.db
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?set ACCESS_TOKEN_SECRET in Dokploy's environment variables}
       REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?set REFRESH_TOKEN_PEPPER in Dokploy's environment variables}
+      SEED_ORG_CODE: ${SEED_ORG_CODE:-}
       SEED_SUPERADMIN_CODE: ${SEED_SUPERADMIN_CODE:-}
       SEED_ORGANIZER_CODE: ${SEED_ORGANIZER_CODE:-}
       SEED_SELLER_CODE: ${SEED_SELLER_CODE:-}

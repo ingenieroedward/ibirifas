@@ -29,6 +29,8 @@ export interface SessionUser {
   role: Role;
   ownerId: string | null;
   plan: string;
+  /** The organization code this person logs in under (see lib/orgCode.ts). */
+  orgCode: string | null;
 }
 
 /**
@@ -41,10 +43,21 @@ export async function getCurrentUser(req: NextRequest): Promise<SessionUser | nu
   const userId = getCurrentUserId(req);
   if (!userId) return null;
 
-  const user = await prisma.adminUser.findUnique({ where: { id: userId } });
+  const user = await prisma.adminUser.findUnique({
+    where: { id: userId },
+    include: { owner: { select: { orgCode: true } } },
+  });
   if (!user || !user.active) return null;
 
-  return { id: user.id, name: user.name, role: user.role as Role, ownerId: user.ownerId, plan: user.plan };
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role as Role,
+    ownerId: user.ownerId,
+    plan: user.plan,
+    // Organizers carry their own code; sellers belong to their organizer's.
+    orgCode: user.orgCode ?? user.owner?.orgCode ?? null,
+  };
 }
 
 /**

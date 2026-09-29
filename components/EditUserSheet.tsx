@@ -5,20 +5,24 @@ import { ApiError, updateUser } from "@/lib/api-client";
 import type { ManagedUserDTO, UpdateUserInput } from "@/lib/types";
 import { BottomSheet } from "@/components/BottomSheet";
 import { CodeInput } from "@/components/CodeInput";
+import { isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
 interface EditUserSheetProps {
   user: ManagedUserDTO;
   /** e.g. "organizador" or "vendedor" — used only in copy. */
   targetRoleLabel: string;
+  /** The superadmin can rename an organizer's organization code. */
+  canEditOrgCode: boolean;
   onClose: () => void;
   onSaved: (user: ManagedUserDTO) => void;
 }
 
 const CODE_LENGTH = 6;
 
-export function EditUserSheet({ user, targetRoleLabel, onClose, onSaved }: EditUserSheetProps) {
+export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, onSaved }: EditUserSheetProps) {
   const [name, setName] = useState(user.name);
+  const [orgCode, setOrgCode] = useState(user.orgCode ?? "");
   const [code, setCode] = useState("");
   const [resetSignal, setResetSignal] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -26,7 +30,8 @@ export function EditUserSheet({ user, targetRoleLabel, onClose, onSaved }: EditU
 
   const nameChanged = name.trim() !== user.name;
   const codeChanged = code.length > 0;
-  const canSave = (nameChanged || codeChanged) && name.trim().length > 0;
+  const orgCodeChanged = canEditOrgCode && normalizeOrgCode(orgCode) !== (user.orgCode ?? "");
+  const canSave = (nameChanged || codeChanged || orgCodeChanged) && name.trim().length > 0;
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -39,8 +44,14 @@ export function EditUserSheet({ user, targetRoleLabel, onClose, onSaved }: EditU
       return;
     }
 
+    if (orgCodeChanged && !isValidOrgCode(normalizeOrgCode(orgCode))) {
+      setFormError(`Código de organización inválido. ${ORG_CODE_HELP}`);
+      return;
+    }
+
     const input: UpdateUserInput = {};
     if (nameChanged) input.name = trimmedName;
+    if (orgCodeChanged) input.orgCode = normalizeOrgCode(orgCode);
     if (codeChanged) input.code = code;
 
     setSaving(true);
@@ -73,6 +84,29 @@ export function EditUserSheet({ user, targetRoleLabel, onClose, onSaved }: EditU
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </div>
+
+      {canEditOrgCode && (
+        <div className="space-y-1.5">
+          <label htmlFor="editUserOrgCode" className="text-sm font-medium text-text-muted">
+            Código de organización
+          </label>
+          <input
+            id="editUserOrgCode"
+            type="text"
+            value={orgCode}
+            onChange={(e) => setOrgCode(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            disabled={saving}
+            className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+          />
+          <p className="text-xs text-text-muted">
+            Si lo cambias, esta organización y sus vendedores tendrán que usar el nuevo al ingresar.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <span className="text-sm font-medium text-text-muted">Código de acceso nuevo (opcional)</span>

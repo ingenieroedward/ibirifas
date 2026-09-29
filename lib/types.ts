@@ -14,6 +14,8 @@ export interface MeDTO {
   name: string;
   role: Role;
   plan: string;
+  /** The organization this person belongs to (an organizer's own, a seller's organizer's). Null for the superadmin. */
+  orgCode: string | null;
 }
 
 export interface RaffleNumberDTO {
@@ -143,16 +145,22 @@ export interface ManagedUserDTO {
   role: Role;
   active: boolean;
   plan: string;
+  /** The organization code this account logs in under. */
+  orgCode: string | null;
   createdAt: string;
 }
 
 export interface CreateUserInput {
   name: string;
   code: string; // 6 digits
+  /** Superadmin creating an organizer only; generated from the name when omitted. */
+  orgCode?: string;
 }
 
 export interface UpdateUserInput {
   name?: string;
+  /** Superadmin renaming an organizer's organization code. */
+  orgCode?: string;
   active?: boolean;
   code?: string; // reset to a new 6-digit code
   plan?: string; // SUPERADMIN only, only meaningful when target role is ORGANIZER
