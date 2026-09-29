@@ -87,6 +87,9 @@ producción. El superadmin entra **sin** código de organización.
   instalada ni si el navegador no puede instalarla. `public/sw.js` tiene un
   `fetch` vacío (algunos navegadores lo piden para considerar el sitio
   instalable) y sigue sin guardar nada en caché.
+- **Botones de la cabecera del tablero**: "Mis rifas / Crear rifa / Mi equipo /
+  Cerrar rifa" van siempre en una sola fila; en el celular usan etiquetas cortas
+  (Nueva, Equipo, Cerrar) y, por debajo de 360 px, sin la flecha.
 - **Encabezado plegable**: en el tablero, el botón "Detalles / Ocultar" pliega
   la tarjeta de premio y precio, las cuentas de pago y los botones de imagen y
   enlace, para que en el celular el tablero de números quede a la vista. Nombre,
@@ -188,7 +191,16 @@ producción. El superadmin entra **sin** código de organización.
   subirlo: recibe una clave secreta (`holdToken`) que solo sirve para esa
   reserva y deja de servir cuando los números se liberan o se revenden. Solo
   acepta JPEG/PNG/WebP (nada de SVG) y hasta 1,5 MB.
-  Endpoint: `POST /api/public/raffles/[token]/receipt`.
+  **Subirlo más tarde**: en la página pública el botón "Ya reservé: subir mi
+  comprobante" pide el teléfono con el que se reservó (el mismo que se recuerda del
+  formulario) y la imagen; no hace falta la clave. El teléfono identifica la
+  reserva (con o sin `+57`), solo alcanza reservas hechas en línea y **aún sin
+  pagar** (no las vendidas por el equipo ni las ya pagadas), y si hay varias con
+  el mismo teléfono la imagen va a las que todavía no tienen comprobante. Como un
+  teléfono es una identidad débil, se limita a 10 intentos por hora por IP, y la
+  respuesta de "no encontramos" no dice si el teléfono existe o si la reserva se
+  liberó. Endpoint: `POST /api/public/raffles/[token]/receipt` con `key` (justo
+  después de reservar) o con `phone`.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso
@@ -330,6 +342,11 @@ entonces los cambios con su propia sesión (`/api/raffles/:id/numbers?since=…`
 Esa misma puesta al día se ejecuta al reconectar, al volver a abrir la app y
 cada 30 segundos, así que si la conexión en vivo se pierde o algún proxy la
 retiene, el tablero igual se actualiza (con unos segundos de retraso).
+
+Al volver a la app tras cerrarla o dejarla en segundo plano (el celular corta la
+conexión), se abre una conexión nueva de inmediato, y el aviso "Sin conexión en
+vivo" solo aparece si la conexión sigue caída pasados unos 4 segundos, así que ya
+no parpadea al reabrir.
 
 Límites a tener en cuenta:
 

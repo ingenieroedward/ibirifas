@@ -11,6 +11,8 @@ export type LiveStatus = "connecting" | "live" | "reconnecting";
 // on screen. If a proxy silently swallows the stream, the board still updates.
 const SAFETY_POLL_MS = 30_000;
 const MAX_RETRY_DELAY_MS = 15_000;
+// How long a dropped connection may stay down before the person is told about it.
+const RECONNECT_NOTICE_DELAY_MS = 4_000;
 
 interface Options {
   raffleId: string;
@@ -89,7 +91,18 @@ export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges, onRaffl
     let stopped = false;
     let source: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let noticeTimer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
+
+    // A dropped connection is normal (a phone suspends the app, the network blinks) and
+    // usually heals in a second, so the "reconnecting" notice only appears if it doesn't.
+    const flagReconnecting = () => {
+      if (noticeTimer || document.visibilityState !== "visible") return;
+      noticeTimer = setTimeout(() => {
+        noticeTimer = undefined;
+        setStatus("reconnecting");
+      }, RECONNECT_NOTICE_DELAY_MS);
+    };
 
     const connect = () => {
       if (stopped) return;
@@ -98,13 +111,15 @@ export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges, onRaffl
 
       es.onopen = () => {
         failures = 0;
+        clearTimeout(noticeTimer);
+        noticeTimer = undefined;
         setStatus("live");
         // Whatever happened while we were away.
         void sync();
       };
       es.addEventListener("changed", () => void sync());
       es.onerror = () => {
-        setStatus("reconnecting");
+        flagReconnecting();
         // While CONNECTING the browser retries by itself. CLOSED means it gave
         // up — typically a 401 because the 15-minute access token expired — so
         // renew the session ourselves and open a fresh connection.
@@ -122,10 +137,29 @@ export function useRaffleLive({ raffleId, enabled, cursorRef, onChanges, onRaffl
       };
     };
 
+    // Coming back to the app (or the network returning) after it was closed or in the
+    // background: the old connection is dead or stale, so open a fresh one right away
+    // instead of waiting for the browser's own retry or our backoff.
+    const wake = () => {
+      if (stopped || document.visibilityState !== "visible") return;
+      if (source?.readyState === EventSource.OPEN) return;
+      clearTimeout(retryTimer);
+      source?.close();
+      failures = 0;
+      connect();
+    };
+
     connect();
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("pageshow", wake);
     return () => {
       stopped = true;
       clearTimeout(retryTimer);
+      clearTimeout(noticeTimer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("pageshow", wake);
       source?.close();
     };
   }, [enabled, raffleId, sync, router]);

@@ -5,6 +5,7 @@ import { darken, lighten, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
+import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { ReserveSheet } from "@/components/ReserveSheet";
 
 const REFRESH_MS = 20_000;
@@ -51,6 +52,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   // Frozen when the sheet opens: the picks become sold (ours) while the sheet still shows the confirmation.
   const [reserving, setReserving] = useState<{ numbers: number[]; sets: string[]; total: number } | null>(null);
   const [limitNote, setLimitNote] = useState<string | null>(null);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
 
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
@@ -189,6 +191,17 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 ? `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"} para pagar.`
                 : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
             </p>
+          )}
+          {canReserve && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setSendingReceipt(true)}
+                className="rounded-full border border-gold-600/50 px-4 py-2 text-xs font-semibold text-gold-400 transition active:scale-95"
+              >
+                Ya reservé: subir mi comprobante
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -339,6 +352,8 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           </div>
         </div>
       )}
+
+      {sendingReceipt && <ReceiptSheet token={token} onClose={() => setSendingReceipt(false)} />}
 
       {reserving && (
         <ReserveSheet

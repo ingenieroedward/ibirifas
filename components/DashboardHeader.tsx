@@ -220,36 +220,44 @@ export function DashboardHeader({
         {!collapsed && (
           <div id="raffle-details" className="mt-4 space-y-4">
           {(showBackToPicker || role === "ORGANIZER") && (
-            <div className="flex flex-wrap items-center gap-2">
+            // One row on any phone: the labels get shorter (the full name stays in aria-label)
+            // instead of a chip wrapping onto a second line by itself.
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* An organizer always needs the way home: it is where "Crear rifa" lives. */}
               <Link
                 href="/"
-                className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95 min-[360px]:px-3 sm:px-3.5"
               >
-                <BackIcon className="h-3.5 w-3.5" />
+                <BackIcon className="hidden h-3.5 w-3.5 min-[360px]:block" />
                 Mis rifas
               </Link>
               {role === "ORGANIZER" && (
                 <>
                   <Link
                     href="/rifas/nueva"
-                    className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                    aria-label="Crear rifa"
+                    className="shrink-0 whitespace-nowrap rounded-full border border-gold-600/40 px-2.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95 min-[360px]:px-3 sm:px-3.5"
                   >
-                    Crear rifa
+                    <span aria-hidden="true" className="sm:hidden">Nueva</span>
+                    <span aria-hidden="true" className="hidden sm:inline">Crear rifa</span>
                   </Link>
                   <Link
                     href="/usuarios"
-                    className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                    aria-label="Mi equipo"
+                    className="shrink-0 whitespace-nowrap rounded-full border border-gold-600/40 px-2.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95 min-[360px]:px-3 sm:px-3.5"
                   >
-                    Mi equipo
+                    <span aria-hidden="true" className="sm:hidden">Equipo</span>
+                    <span aria-hidden="true" className="hidden sm:inline">Mi equipo</span>
                   </Link>
                   {!closed && (
                     <button
                       type="button"
                       onClick={onCloseRaffle}
-                      className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+                      aria-label="Cerrar rifa"
+                      className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95 min-[360px]:px-3 sm:px-3.5"
                     >
-                      Cerrar rifa
+                      <span aria-hidden="true" className="sm:hidden">Cerrar</span>
+                      <span aria-hidden="true" className="hidden sm:inline">Cerrar rifa</span>
                     </button>
                   )}
                 </>

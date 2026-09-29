@@ -90,6 +90,32 @@ export function checkReserveRateLimit(ip: string): boolean {
   return true;
 }
 
+const lookupHits = new Map<string, number[]>();
+const LOOKUP_WINDOW_MS = 60 * 60 * 1000;
+const LOOKUP_MAX_HITS = 10;
+
+/**
+ * Attaching a receipt by phone number is a lookup ("does this phone have a reservation?"),
+ * so it is limited to 10 tries an hour per IP to stop someone from probing numbers.
+ */
+export function checkReceiptLookupLimit(ip: string): boolean {
+  const now = Date.now();
+  const recent = (lookupHits.get(ip) ?? []).filter((ts) => now - ts < LOOKUP_WINDOW_MS);
+  if (recent.length >= LOOKUP_MAX_HITS) {
+    lookupHits.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  lookupHits.set(ip, recent);
+
+  if (lookupHits.size > 10_000) {
+    for (const [key, timestamps] of lookupHits) {
+      if (timestamps.every((ts) => now - ts >= LOOKUP_WINDOW_MS)) lookupHits.delete(key);
+    }
+  }
+  return true;
+}
+
 /** Best-effort client IP extraction for App Router requests. */
 export function getClientIp(req: NextRequest): string {
   const forwardedFor = req.headers.get("x-forwarded-for");
