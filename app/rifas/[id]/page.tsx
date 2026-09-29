@@ -13,9 +13,20 @@ import {
 } from "@/lib/api-client";
 import { downloadBlob, generateRaffleShareImage } from "@/lib/shareImage";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
 import { useRaffleLive } from "@/lib/useRaffleLive";
-import type { PaymentMethod, RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
+import type {
+  BulkActionBody,
+  BulkNumberInput,
+  PaymentMethod,
+  RaffleDTO,
+  RaffleGroupDTO,
+  RaffleNumberDTO,
+  UpdateNumberInput,
+} from "@/lib/types";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { GroupedBoard } from "@/components/GroupedBoard";
+import { GroupSheet } from "@/components/GroupSheet";
 import { NumberGrid } from "@/components/NumberGrid";
 import { NumberSheet } from "@/components/NumberSheet";
 import { ParticipantsList } from "@/components/ParticipantsList";
@@ -46,6 +57,8 @@ export default function RaffleDashboardPage() {
   const [raffleLoading, setRaffleLoading] = useState(true);
   const [raffleError, setRaffleError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The lettered set whose sheet is open (raffles sold in sets).
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   // Only used to decide whether the "back to picker" link is worth showing.
   const [raffleCount, setRaffleCount] = useState(1);
   const [downloadingImage, setDownloadingImage] = useState(false);
@@ -149,6 +162,24 @@ export default function RaffleDashboardPage() {
   }, [raffle, downloadingImage, show]);
 
   const selected = raffle?.numbers.find((n) => n.id === selectedId) ?? null;
+  const hasGroups = (raffle?.groups.length ?? 0) > 0;
+  // Numbers outside every set: sold one by one, at the raffle's number price.
+  const looseNumbers = useMemo(
+    () => (raffle?.numbers ?? []).filter((n) => n.groupId === null),
+    [raffle],
+  );
+  const pricer = useMemo(() => (raffle ? makePricer(raffle) : () => 0), [raffle]);
+  const openGroup = raffle?.groups.find((g) => g.id === openGroupId) ?? null;
+  const openGroupMembers = useMemo(
+    () => (raffle && openGroupId ? numbersOfGroup(raffle.numbers, openGroupId) : []),
+    [raffle, openGroupId],
+  );
+
+  /** A number opened from anywhere (board, participants): sets open as a whole. */
+  const openNumber = useCallback((n: RaffleNumberDTO) => {
+    if (n.groupId) setOpenGroupId(n.groupId);
+    else setSelectedId(n.id);
+  }, []);
 
   const knownBuyers = useMemo(() => {
     const byKey = new Map<string, string>();
@@ -176,7 +207,7 @@ export default function RaffleDashboardPage() {
   const handleGridSelect = useCallback(
     (n: RaffleNumberDTO) => {
       if (!selecting) {
-        setSelectedId(n.id);
+        openNumber(n);
         return;
       }
       if (n.status !== "available") return;
@@ -187,7 +218,7 @@ export default function RaffleDashboardPage() {
         return next;
       });
     },
-    [selecting],
+    [selecting, openNumber],
   );
 
   const handleLongPress = useCallback((n: RaffleNumberDTO) => {
@@ -257,13 +288,23 @@ export default function RaffleDashboardPage() {
       }
 
       const messages: string[] = [];
-      if (byOthers.length === 1) {
-        const n = byOthers[0]!;
-        const who = n.updatedByName ?? "Alguien";
-        const verb = n.status === "paid" ? "cobró" : n.status === "occupied" ? "vendió" : "liberó";
-        messages.push(`${who} ${verb} el ${formatNumberValue(n.value)}`);
-      } else if (byOthers.length > 1) {
-        messages.push(`${byOthers.length} números actualizados por el equipo`);
+      // A set changes hands as one: say "el conjunto A", not ten numbers.
+      const sets = new Map<string, RaffleNumberDTO>();
+      const loose: RaffleNumberDTO[] = [];
+      for (const n of byOthers) {
+        if (n.groupId) sets.set(n.groupId, n);
+        else loose.push(n);
+      }
+      const verbOf = (n: RaffleNumberDTO) => (n.status === "paid" ? "cobró" : n.status === "occupied" ? "vendió" : "liberó");
+      for (const [groupId, n] of sets) {
+        const label = groupLabelOf(raffleRef.current?.groups ?? [], groupId) ?? "";
+        messages.push(`${n.updatedByName ?? "Alguien"} ${verbOf(n)} el conjunto ${label}`.trim());
+      }
+      if (loose.length === 1) {
+        const n = loose[0]!;
+        messages.push(`${n.updatedByName ?? "Alguien"} ${verbOf(n)} el ${formatNumberValue(n.value)}`);
+      } else if (loose.length > 1) {
+        messages.push(`${loose.length} números actualizados por el equipo`);
       }
       if (taken.length > 0) {
         const list = taken.map((n) => formatNumberValue(n.value)).join(", ");
@@ -319,6 +360,27 @@ export default function RaffleDashboardPage() {
       }
     },
     [payTarget, mergeNumbers, show, refreshAfterConflict],
+  );
+
+  /** One action on a whole set (sell, collect, undo, edit, free): all its numbers in a single atomic request. */
+  const runGroupAction = useCallback(
+    async (group: RaffleGroupDTO, body: BulkActionBody, message: string) => {
+      const ids = numbersOfGroup(raffleRef.current?.numbers ?? [], group.id).map((n) => n.id);
+      try {
+        const updated = await updateNumbersBulk({ ...body, ids } as BulkNumberInput);
+        mergeNumbers(updated);
+        show(message, "success");
+        setOpenGroupId(null);
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.", "error");
+        if (err instanceof ApiError && err.status === 409) {
+          setOpenGroupId(null);
+          await refreshAfterConflict();
+        }
+        throw err;
+      }
+    },
+    [mergeNumbers, show, refreshAfterConflict],
   );
 
   const handleSave = useCallback(
@@ -456,38 +518,63 @@ export default function RaffleDashboardPage() {
 
               {view === "board" ? (
                 <>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-sm text-text-muted">
-                      {selecting
-                        ? "Toca los números que se lleva el comprador."
-                        : "¿Alguien se lleva varios? Mantén presionado un número."}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => (selecting ? exitSelection() : setSelecting(true))}
-                      className={`h-10 shrink-0 rounded-full px-4 text-xs font-semibold transition active:scale-95 ${
-                        selecting
-                          ? "border border-line text-text-muted"
-                          : "border border-gold-600/50 text-gold-400"
-                      }`}
-                    >
-                      {selecting ? "Cancelar" : "Seleccionar varios"}
-                    </button>
-                  </div>
-                  <NumberGrid
-                    numbers={raffle.numbers}
-                    onSelect={handleGridSelect}
-                    onLongPress={selecting ? undefined : handleLongPress}
-                    themeNumberColor={raffle.themeNumberColor}
-                    themeTextColor={raffle.themeTextColor}
-                    selectedIds={selecting ? pickedIds : undefined}
-                  />
+                  {hasGroups && (
+                    <section aria-label="Conjuntos" className="mb-6">
+                      <p className="mb-3 text-sm text-text-muted">
+                        Cada letra se vende completa a un solo comprador. Toca una para venderla o gestionarla.
+                      </p>
+                      <GroupedBoard
+                        groups={raffle.groups}
+                        numbers={raffle.numbers}
+                        onOpenGroup={(g) => setOpenGroupId(g.id)}
+                        themeNumberColor={raffle.themeNumberColor}
+                        themeTextColor={raffle.themeTextColor}
+                      />
+                    </section>
+                  )}
+
+                  {looseNumbers.length > 0 && (
+                    <section aria-label="Números sueltos">
+                      {hasGroups && (
+                        <h2 className="mb-1 font-[family-name:var(--font-heading)] text-lg font-bold text-text">
+                          Números sueltos · {formatCurrency(raffle.numberPrice)} c/u
+                        </h2>
+                      )}
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm text-text-muted">
+                          {selecting
+                            ? "Toca los números que se lleva el comprador."
+                            : "¿Alguien se lleva varios? Mantén presionado un número."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+                          className={`h-10 shrink-0 rounded-full px-4 text-xs font-semibold transition active:scale-95 ${
+                            selecting
+                              ? "border border-line text-text-muted"
+                              : "border border-gold-600/50 text-gold-400"
+                          }`}
+                        >
+                          {selecting ? "Cancelar" : "Seleccionar varios"}
+                        </button>
+                      </div>
+                      <NumberGrid
+                        numbers={looseNumbers}
+                        onSelect={handleGridSelect}
+                        onLongPress={selecting ? undefined : handleLongPress}
+                        themeNumberColor={raffle.themeNumberColor}
+                        themeTextColor={raffle.themeTextColor}
+                        selectedIds={selecting ? pickedIds : undefined}
+                      />
+                    </section>
+                  )}
                 </>
               ) : (
                 <ParticipantsList
                   numbers={raffle.numbers}
-                  numberPrice={raffle.numberPrice}
-                  onSelect={(n) => setSelectedId(n.id)}
+                  groups={raffle.groups}
+                  priceOf={pricer}
+                  onSelect={openNumber}
                   onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
                 />
               )}
@@ -527,6 +614,25 @@ export default function RaffleDashboardPage() {
         onSave={handleSave}
       />
 
+      {openGroup && (
+        <GroupSheet
+          key={`${openGroup.id}-${openGroupMembers[0]?.status ?? ""}`}
+          group={openGroup}
+          members={openGroupMembers}
+          knownBuyers={knownBuyers}
+          onClose={() => setOpenGroupId(null)}
+          onSell={(input) =>
+            runGroupAction(openGroup, { action: "sell", ...input }, `Conjunto ${openGroup.label} vendido a ${input.buyerName}`)
+          }
+          onPay={(method) =>
+            runGroupAction(openGroup, { action: "pay", paymentMethod: method }, `Conjunto ${openGroup.label} cobrado`)
+          }
+          onUnpay={() => runGroupAction(openGroup, { action: "unpay" }, `Pago del conjunto ${openGroup.label} deshecho`)}
+          onEdit={(input) => runGroupAction(openGroup, { action: "edit", ...input }, "Datos del comprador actualizados")}
+          onRelease={() => runGroupAction(openGroup, { action: "release" }, `Conjunto ${openGroup.label} liberado`)}
+        />
+      )}
+
       {sellingMany && raffle && (
         <SellManySheet
           numbers={pickedNumbers}
@@ -541,7 +647,8 @@ export default function RaffleDashboardPage() {
         <PayManySheet
           buyerName={payTarget.buyerName}
           numbers={payTarget.numbers}
-          numberPrice={raffle.numberPrice}
+          groups={raffle.groups}
+          total={pricer(payTarget.numbers)}
           onClose={() => setPayTarget(null)}
           onConfirm={handlePayMany}
         />

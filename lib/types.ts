@@ -28,6 +28,8 @@ export interface RaffleNumberDTO {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
   notes: string | null;
+  /** The lettered set this number belongs to (sold only together with the rest of it); null for a loose number. */
+  groupId: string | null;
   /** Name of whoever last sold/registered this number — useful when a raffle has several sellers. */
   updatedByName: string | null;
   updatedAt: string;
@@ -46,6 +48,10 @@ export interface RaffleSummaryDTO {
   availableCount: number;
   occupiedCount: number;
   paidCount: number;
+  /** How many lettered sets the raffle is sold in (0 = plain numbers only). */
+  groupCount: number;
+  /** Money collected so far, counting sets at their set price. */
+  collected: number;
   /** Grid theme overrides — null means "use the app's default gold/black look". */
   themeBackground?: string | null;
   themeNumberColor?: string | null;
@@ -61,6 +67,13 @@ export interface RaffleAccountDTO {
   holderName: string | null;
 }
 
+/** A lettered set of numbers sold as one unit at `price`. */
+export interface RaffleGroupDTO {
+  id: string;
+  label: string;
+  price: number;
+}
+
 export interface RaffleDTO {
   id: string;
   name: string;
@@ -72,6 +85,8 @@ export interface RaffleDTO {
   status: "active" | "closed";
   numbers: RaffleNumberDTO[];
   accounts: RaffleAccountDTO[];
+  /** Lettered sets in order (A, B, C…); empty for a raffle sold number by number. */
+  groups: RaffleGroupDTO[];
   /** Grid theme overrides — null means "use the app's default gold/black look". */
   themeBackground?: string | null;
   themeNumberColor?: string | null;
@@ -87,6 +102,17 @@ export interface RaffleAccountInput {
   holderName?: string | null;
 }
 
+/**
+ * One lettered set, as sent when creating a raffle. `values` are the numbers it
+ * holds — drawn at random or picked by hand, the client decides — and they can't
+ * overlap with another set's. Numbers left out stay loose (sold one by one).
+ */
+export interface RaffleGroupInput {
+  label: string;
+  price: number;
+  values: number[];
+}
+
 export interface CreateRaffleInput {
   name: string;
   prizeLabel?: string | null;
@@ -98,6 +124,8 @@ export interface CreateRaffleInput {
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
   accounts?: RaffleAccountInput[];
+  /** Sell in lettered sets; numbers not listed here remain loose and use `numberPrice`. */
+  groups?: RaffleGroupInput[];
 }
 
 // Editing an existing raffle. `totalNumbers` is intentionally absent — changing
@@ -134,7 +162,15 @@ export type BulkNumberInput =
       buyerPhone?: string | null;
       photoDataUrl?: string | null;
     }
-  | { action: "pay"; ids: string[]; paymentMethod: PaymentMethod };
+  | { action: "pay"; ids: string[]; paymentMethod: PaymentMethod }
+  // Undo a payment (paid -> pending), free the numbers, or fix the buyer's details.
+  | { action: "unpay"; ids: string[] }
+  | { action: "release"; ids: string[] }
+  | { action: "edit"; ids: string[]; buyerName: string; buyerPhone?: string | null };
+
+type WithoutIds<T> = T extends { ids: string[] } ? Omit<T, "ids"> : never;
+/** A bulk action minus the ids — for callers that fill them in from a set's numbers. */
+export type BulkActionBody = WithoutIds<BulkNumberInput>;
 
 // A user managed from the "Usuarios" screen: the target role is always the
 // caller's direct report (SUPERADMIN -> ORGANIZER, ORGANIZER -> SELLER), so

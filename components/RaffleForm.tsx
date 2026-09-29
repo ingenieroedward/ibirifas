@@ -3,10 +3,12 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, createRaffle, updateRaffle } from "@/lib/api-client";
-import { formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { lighten } from "@/lib/color";
+import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME } from "@/lib/theme";
-import type { RaffleAccountInput, RaffleDTO } from "@/lib/types";
+import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput } from "@/lib/types";
+import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { Spinner } from "@/components/Spinner";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
@@ -31,6 +33,22 @@ function newAccountRow(source?: Partial<AccountRow>): AccountRow {
   };
 }
 
+const DEFAULT_SET_SIZE = 10;
+
+/** Fresh sets for `total` numbers dealt into sets of `size`: dealt at random, or empty to be filled by hand. */
+function buildSets(total: number, size: number, mode: "random" | "manual", price: string, previous: PlannerSet[]): PlannerSet[] {
+  const count = setsThatFit(total, size);
+  if (mode === "random") {
+    return drawRandomSets(total, size, count).map((values, i) => ({ label: GROUP_LABELS[i]!, price, values }));
+  }
+  // By hand: keep what was already picked (minus numbers that no longer exist).
+  return Array.from({ length: count }, (_, i) => ({
+    label: GROUP_LABELS[i]!,
+    price: previous[i]?.price ?? price,
+    values: (previous[i]?.values ?? []).filter((v) => v < total),
+  }));
+}
+
 interface RaffleFormProps {
   mode: "create" | "edit";
   /** Required for "edit" — the raffle being edited, as loaded from getRaffleById. */
@@ -53,6 +71,14 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
 
+  // Selling in lettered sets (A, B, C…) is chosen when the raffle is created.
+  const [useSets, setUseSets] = useState(false);
+  const [setSize, setSetSize] = useState(String(DEFAULT_SET_SIZE));
+  const [setPrice, setSetPrice] = useState("");
+  const [setMode, setSetMode] = useState<"random" | "manual">("random");
+  const [sets, setSets] = useState<PlannerSet[]>([]);
+  const existingSets = raffle?.groups ?? [];
+
   const [accounts, setAccounts] = useState<AccountRow[]>(() =>
     raffle?.accounts && raffle.accounts.length > 0
       ? raffle.accounts.map((a) => newAccountRow({ label: a.label, number: a.number, holderName: a.holderName ?? "" }))
@@ -71,6 +97,53 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const totalValue = totalNumbers.trim() === "" ? DEFAULT_TOTAL_NUMBERS : Number(totalNumbers);
+  const sizeValue = Number(setSize);
+  const totalOk = Number.isInteger(totalValue) && totalValue >= 10 && totalValue <= 1000;
+  const sizeOk = Number.isInteger(sizeValue) && sizeValue >= 1;
+  const assignedCount = sets.reduce((sum, set) => sum + set.values.length, 0);
+  // Numbers outside every set are sold one by one at the number price.
+  const looseCount = useSets ? Math.max(0, (totalOk ? totalValue : 0) - assignedCount) : 0;
+  const askNumberPrice = !useSets || looseCount > 0;
+
+  /** Re-deal (or trim) the sets after the total or the set size changed. */
+  const resetSets = (nextTotal: string, nextSize: string, mode = setMode, price = setPrice, previous = sets) => {
+    const total = nextTotal.trim() === "" ? DEFAULT_TOTAL_NUMBERS : Number(nextTotal);
+    const size = Number(nextSize);
+    if (!Number.isInteger(total) || total < 10 || total > 1000 || !Number.isInteger(size) || size < 1) {
+      setSets([]);
+      return;
+    }
+    setSets(buildSets(total, size, mode, price, previous));
+  };
+
+  const handleTotalChange = (value: string) => {
+    setTotalNumbers(value);
+    if (useSets) resetSets(value, setSize);
+  };
+
+  const handleSetSizeChange = (value: string) => {
+    setSetSize(value);
+    resetSets(totalNumbers, value);
+  };
+
+  const handleSetPriceChange = (value: string) => {
+    setSetPrice(value);
+    setSets((current) => current.map((set) => ({ ...set, price: value })));
+  };
+
+  const handleToggleSets = (on: boolean) => {
+    setUseSets(on);
+    if (on) resetSets(totalNumbers, setSize, setMode, setPrice, []);
+    else setSets([]);
+  };
+
+  const handleModeChange = (mode: "random" | "manual") => {
+    setSetMode(mode);
+    // Going to "by hand" starts from what's on screen; going back to random deals again.
+    if (mode === "random") resetSets(totalNumbers, setSize, mode, setPrice, sets);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -83,14 +156,40 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       setError("El nombre de la rifa es obligatorio.");
       return;
     }
-    if (!Number.isFinite(price) || price <= 0) {
-      setError("El valor del número debe ser mayor a cero.");
+    const creatingSets = !isEdit && useSets;
+    const needsNumberPrice = !creatingSets || looseCount > 0;
+    if (needsNumberPrice && (!Number.isFinite(price) || price <= 0)) {
+      setError(creatingSets ? "El valor de cada número suelto debe ser mayor a cero." : "El valor del número debe ser mayor a cero.");
       return;
     }
     if (!isEdit && (!Number.isInteger(total) || total < 10 || total > 1000)) {
       setError("La cantidad de números debe estar entre 10 y 1000.");
       return;
     }
+
+    // Empty letters are dropped and the rest renamed A, B, C… in order.
+    let groupsPayload: RaffleGroupInput[] | undefined;
+    if (creatingSets) {
+      const filled = sets.filter((set) => set.values.length > 0);
+      if (filled.length === 0) {
+        setError(
+          sets.length === 0
+            ? "Con ese tamaño no cabe ningún conjunto. Ajusta la cantidad de números o el tamaño."
+            : "Reparte al menos un número en un conjunto.",
+        );
+        return;
+      }
+      const badPrice = filled.find((set) => !Number.isInteger(Number(set.price)) || Number(set.price) <= 0);
+      if (badPrice) {
+        setError(`Ponle un precio (mayor a cero) al conjunto ${badPrice.label}.`);
+        return;
+      }
+      groupsPayload = filled.map((set, i) => ({ label: GROUP_LABELS[i]!, price: Number(set.price), values: set.values }));
+    }
+    // Every number in a set: there is no loose price to ask for, so keep something sensible on record.
+    const looseNumberPrice = needsNumberPrice
+      ? Math.round(price)
+      : Math.max(1, Math.round(groupsPayload![0]!.price / groupsPayload![0]!.values.length));
 
     // Blank rows (never filled in) are dropped silently; a row with only one
     // of label/number filled in is a real mistake, so we ask for it to be fixed.
@@ -131,10 +230,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
           lottery: lottery.trim() || null,
-          numberPrice: Math.round(price),
+          numberPrice: looseNumberPrice,
           totalNumbers: total,
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
           accounts: accountsPayload,
+          ...(groupsPayload ? { groups: groupsPayload } : {}),
           ...themePayload,
         });
         router.push(`/rifas/${created.id}`);
@@ -191,20 +291,6 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         />
       </Field>
 
-      <Field label="Valor por número" htmlFor="numberPrice" required>
-        <input
-          id="numberPrice"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          step={1}
-          value={numberPrice}
-          onChange={(e) => setNumberPrice(e.target.value)}
-          placeholder="Ej. 10000"
-          disabled={submitting}
-          className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
-        />
-      </Field>
 
       <Field
         label="Cantidad de números"
@@ -219,11 +305,129 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           max={1000}
           step={1}
           value={totalNumbers}
-          onChange={(e) => setTotalNumbers(e.target.value)}
+          onChange={(e) => handleTotalChange(e.target.value)}
           disabled={submitting || isEdit}
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
+
+      {isEdit && existingSets.length > 0 ? (
+        <div className="space-y-1 rounded-2xl border border-line bg-surface-2/60 p-4">
+          <p className="text-sm font-semibold text-text">Se vende por conjuntos</p>
+          <p className="text-xs text-text-muted">
+            {existingSets.map((g) => `${g.label} · ${formatCurrency(g.price)}`).join("   ")}
+          </p>
+          <p className="text-xs text-text-muted">Los conjuntos y sus números no se pueden cambiar después de crear la rifa.</p>
+        </div>
+      ) : (
+        !isEdit && (
+          <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                id="useSets"
+                type="checkbox"
+                checked={useSets}
+                onChange={(e) => handleToggleSets(e.target.checked)}
+                disabled={submitting}
+                className="mt-1 h-5 w-5 accent-[#f5c542]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-text">Vender por conjuntos (letras)</span>
+                <span className="mt-0.5 block text-xs text-text-muted">
+                  Agrupa los números en letras (A, B, C…): cada letra se vende completa por un precio. Los números que no
+                  metas en ninguna se venden de a uno.
+                </span>
+              </span>
+            </label>
+
+            {useSets && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Números por conjunto" htmlFor="setSize">
+                    <input
+                      id="setSize"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={setSize}
+                      onChange={(e) => handleSetSizeChange(e.target.value)}
+                      disabled={submitting}
+                      className="h-12 w-full rounded-xl border border-line bg-bg-elevated px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                    />
+                  </Field>
+                  <Field label="Precio de cada conjunto" htmlFor="setPrice" required>
+                    <input
+                      id="setPrice"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={setPrice}
+                      onChange={(e) => handleSetPriceChange(e.target.value)}
+                      placeholder="Ej. 40000"
+                      disabled={submitting}
+                      className="h-12 w-full rounded-xl border border-line bg-bg-elevated px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                    />
+                  </Field>
+                </div>
+
+                {totalOk && sizeOk ? (
+                  <>
+                    <p className="text-sm font-medium text-text">
+                      {sets.length === 0
+                        ? "No cabe ningún conjunto con ese tamaño."
+                        : `${sets.length} ${sets.length === 1 ? "conjunto" : "conjuntos"} (${sets[0]!.label}${sets.length > 1 ? `–${sets[sets.length - 1]!.label}` : ""}) de ${setSize} números`}
+                    </p>
+                    {sets.length > 0 && (
+                      <GroupPlanner
+                        total={totalValue}
+                        size={sizeValue}
+                        sets={sets}
+                        mode={setMode}
+                        disabled={submitting}
+                        onModeChange={handleModeChange}
+                        onRedraw={() => resetSets(totalNumbers, setSize, "random", setPrice, sets)}
+                        onSetsChange={setSets}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-text-muted">Revisa la cantidad de números y el tamaño del conjunto.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {(askNumberPrice || isEdit) && (
+        <Field
+          label={useSets || existingSets.length > 0 ? "Valor por número suelto" : "Valor por número"}
+          htmlFor="numberPrice"
+          required
+          hint={
+            useSets
+              ? `Solo para los ${looseCount} ${looseCount === 1 ? "número que queda suelto" : "números que quedan sueltos"}, fuera de los conjuntos.`
+              : existingSets.length > 0
+                ? "Se usa solo para los números que no pertenecen a ningún conjunto."
+                : undefined
+          }
+        >
+          <input
+            id="numberPrice"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={numberPrice}
+            onChange={(e) => setNumberPrice(e.target.value)}
+            placeholder="Ej. 10000"
+            disabled={submitting}
+            className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+          />
+        </Field>
+      )}
 
       <Field label="Fecha del sorteo (opcional)" htmlFor="drawDate">
         <input

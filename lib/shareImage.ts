@@ -1,7 +1,7 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
-import type { RaffleDTO } from "@/lib/types";
+import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
 /**
  * Renders a shareable "which numbers are still available" poster as a PNG,
@@ -424,8 +424,33 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const headingFont = getBrandFontFamily("--font-heading", FALLBACK_HEADING_FONT);
   const bodyFont = getBrandFontFamily("--font-body", FALLBACK_BODY_FONT);
 
-  const columns = pickColumns(total);
-  const rows = Math.max(1, Math.ceil(sorted.length / columns));
+  // Raffles sold in lettered sets draw one block per letter (header + its
+  // numbers), then the loose numbers; a plain raffle is a single headerless block.
+  const hasSets = raffle.groups.length > 0;
+  const columns = hasSets ? 10 : pickColumns(total);
+  interface Section {
+    set: { label: string; price: number; sold: boolean } | null;
+    title: string | null;
+    numbers: RaffleNumberDTO[];
+  }
+  const sections: Section[] = [];
+  if (hasSets) {
+    for (const group of raffle.groups) {
+      const members = sorted.filter((n) => n.groupId === group.id);
+      if (members.length === 0) continue;
+      sections.push({
+        set: { label: group.label, price: group.price, sold: members.every((n) => n.status !== "available") },
+        title: null,
+        numbers: members,
+      });
+    }
+    const loose = sorted.filter((n) => n.groupId === null);
+    if (loose.length > 0) {
+      sections.push({ set: null, title: `NÚMEROS SUELTOS · ${formatCurrency(raffle.numberPrice)} C/U`, numbers: loose });
+    }
+  } else {
+    sections.push({ set: null, title: null, numbers: sorted });
+  }
   const availWidth = CANVAS_WIDTH - SIDE_PADDING * 2;
   const rawCell = (availWidth - (columns - 1) * GRID_GAP) / columns;
   const cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, rawCell));
@@ -505,7 +530,14 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     DIVIDER_GAP +
     LEGEND_HEIGHT;
 
-  const gridHeight = rows * cellSize + (rows - 1) * GRID_GAP;
+  const SECTION_HEAD_HEIGHT = 74;
+  const SECTION_GAP = 38;
+  const sectionHeights = sections.map((section) => {
+    const sectionRows = Math.max(1, Math.ceil(section.numbers.length / columns));
+    const head = section.set || section.title ? SECTION_HEAD_HEIGHT : 0;
+    return head + sectionRows * cellSize + (sectionRows - 1) * GRID_GAP;
+  });
+  const gridHeight = sectionHeights.reduce((sum, h) => sum + h, 0) + (sections.length - 1) * SECTION_GAP;
   const canvasHeight = headerHeight + GRID_TOP_GAP + gridHeight + GRID_BOTTOM_GAP + FOOTER_HEIGHT;
 
   const canvas = document.createElement("canvas");
@@ -603,7 +635,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, heroHeight, 24);
   ctx.stroke();
 
-  const valorText = formatCurrency(raffle.numberPrice);
+  const setPrices = raffle.groups.map((g) => g.price);
+  const valorLabel = hasSets ? "VALOR DEL CONJUNTO" : "VALOR DEL NÚMERO";
+  const valorText = hasSets
+    ? Math.min(...setPrices) === Math.max(...setPrices)
+      ? formatCurrency(setPrices[0]!)
+      : `${formatCurrency(Math.min(...setPrices))} – ${formatCurrency(Math.max(...setPrices))}`
+    : formatCurrency(raffle.numberPrice);
 
   if (hasPrize) {
     const splitX = gridStartX + gridWidth * 0.62;
@@ -660,7 +698,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
 
     ctx.font = `800 20px ${headingFont}`;
     ctx.fillStyle = mutedText;
-    ctx.fillText("VALOR DEL NÚMERO", valorCenterX, labelBaseline);
+    ctx.fillText(valorLabel, valorCenterX, labelBaseline);
 
     // Valor always stays visibly smaller than premio.
     const valorMaxWidth = gridStartX + gridWidth - splitX - 32;
@@ -683,7 +721,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     ctx.textAlign = "center";
     ctx.font = `800 22px ${headingFont}`;
     ctx.fillStyle = mutedText;
-    ctx.fillText("VALOR DEL NÚMERO", centerX, cursorY + 44);
+    ctx.fillText(valorLabel, centerX, cursorY + 44);
 
     const maxWidth = gridWidth - 80;
     const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 88, 32, "800", headingFont);
@@ -865,11 +903,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  sorted.forEach((number, index) => {
-    const col = index % columns;
-    const row = Math.floor(index / columns);
-    const x = gridStartX + col * (cellSize + GRID_GAP);
-    const y = cursorY + row * (cellSize + GRID_GAP);
+  const drawTile = (number: RaffleNumberDTO, x: number, y: number) => {
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
@@ -909,6 +943,71 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       ctx.lineTo(x + inset, y + cellSize - inset);
       ctx.stroke();
     }
+  };
+
+  let sectionY = cursorY;
+  sections.forEach((section, sectionIndex) => {
+    let tilesTop = sectionY;
+
+    if (section.set || section.title) {
+      // Block header: the letter as a tile, its name, and its price — or
+      // "VENDIDO" once someone has the whole set.
+      const headMid = sectionY + 28;
+      ctx.textBaseline = "middle";
+      if (section.set) {
+        const badge = 56;
+        const badgeX = gridStartX;
+        const badgeY = sectionY;
+        if (section.set.sold) {
+          ctx.drawImage(soldSprite, 0, 0, cellSize, cellSize, badgeX, badgeY, badge, badge);
+        } else {
+          ctx.drawImage(availableSprite, 0, 0, cellSize, cellSize, badgeX, badgeY, badge, badge);
+        }
+        ctx.textAlign = "center";
+        ctx.font = `800 34px ${headingFont}`;
+        ctx.fillStyle = section.set.sold ? mutedText : theme.textColor || DEFAULT_THEME.textColor;
+        ctx.fillText(section.set.label, badgeX + badge / 2, badgeY + badge / 2 + 1);
+
+        ctx.textAlign = "left";
+        ctx.font = `800 30px ${headingFont}`;
+        ctx.fillStyle = section.set.sold ? mutedText : theme.numberColor;
+        ctx.fillText(`CONJUNTO ${section.set.label}`, badgeX + badge + 18, headMid);
+
+        ctx.textAlign = "right";
+        if (section.set.sold) {
+          ctx.font = `800 26px ${headingFont}`;
+          ctx.fillStyle = mutedText;
+          ctx.fillText("VENDIDO", gridStartX + gridWidth, headMid);
+        } else {
+          ctx.font = `800 40px ${headingFont}`;
+          ctx.fillStyle = theme.numberColor;
+          ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.45 : 0.2);
+          ctx.shadowBlur = 12;
+          ctx.fillText(formatCurrency(section.set.price), gridStartX + gridWidth, headMid);
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+        }
+      } else if (section.title) {
+        ctx.textAlign = "left";
+        ctx.font = `800 26px ${headingFont}`;
+        ctx.fillStyle = mutedText;
+        ctx.fillText(section.title, gridStartX, headMid);
+      }
+      // Hairline under the header, then the numbers.
+      ctx.fillStyle = withAlpha(theme.numberColor, 0.28);
+      ctx.fillRect(gridStartX, sectionY + SECTION_HEAD_HEIGHT - 12, gridWidth, 1.5);
+      tilesTop = sectionY + SECTION_HEAD_HEIGHT;
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    section.numbers.forEach((number, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      drawTile(number, gridStartX + col * (cellSize + GRID_GAP), tilesTop + row * (cellSize + GRID_GAP));
+    });
+
+    sectionY += sectionHeights[sectionIndex]! + SECTION_GAP;
   });
 
   cursorY += gridHeight + GRID_BOTTOM_GAP;

@@ -14,6 +14,7 @@ export function toNumberDTO(n: NumberWithAuthor): RaffleNumberDTO {
     paymentStatus: n.paymentStatus as PaymentStatus,
     paymentMethod: n.paymentMethod as PaymentMethod | null,
     notes: n.notes,
+    groupId: n.groupId,
     updatedByName: n.updatedBy?.name ?? null,
     updatedAt: n.updatedAt.toISOString(),
   };

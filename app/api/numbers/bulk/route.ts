@@ -39,14 +39,26 @@ const bulkSchema = z.discriminatedUnion("action", [
     ids: idsSchema,
     paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]),
   }),
+  z.object({ action: z.literal("unpay"), ids: idsSchema }),
+  z.object({ action: z.literal("release"), ids: idsSchema }),
+  z.object({
+    action: z.literal("edit"),
+    ids: idsSchema,
+    buyerName: z.string().trim().min(1).max(120),
+    buyerPhone: trimmedOptional(120),
+  }),
 ]);
 
 class ConflictError extends Error {}
 
 /**
- * Several numbers for one buyer in a single request. All-or-nothing: if any
- * number is no longer in the expected state (another seller got there first),
- * nothing is written and the caller gets a 409 to refresh and retry.
+ * Several numbers in a single request: sell them to one buyer, collect them,
+ * undo a payment, free them or correct the buyer. All-or-nothing: if any number
+ * is no longer in the expected state (another seller got there first), nothing
+ * is written and the caller gets a 409 to refresh and retry.
+ *
+ * Numbers of a lettered set only ever move together, so a request that names
+ * part of a set is refused; this is also how a whole set is sold at once.
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -70,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   const found = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
-    select: { id: true, raffleId: true, raffle: { select: { ownerId: true } } },
+    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true } } },
   });
 
   const tenantId = tenantIdFor(user);
@@ -82,9 +94,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Los números deben ser de la misma rifa" }, { status: 400 });
   }
 
+  // A set is all or nothing.
+  const groupIds = [...new Set(found.map((n) => n.groupId).filter((g): g is string => g !== null))];
+  if (groupIds.length > 0) {
+    const members = await prisma.raffleNumber.findMany({
+      where: { groupId: { in: groupIds } },
+      select: { id: true },
+    });
+    const requested = new Set(ids);
+    if (members.some((m) => !requested.has(m.id))) {
+      return NextResponse.json(
+        { error: "Un conjunto se vende, cobra y libera completo, no por partes." },
+        { status: 400 },
+      );
+    }
+  }
+
   // Which numbers actually changed hands, for the notification (paying a number
   // that was already paid is a no-op and shouldn't announce anything).
   let newlyPaidValues: number[] = [];
+  let releasedBefore: { value: number; buyerName: string | null }[] = [];
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -105,6 +134,64 @@ export async function POST(req: NextRequest) {
         if (count !== ids.length) {
           throw new ConflictError("Alguno de los números ya fue vendido. Actualiza el tablero e inténtalo de nuevo.");
         }
+        return;
+      }
+
+      if (input.action === "release") {
+        releasedBefore = await tx.raffleNumber.findMany({
+          where: { id: { in: ids }, status: { not: "available" } },
+          select: { value: true, buyerName: true },
+        });
+        await tx.raffleNumber.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            status: "available",
+            buyerName: null,
+            buyerPhone: null,
+            photoDataUrl: null,
+            notes: null,
+            paymentStatus: "pending" satisfies PaymentStatus,
+            paymentMethod: null,
+            updatedById: user.id,
+          },
+        });
+        return;
+      }
+
+      if (input.action === "unpay") {
+        const withBuyer = await tx.raffleNumber.count({
+          where: { id: { in: ids }, status: { in: ["occupied", "paid"] } },
+        });
+        if (withBuyer !== ids.length) {
+          throw new ConflictError("Alguno de los números ya no tiene comprador. Actualiza el tablero e inténtalo de nuevo.");
+        }
+        await tx.raffleNumber.updateMany({
+          where: { id: { in: ids }, status: "paid" },
+          data: {
+            status: "occupied",
+            paymentStatus: "pending" satisfies PaymentStatus,
+            paymentMethod: null,
+            updatedById: user.id,
+          },
+        });
+        return;
+      }
+
+      if (input.action === "edit") {
+        const withBuyer = await tx.raffleNumber.count({
+          where: { id: { in: ids }, status: { in: ["occupied", "paid"] } },
+        });
+        if (withBuyer !== ids.length) {
+          throw new ConflictError("Alguno de los números ya no tiene comprador. Actualiza el tablero e inténtalo de nuevo.");
+        }
+        await tx.raffleNumber.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            buyerName: input.buyerName,
+            ...(input.buyerPhone !== undefined ? { buyerPhone: input.buyerPhone } : {}),
+            updatedById: user.id,
+          },
+        });
         return;
       }
 
@@ -153,6 +240,19 @@ export async function POST(req: NextRequest) {
   if (raffle) {
     const buyers = [...new Set(updated.map((n) => n.buyerName).filter((name): name is string => Boolean(name)))];
     const buyerName = buyers.length === 0 ? null : buyers.length <= 2 ? buyers.join(" y ") : "varios compradores";
+    const url = `/rifas/${found[0]!.raffleId}`;
+
+    // What the team is told: whole sets by letter and their set price, loose numbers by number.
+    const sets = groupIds.length
+      ? await prisma.raffleGroup.findMany({ where: { id: { in: groupIds } }, orderBy: { position: "asc" } })
+      : [];
+    const isLoose = (n: { groupId: string | null }) => n.groupId === null;
+    const describe = (rows: { value: number; groupId: string | null }[]) => ({
+      sets: sets.map((g) => g.label),
+      looseValues: rows.filter(isLoose).map((n) => n.value),
+      amount: sets.reduce((sum, g) => sum + g.price, 0) + rows.filter(isLoose).length * raffle.numberPrice,
+    });
+
     if (input.action === "sell") {
       void notifyTeam(tenantId, user.id, {
         title: raffle.name,
@@ -162,10 +262,14 @@ export async function POST(req: NextRequest) {
           buyerName: input.buyerName,
           values: updated.map((n) => n.value),
           numberPrice: raffle.numberPrice,
+          ...describe(updated),
         }),
-        url: `/rifas/${found[0]!.raffleId}`,
+        url,
       });
-    } else if (newlyPaidValues.length > 0) {
+    } else if (input.action === "pay" && newlyPaidValues.length > 0) {
+      const paidRows = updated.filter((n) => newlyPaidValues.includes(n.value));
+      const paidGroupIds = new Set(paidRows.map((n) => n.groupId).filter((g): g is string => g !== null));
+      const paidSets = sets.filter((g) => paidGroupIds.has(g.id));
       void notifyTeam(tenantId, user.id, {
         title: raffle.name,
         body: describeEvent({
@@ -175,8 +279,25 @@ export async function POST(req: NextRequest) {
           values: newlyPaidValues,
           numberPrice: raffle.numberPrice,
           paymentMethod: input.paymentMethod,
+          sets: paidSets.map((g) => g.label),
+          looseValues: paidRows.filter(isLoose).map((n) => n.value),
+          amount: paidSets.reduce((sum, g) => sum + g.price, 0) + paidRows.filter(isLoose).length * raffle.numberPrice,
         }),
-        url: `/rifas/${found[0]!.raffleId}`,
+        url,
+      });
+    } else if (input.action === "release" && releasedBefore.length > 0) {
+      const beforeBuyers = [...new Set(releasedBefore.map((n) => n.buyerName).filter((name): name is string => Boolean(name)))];
+      void notifyTeam(tenantId, user.id, {
+        title: raffle.name,
+        body: describeEvent({
+          kind: "released",
+          actorName: user.name,
+          buyerName: beforeBuyers.length === 0 ? null : beforeBuyers.length <= 2 ? beforeBuyers.join(" y ") : "varios compradores",
+          values: releasedBefore.map((n) => n.value),
+          numberPrice: raffle.numberPrice,
+          ...describe(updated),
+        }),
+        url,
       });
     }
   }

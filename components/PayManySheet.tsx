@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PaymentMethod, RaffleNumberDTO } from "@/lib/types";
+import type { PaymentMethod, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { BottomSheet } from "@/components/BottomSheet";
@@ -11,15 +11,18 @@ interface PayManySheetProps {
   buyerName: string;
   /** The buyer's numbers that are still unpaid. */
   numbers: RaffleNumberDTO[];
-  numberPrice: number;
+  groups: RaffleGroupDTO[];
+  /** What these numbers add up to (sets count at their set price). */
+  total: number;
   onClose: () => void;
   onConfirm: (method: PaymentMethod) => Promise<void>;
 }
 
-export function PayManySheet({ buyerName, numbers, numberPrice, onClose, onConfirm }: PayManySheetProps) {
+export function PayManySheet({ buyerName, numbers, groups, total, onClose, onConfirm }: PayManySheetProps) {
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [saving, setSaving] = useState(false);
-  const count = numbers.length;
+  const sets = groups.filter((g) => numbers.some((n) => n.groupId === g.id));
+  const loose = numbers.filter((n) => n.groupId === null);
 
   const handleConfirm = async () => {
     setSaving(true);
@@ -33,11 +36,24 @@ export function PayManySheet({ buyerName, numbers, numberPrice, onClose, onConfi
   return (
     <BottomSheet
       title={`Cobrar a ${buyerName}`}
-      subtitle={`${count} ${count === 1 ? "número" : "números"} · ${formatCurrency(count * numberPrice)}`}
+      subtitle={`${[
+        sets.length > 0 ? `${sets.length === 1 ? "Conjunto" : "Conjuntos"} ${sets.map((g) => g.label).join(", ")}` : null,
+        loose.length > 0 ? `${loose.length} ${loose.length === 1 ? "número" : "números"}` : null,
+      ]
+        .filter(Boolean)
+        .join(" + ")} · ${formatCurrency(total)}`}
       onClose={onClose}
     >
       <div className="flex flex-wrap gap-2">
-        {numbers.map((n) => (
+        {sets.map((g) => (
+          <span
+            key={g.id}
+            className="flex h-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-3 font-[family-name:var(--font-heading)] text-base font-bold text-gold-300"
+          >
+            Conjunto {g.label}
+          </span>
+        ))}
+        {loose.map((n) => (
           <span
             key={n.id}
             className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-gold-300"
@@ -72,7 +88,11 @@ export function PayManySheet({ buyerName, numbers, numberPrice, onClose, onConfi
         disabled={saving}
         className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-green-400 to-green-600 text-base font-bold text-[#052012] shadow-green transition active:scale-[0.98] disabled:opacity-50"
       >
-        {saving ? <Spinner size={20} /> : `Marcar ${count === 1 ? "el número" : `los ${count}`} como pagado${count === 1 ? "" : "s"}`}
+        {saving ? <Spinner size={20} /> : (() => {
+            const items = sets.length + loose.length;
+            if (sets.length > 0 && items === 1) return `Marcar el conjunto ${sets[0]!.label} como pagado`;
+            return `Marcar ${items === 1 ? "el número" : `los ${items}`} como pagado${items === 1 ? "" : "s"}`;
+          })()}
       </button>
     </BottomSheet>
   );

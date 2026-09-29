@@ -2,11 +2,14 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
-import type { RaffleNumberDTO } from "@/lib/types";
+import type { RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 
 interface ParticipantsListProps {
   numbers: RaffleNumberDTO[];
-  numberPrice: number;
+  /** Lettered sets, when the raffle has them. */
+  groups: RaffleGroupDTO[];
+  /** Worth of some numbers, counting sets at their set price. */
+  priceOf: (subset: RaffleNumberDTO[]) => number;
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -63,7 +66,7 @@ function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   return list;
 }
 
-export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: ParticipantsListProps) {
+export function ParticipantsList({ numbers, groups, priceOf, onSelect, onPayAll }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -72,12 +75,16 @@ export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: P
   const totals = useMemo(() => {
     let pending = 0;
     let paid = 0;
+    let pendingAmount = 0;
+    let paidAmount = 0;
     for (const p of participants) {
       pending += p.pendingCount;
       paid += p.paidCount;
+      pendingAmount += priceOf(p.numbers.filter((n) => n.status !== "paid"));
+      paidAmount += priceOf(p.numbers.filter((n) => n.status === "paid"));
     }
-    return { pending, paid };
-  }, [participants]);
+    return { pending, paid, pendingAmount, paidAmount };
+  }, [participants, priceOf]);
 
   const debtors = participants.filter((p) => p.pendingCount > 0).length;
 
@@ -115,7 +122,7 @@ export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: P
             Por cobrar
           </p>
           <p className="mt-0.5 font-[family-name:var(--font-heading)] text-2xl font-extrabold text-gold-400">
-            {formatCurrency(totals.pending * numberPrice)}
+            {formatCurrency(totals.pendingAmount)}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
             {totals.pending} {totals.pending === 1 ? "número" : "números"} · {debtors}{" "}
@@ -127,7 +134,7 @@ export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: P
             Recaudado
           </p>
           <p className="mt-0.5 font-[family-name:var(--font-heading)] text-2xl font-extrabold text-green-400">
-            {formatCurrency(totals.paid * numberPrice)}
+            {formatCurrency(totals.paidAmount)}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
             {totals.paid} {totals.paid === 1 ? "número pagado" : "números pagados"}
@@ -164,7 +171,8 @@ export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: P
             <ParticipantCard
               key={p.key}
               participant={p}
-              numberPrice={numberPrice}
+              groups={groups}
+              priceOf={priceOf}
               onSelect={onSelect}
               onPayAll={onPayAll}
             />
@@ -175,18 +183,38 @@ export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: P
   );
 }
 
+/** What a buyer holds, as things you can tap: each whole set once, and every loose number. */
+type Holding =
+  | { kind: "set"; group: RaffleGroupDTO; members: RaffleNumberDTO[]; paid: boolean }
+  | { kind: "number"; number: RaffleNumberDTO; paid: boolean };
+
+function holdingsOf(numbers: RaffleNumberDTO[], groups: RaffleGroupDTO[]): Holding[] {
+  const out: Holding[] = [];
+  for (const g of groups) {
+    const members = numbers.filter((n) => n.groupId === g.id);
+    if (members.length > 0) out.push({ kind: "set", group: g, members, paid: members.every((n) => n.status === "paid") });
+  }
+  for (const n of numbers) if (n.groupId === null) out.push({ kind: "number", number: n, paid: n.status === "paid" });
+  return out;
+}
+
 function ParticipantCard({
   participant: p,
-  numberPrice,
+  groups,
+  priceOf,
   onSelect,
   onPayAll,
 }: {
   participant: Participant;
-  numberPrice: number;
+  groups: RaffleGroupDTO[];
+  priceOf: (subset: RaffleNumberDTO[]) => number;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
 }) {
-  const owes = p.pendingCount * numberPrice;
+  const owes = priceOf(p.numbers.filter((n) => n.status !== "paid"));
+  const holdings = holdingsOf(p.numbers, groups);
+  const pendingItems = holdings.filter((h) => !h.paid).length;
+  const paidItems = holdings.length - pendingItems;
 
   return (
     <li className="rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
@@ -213,21 +241,25 @@ function ParticipantCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {p.numbers.map((n) => {
-          const paid = n.status === "paid";
+        {holdings.map((h) => {
+          const paid = h.paid;
+          const label =
+            h.kind === "set"
+              ? `Conjunto ${h.group.label}, ${h.members.length} números, ${paid ? "pagado" : "pendiente de pago"}`
+              : `Número ${formatNumberValue(h.number.value)}, ${paid ? "pagado" : "pendiente de pago"}`;
           return (
             <button
-              key={n.id}
+              key={h.kind === "set" ? h.group.id : h.number.id}
               type="button"
-              onClick={() => onSelect(n)}
-              aria-label={`Número ${formatNumberValue(n.value)}, ${paid ? "pagado" : "pendiente de pago"}`}
+              onClick={() => onSelect(h.kind === "set" ? h.members[0]! : h.number)}
+              aria-label={label}
               className={`flex h-11 min-w-11 items-center justify-center rounded-xl px-2.5 font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 ${
                 paid
                   ? "bg-gradient-to-b from-green-400 to-green-600 text-[#052012]"
                   : "border border-gold-600/60 bg-gold-400/10 text-gold-300"
               }`}
             >
-              {formatNumberValue(n.value)}
+              {h.kind === "set" ? `Conjunto ${h.group.label}` : formatNumberValue(h.number.value)}
             </button>
           );
         })}
@@ -244,15 +276,15 @@ function ParticipantCard({
           }
           className="mt-3 flex h-11 w-full items-center justify-center rounded-xl border border-green-500/40 bg-green-500/10 text-sm font-semibold text-green-400 transition active:scale-[0.98]"
         >
-          {p.pendingCount === 1 ? "Marcar como pagado" : `Cobrar los ${p.pendingCount} pendientes`} ·{" "}
+          {pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} ·{" "}
           {formatCurrency(owes)}
         </button>
       )}
 
       <p className="mt-3 text-xs text-text-muted">
         {p.numbers.length} {p.numbers.length === 1 ? "número" : "números"}
-        {p.paidCount > 0 && ` · ${p.paidCount} pagado${p.paidCount === 1 ? "" : "s"}`}
-        {p.pendingCount > 0 && ` · ${p.pendingCount} pendiente${p.pendingCount === 1 ? "" : "s"}`}
+        {paidItems > 0 && ` · ${paidItems} pagado${paidItems === 1 ? "" : "s"}`}
+        {pendingItems > 0 && ` · ${pendingItems} pendiente${pendingItems === 1 ? "" : "s"}`}
       </p>
     </li>
   );

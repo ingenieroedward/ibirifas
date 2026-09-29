@@ -143,6 +143,12 @@ export interface SaleEvent {
   values: number[];
   numberPrice: number;
   paymentMethod?: PaymentMethod | null;
+  /** Letters of the whole sets involved; their numbers are then named by letter, not one by one. */
+  sets?: string[];
+  /** With `sets`: the loose numbers that went along with them. */
+  looseValues?: number[];
+  /** What it all came to, when it isn't simply `values.length * numberPrice` (sets have their own price). */
+  amount?: number;
 }
 
 /** Spanish copy for a sale/payment/release, worded for one number or several. */
@@ -150,8 +156,18 @@ export function describeEvent(event: SaleEvent): string {
   const { actorName, values, numberPrice } = event;
   const buyer = event.buyerName ?? "un comprador";
   const many = values.length > 1;
-  const numbers = many ? `${values.length} números (${describeNumbers(values)})` : `el ${describeNumbers(values)}`;
-  const total = formatCurrency(values.length * numberPrice);
+  const looseText = (loose: number[]) =>
+    loose.length > 1 ? `${loose.length} números (${describeNumbers(loose)})` : `el ${describeNumbers(loose)}`;
+  let numbers = many ? `${values.length} números (${describeNumbers(values)})` : `el ${describeNumbers(values)}`;
+  if (event.sets && event.sets.length > 0) {
+    const setsText =
+      event.sets.length === 1
+        ? `el conjunto ${event.sets[0]}`
+        : `los conjuntos ${event.sets.slice(0, -1).join(", ")} y ${event.sets[event.sets.length - 1]}`;
+    const loose = event.looseValues ?? [];
+    numbers = loose.length > 0 ? `${setsText} y ${looseText(loose)}` : setsText;
+  }
+  const total = formatCurrency(event.amount ?? values.length * numberPrice);
   const method = event.paymentMethod ? ` · ${PAYMENT_METHOD_LABEL[event.paymentMethod]}` : "";
 
   switch (event.kind) {
