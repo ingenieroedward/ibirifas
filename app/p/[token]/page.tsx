@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PublicRaffleView } from "@/components/PublicRaffleView";
 import { formatCurrency } from "@/lib/format";
 import { getPublicRaffle } from "@/lib/publicRaffle";
+import { requestOrigin } from "@/lib/siteUrl";
 
 // Always fresh: what's still available changes with every sale.
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const raffle = await getPublicRaffle(token);
   // Private link: keep it out of search engines whatever it holds.
   const robots = { index: false, follow: false };
-  if (!raffle) return { title: "Rifa no disponible · Ibirifas", robots };
+  if (!raffle) return { metadataBase: await requestOrigin(), title: "Rifa no disponible · Ibirifas", robots };
 
   const available = raffle.numbers.filter((n) => !n.sold).length;
   const description =
@@ -22,10 +23,13 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
           raffle.groups.length === 0 ? ` a ${formatCurrency(raffle.numberPrice)}` : ""
         }`;
   return {
+    // The picture (app/p/[token]/opengraph-image.tsx) needs the site's absolute address.
+    metadataBase: await requestOrigin(),
     title: `${raffle.name} · números disponibles`,
     description,
     robots,
-    openGraph: { title: raffle.name, description, type: "website" },
+    openGraph: { title: raffle.name, description, siteName: "Ibirifas", type: "website", locale: "es_CO" },
+    twitter: { card: "summary_large_image", title: raffle.name, description },
   };
 }
 

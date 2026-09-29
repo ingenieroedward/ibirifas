@@ -69,6 +69,17 @@ producción. El superadmin entra **sin** código de organización.
   en buscadores, el endpoint público limita 60 consultas por minuto por IP y
   eliminar la rifa mata el enlace. Los vendedores pueden copiarlo si está
   activo, pero solo el organizador lo administra.
+- **Vista previa al compartir enlaces** (WhatsApp, Telegram, Facebook…): el
+  enlace de ingreso muestra una tarjeta de marca con título y descripción
+  cortos, y el enlace público de cada rifa muestra **su propia tarjeta** de
+  1200×630 con el nombre, el premio, el valor, cuántos números o conjuntos
+  quedan y la fecha del sorteo, en los colores de la rifa (rifa cerrada: "Ganó el
+  47"). Se dibuja al pedirla, con la tipografía Baloo 2 (`public/fonts`, licencia
+  OFL), y solo usa datos públicos. Las direcciones de las imágenes se arman con
+  el dominio real desde los encabezados del proxy (`x-forwarded-host/proto`);
+  `APP_URL` (opcional, ej. `https://rifas.midominio.com`) lo fija a mano. Las
+  apps de chat guardan la vista previa un buen rato: si acabas de cambiar el
+  nombre o vendiste mucho, puede tardar en actualizarse en un chat ya compartido.
 - **Instalar la app**: la pantalla de ingreso tiene un botón "Instalar app". Donde
   el navegador lo permite (Android, Chrome, Edge) instala con un toque usando
   `beforeinstallprompt`; en iPhone/iPad, que no tiene ese evento, abre los pasos

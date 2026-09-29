@@ -17,9 +17,11 @@ const bodyFont = Inter({
 
 export const metadata: Metadata = {
   title: "Ibirifas · Gestión de Rifas",
-  description:
-    "Gestiona tu rifa en vivo: marca números vendidos, registra al comprador y adjunta el comprobante desde el celular.",
+  // Short on purpose: chat apps cut the description of a shared link after ~80 characters.
+  description: "Vende, cobra y comparte tus rifas desde el celular.",
   applicationName: "Ibirifas",
+  openGraph: { siteName: "Ibirifas", type: "website", locale: "es_CO" },
+  twitter: { card: "summary_large_image" },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
