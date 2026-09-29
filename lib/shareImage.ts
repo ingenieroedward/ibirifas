@@ -443,8 +443,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const CROWN_WIDTH = 104;
   const CROWN_HEIGHT = (40 * CROWN_WIDTH) / 64;
   const TITLE_GAP = 22;
-  const TITLE_MAX_SIZE = 58;
-  const TITLE_MIN_SIZE = 30;
+  const TITLE_MAX_SIZE = 88;
+  const TITLE_MIN_SIZE = 40;
   const TITLE_MAX_LINES = 2;
   const TITLE_LINE_HEIGHT = 1.1;
   const UNDERLINE_GAP = 14;
@@ -452,14 +452,14 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const KICKER_GAP = 20;
   const KICKER_HEIGHT = 46;
   const HERO_GAP = 26;
-  const HERO_TOP_HEIGHT = 132;
-  const HERO_META_HEIGHT = 54;
+  const HERO_TOP_HEIGHT = 178;
+  const HERO_META_HEIGHT = 62;
   const ACCOUNTS_GAP = 18;
   // 2 per row (not 3): a chip carrying "Label number · Responsable: Name" needs
   // real width to stay legible instead of truncating the one detail — the
   // payee's name — that buyers actually need to read.
   const ACCOUNTS_PER_ROW = 2;
-  const ACCOUNT_CHIP_HEIGHT = 44;
+  const ACCOUNT_CHIP_HEIGHT = 56;
   const ACCOUNT_ROW_GAP = 12;
   const DIVIDER_GAP = 26;
   const LEGEND_HEIGHT = 32;
@@ -622,56 +622,82 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     const premioCenterX = gridStartX + (splitX - gridStartX) / 2;
     const valorCenterX = splitX + (gridStartX + gridWidth - splitX) / 2;
 
-    ctx.textAlign = "center";
-    ctx.font = `700 15px ${bodyFont}`;
-    ctx.fillStyle = mutedText;
-    ctx.fillText("PREMIO", premioCenterX, cursorY + 32);
+    // Both values share one baseline so the two columns read as a single row.
+    const labelBaseline = cursorY + 44;
+    const valueBaseline = cursorY + HERO_TOP_HEIGHT - 34;
 
+    ctx.textAlign = "center";
+    ctx.font = `800 22px ${headingFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("PREMIO", premioCenterX, labelBaseline);
+
+    // Short prizes ("$500.000") stay on one big line; long ones ("Moto AKT
+    // 125 + casco") wrap to two lines rather than shrinking below the valor.
+    // The 48px two-line cap keeps the first line clear of the label.
     const premioMaxWidth = splitX - gridStartX - 40;
-    const { fontSize: premioSize, text: premioText } = fitFontSize(
-      ctx,
-      raffle.prizeLabel!,
-      premioMaxWidth,
-      42,
-      24,
-      "800",
-      headingFont,
-    );
+    let premioSize = 0;
+    let premioLines: string[] = [];
+    for (let size = 96; size >= 56; size -= 2) {
+      ctx.font = `800 ${size}px ${headingFont}`;
+      if (ctx.measureText(raffle.prizeLabel!).width <= premioMaxWidth) {
+        premioSize = size;
+        premioLines = [raffle.prizeLabel!];
+        break;
+      }
+    }
+    if (premioLines.length === 0) {
+      const wrapped = fitHeadline(ctx, raffle.prizeLabel!, premioMaxWidth, 2, 48, 30, "800", headingFont);
+      premioSize = wrapped.fontSize;
+      premioLines = wrapped.lines;
+    }
+    const premioLineHeight = premioSize * 1.05;
     ctx.font = `800 ${premioSize}px ${headingFont}`;
     ctx.fillStyle = theme.numberColor;
-    ctx.fillText(premioText, premioCenterX, cursorY + HERO_TOP_HEIGHT - 28);
+    ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
+    ctx.shadowBlur = premioSize * 0.3;
+    premioLines.forEach((line, i) => {
+      const y = valueBaseline - (premioLines.length - 1 - i) * premioLineHeight;
+      ctx.fillText(line, premioCenterX, y);
+    });
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
 
-    ctx.font = `700 13px ${bodyFont}`;
+    ctx.font = `800 20px ${headingFont}`;
     ctx.fillStyle = mutedText;
-    ctx.fillText("VALOR", valorCenterX, cursorY + 32);
+    ctx.fillText("VALOR DEL NÚMERO", valorCenterX, labelBaseline);
 
+    // Valor always stays visibly smaller than premio.
     const valorMaxWidth = gridStartX + gridWidth - splitX - 32;
     const { fontSize: valorSize, text: valorFitText } = fitFontSize(
       ctx,
       valorText,
       valorMaxWidth,
-      26,
-      16,
+      Math.max(24, Math.min(58, Math.round(premioSize * 0.72))),
+      24,
       "800",
       headingFont,
     );
     ctx.font = `800 ${valorSize}px ${headingFont}`;
     ctx.fillStyle = theme.numberColor;
-    ctx.fillText(valorFitText, valorCenterX, cursorY + HERO_TOP_HEIGHT - 26);
+    ctx.fillText(valorFitText, valorCenterX, valueBaseline);
   } else {
     // No prize set: valor is the only fact, so it gets the spotlight instead
     // of sitting small in a corner.
     const centerX = gridStartX + gridWidth / 2;
     ctx.textAlign = "center";
-    ctx.font = `700 15px ${bodyFont}`;
+    ctx.font = `800 22px ${headingFont}`;
     ctx.fillStyle = mutedText;
-    ctx.fillText("VALOR DEL NÚMERO", centerX, cursorY + 36);
+    ctx.fillText("VALOR DEL NÚMERO", centerX, cursorY + 44);
 
     const maxWidth = gridWidth - 80;
-    const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 40, 26, "800", headingFont);
+    const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 88, 32, "800", headingFont);
     ctx.font = `800 ${fontSize}px ${headingFont}`;
     ctx.fillStyle = theme.numberColor;
-    ctx.fillText(text, centerX, cursorY + HERO_TOP_HEIGHT - 30);
+    ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
+    ctx.shadowBlur = fontSize * 0.3;
+    ctx.fillText(text, centerX, cursorY + HERO_TOP_HEIGHT - 34);
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
   }
 
   if (hasMeta) {
@@ -686,9 +712,9 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     const metaText = raffle.drawDate
       ? `Sorteo el ${formatDate(raffle.drawDate)}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
       : `Lotería: ${raffle.lottery}`;
-    const metaIconSize = 20;
-    const metaIconGap = 8;
-    ctx.font = `600 18px ${bodyFont}`;
+    const metaIconSize = 26;
+    const metaIconGap = 10;
+    ctx.font = `600 24px ${bodyFont}`;
     const metaTextWidth = ctx.measureText(metaText).width;
     const metaBlockWidth = metaIconSize + metaIconGap + metaTextWidth;
     const metaBlockStartX = gridStartX + gridWidth / 2 - metaBlockWidth / 2;
@@ -701,7 +727,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     }
     ctx.textAlign = "left";
     ctx.fillStyle = mutedText;
-    ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 6);
+    ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 8);
   }
 
   cursorY += heroHeight;
@@ -734,16 +760,16 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       drawRoundedRect(ctx, x, y, chipWidth, ACCOUNT_CHIP_HEIGHT, ACCOUNT_CHIP_HEIGHT / 2);
       ctx.stroke();
 
-      const iconCx = x + 22;
+      const iconCx = x + 30;
       const iconCy = y + ACCOUNT_CHIP_HEIGHT / 2;
-      drawWalletIcon(ctx, iconCx, iconCy, 18, theme.numberColor);
+      drawWalletIcon(ctx, iconCx, iconCy, 24, theme.numberColor);
 
       const label = account.holderName
         ? `${account.label} ${account.number} · Responsable: ${account.holderName}`
         : `${account.label} ${account.number}`;
-      const textStartX = x + 40;
-      const textAreaWidth = chipWidth - 40 - 14;
-      const { fontSize, text } = fitFontSize(ctx, label, textAreaWidth, 17, 12, "600", bodyFont);
+      const textStartX = x + 52;
+      const textAreaWidth = chipWidth - 52 - 18;
+      const { fontSize, text } = fitFontSize(ctx, label, textAreaWidth, 24, 14, "700", bodyFont);
       ctx.font = `600 ${fontSize}px ${bodyFont}`;
       ctx.fillStyle = dark ? "#f5f3ff" : "#131218";
       ctx.textAlign = "left";
