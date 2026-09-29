@@ -148,6 +148,32 @@ Requisitos y límites:
 - El aviso se envía después de guardar la venta y nunca la retrasa ni la
   hace fallar: si el servicio de push está caído, la venta se guarda igual.
 
+## Actualización en tiempo real
+
+Cuando alguien del equipo vende, cobra o libera un número, los demás lo ven
+en su tablero al instante, sin recargar. El botón de recargar junto a las
+pestañas (con un punto verde cuando hay conexión en vivo) fuerza una
+actualización completa, que además trae cambios de la rifa misma (premio,
+cuentas de pago).
+
+Cómo funciona: cada tablero mantiene una conexión Server-Sent Events con
+`/api/raffles/:id/events`, que solo avisa "algo cambió"; el navegador pide
+entonces los cambios con su propia sesión (`/api/raffles/:id/numbers?since=…`).
+Esa misma puesta al día se ejecuta al reconectar, al volver a abrir la app y
+cada 30 segundos, así que si la conexión en vivo se pierde o algún proxy la
+retiene, el tablero igual se actualiza (con unos segundos de retraso).
+
+Límites a tener en cuenta:
+
+- Las conexiones viven en la memoria del servidor (`lib/realtime.ts`), así
+  que esto asume **una sola instancia** de la app, como hoy en Dokploy. Si algún
+  día se escala a varias, hay que cambiar ese archivo por un canal compartido
+  (por ejemplo Redis pub/sub); el respaldo de 30 s sigue funcionando mientras tanto.
+- Un proxy inverso no debe guardar en buffer las respuestas
+  `text/event-stream`. El de Dokploy (Traefik) no lo hace por defecto y la app
+  envía `X-Accel-Buffering: no` para los que sí (nginx).
+- Cada rifa admite hasta 300 conexiones en vivo a la vez.
+
 ## Notas conocidas
 
 - `npm audit` reporta una vulnerabilidad en una dependencia transitiva del

@@ -3,7 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam } from "@/lib/push";
-import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
+import { publishRaffleChange } from "@/lib/realtime";
+import { toNumberDTO } from "@/lib/numberDto";
+import type { PaymentStatus } from "@/lib/types";
 
 const MAX_IDS = 100;
 const MAX_PHOTO_DATA_URL_LENGTH = 3 * 1024 * 1024;
@@ -136,6 +138,8 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  publishRaffleChange(found[0]!.raffleId);
+
   const updated = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
     orderBy: { value: "asc" },
@@ -177,19 +181,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const dtos: RaffleNumberDTO[] = updated.map((n) => ({
-    id: n.id,
-    value: n.value,
-    status: n.status as NumberStatus,
-    buyerName: n.buyerName,
-    buyerPhone: n.buyerPhone,
-    photoDataUrl: n.photoDataUrl,
-    paymentStatus: n.paymentStatus as PaymentStatus,
-    paymentMethod: n.paymentMethod as PaymentMethod | null,
-    notes: n.notes,
-    updatedByName: n.updatedBy?.name ?? null,
-    updatedAt: n.updatedAt.toISOString(),
-  }));
+  const dtos = updated.map(toNumberDTO);
 
   return NextResponse.json(dtos);
 }
