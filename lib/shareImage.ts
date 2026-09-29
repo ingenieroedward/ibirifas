@@ -1,5 +1,5 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
-import { formatCurrency, formatDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import type { RaffleDTO } from "@/lib/types";
 
@@ -706,7 +706,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     ctx.stroke();
 
     const metaText = raffle.drawDate
-      ? `Sorteo el ${formatDate(raffle.drawDate)}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
+      ? `Sorteo el ${formatDrawDate(raffle.drawDate)}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
       : `Lotería: ${raffle.lottery}`;
     const metaIconSize = 26;
     const metaIconGap = 10;

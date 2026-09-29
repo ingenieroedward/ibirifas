@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RaffleSummaryDTO } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDrawDate } from "@/lib/format";
 
 interface RafflePickerProps {
   raffles: RaffleSummaryDTO[];
@@ -55,7 +55,7 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
             Sorteo
           </p>
           <p className="mt-0.5 truncate text-base font-semibold text-text">
-            {raffle.drawDate ? formatDate(raffle.drawDate) : "Por definir"}
+            {raffle.drawDate ? formatDrawDate(raffle.drawDate) : "Por definir"}
           </p>
         </div>
       </div>

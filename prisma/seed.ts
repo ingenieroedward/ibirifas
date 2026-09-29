@@ -62,8 +62,9 @@ async function main() {
     },
   });
 
-  const drawDate = new Date();
-  drawDate.setDate(drawDate.getDate() + 14);
+  // UTC midnight, matching how the raffle form stores a picked calendar day.
+  const now = new Date();
+  const drawDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 14));
 
   const raffle = await prisma.raffle.create({
     data: {

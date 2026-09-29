@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDrawDate } from "@/lib/format";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
 import { Spinner } from "@/components/Spinner";
@@ -114,7 +114,7 @@ export function DashboardHeader({
             <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
               <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
               <span>
-                {raffle.drawDate ? `Sorteo el ${formatDate(raffle.drawDate)}` : "Sorteo"}
+                {raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo"}
                 {raffle.lottery && (
                   <>
                     {raffle.drawDate && " · "}
