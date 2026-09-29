@@ -455,12 +455,9 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const HERO_TOP_HEIGHT = 178;
   const HERO_META_HEIGHT = 62;
   const ACCOUNTS_GAP = 18;
-  // 2 per row (not 3): a chip carrying "Label number · Responsable: Name" needs
-  // real width to stay legible instead of truncating the one detail — the
-  // payee's name — that buyers actually need to read.
-  const ACCOUNTS_PER_ROW = 2;
-  const ACCOUNT_CHIP_HEIGHT = 56;
-  const ACCOUNT_ROW_GAP = 12;
+  const ACCOUNTS_HEADER_HEIGHT = 50;
+  const ACCOUNT_ROW_HEIGHT = 52;
+  const ACCOUNTS_BOTTOM_PADDING = 12;
   const DIVIDER_GAP = 26;
   const LEGEND_HEIGHT = 32;
   const GRID_TOP_GAP = 30;
@@ -490,9 +487,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const heroHeight = HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
 
   const accountsCount = raffle.accounts.length;
-  const accountsRows = accountsCount > 0 ? Math.ceil(accountsCount / ACCOUNTS_PER_ROW) : 0;
   const accountsHeight =
-    accountsRows > 0 ? accountsRows * ACCOUNT_CHIP_HEIGHT + (accountsRows - 1) * ACCOUNT_ROW_GAP : 0;
+    accountsCount > 0 ? ACCOUNTS_HEADER_HEIGHT + accountsCount * ACCOUNT_ROW_HEIGHT + ACCOUNTS_BOTTOM_PADDING : 0;
 
   const headerHeight =
     HEADER_TOP +
@@ -505,7 +501,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     KICKER_HEIGHT +
     HERO_GAP +
     heroHeight +
-    (accountsRows > 0 ? ACCOUNTS_GAP + accountsHeight : 0) +
+    (accountsCount > 0 ? ACCOUNTS_GAP + accountsHeight : 0) +
     DIVIDER_GAP +
     LEGEND_HEIGHT;
 
@@ -732,48 +728,96 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
 
   cursorY += heroHeight;
 
-  // Payment accounts: compact pill chips, wrapped at a fixed count per row so
-  // the reserved height only ever depends on how many accounts there are —
-  // omitted entirely (no gap reserved) when the raffle has none.
-  if (accountsRows > 0) {
+  // Payment accounts: a card styled like the hero banner, one centered row
+  // per account (gold bank name, bright number, muted responsable). Rows are
+  // sized to their content, so a single short account never leaves a
+  // half-empty pill behind it.
+  if (accountsCount > 0) {
     cursorY += ACCOUNTS_GAP;
-    const chipGap = 10;
-    const chipWidth = (gridWidth - chipGap * (ACCOUNTS_PER_ROW - 1)) / ACCOUNTS_PER_ROW;
+
+    drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, accountsHeight, 24);
+    ctx.fillStyle = dark ? withAlpha("#000000", 0.32) : withAlpha("#ffffff", 0.55);
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(theme.numberColor, 0.4);
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, accountsHeight, 24);
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.font = `800 20px ${headingFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("CUENTAS DE PAGO", CANVAS_WIDTH / 2, cursorY + 36);
+
+    const rowMaxWidth = gridWidth - 48;
+    const numberColor = dark ? "#f5f3ff" : "#131218";
 
     raffle.accounts.forEach((account, index) => {
-      const row = Math.floor(index / ACCOUNTS_PER_ROW);
-      const indexInRow = index % ACCOUNTS_PER_ROW;
-      const itemsInRow = Math.min(ACCOUNTS_PER_ROW, accountsCount - row * ACCOUNTS_PER_ROW);
-      const rowWidth = itemsInRow * chipWidth + (itemsInRow - 1) * chipGap;
-      const rowStartX = gridStartX + (gridWidth - rowWidth) / 2;
-      const x = rowStartX + indexInRow * (chipWidth + chipGap);
-      const y = cursorY + row * (ACCOUNT_CHIP_HEIGHT + ACCOUNT_ROW_GAP);
+      const rowTop = cursorY + ACCOUNTS_HEADER_HEIGHT + index * ACCOUNT_ROW_HEIGHT;
+      const rowCy = rowTop + ACCOUNT_ROW_HEIGHT / 2;
 
-      drawRoundedRect(ctx, x, y, chipWidth, ACCOUNT_CHIP_HEIGHT, ACCOUNT_CHIP_HEIGHT / 2);
-      const chipFill = ctx.createLinearGradient(x, y, x, y + ACCOUNT_CHIP_HEIGHT);
-      chipFill.addColorStop(0, withAlpha(theme.numberColor, dark ? 0.2 : 0.14));
-      chipFill.addColorStop(1, withAlpha(theme.numberColor, dark ? 0.1 : 0.07));
-      ctx.fillStyle = chipFill;
-      ctx.fill();
-      ctx.strokeStyle = withAlpha(theme.numberColor, 0.45);
-      ctx.lineWidth = 1.3;
-      drawRoundedRect(ctx, x, y, chipWidth, ACCOUNT_CHIP_HEIGHT, ACCOUNT_CHIP_HEIGHT / 2);
-      ctx.stroke();
+      if (index > 0) {
+        ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.08);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gridStartX + 40, rowTop);
+        ctx.lineTo(gridStartX + gridWidth - 40, rowTop);
+        ctx.stroke();
+      }
 
-      const iconCx = x + 30;
-      const iconCy = y + ACCOUNT_CHIP_HEIGHT / 2;
-      drawWalletIcon(ctx, iconCx, iconCy, 24, theme.numberColor);
+      // 10-digit Colombian mobile numbers (Nequi/Daviplata) read far easier
+      // grouped 3-3-4; anything else is shown exactly as entered.
+      const number = /^\d{10}$/.test(account.number)
+        ? `${account.number.slice(0, 3)} ${account.number.slice(3, 6)} ${account.number.slice(6)}`
+        : account.number;
+      let holder = account.holderName ? `· Responsable: ${account.holderName}` : null;
 
-      const label = account.holderName
-        ? `${account.label} ${account.number} · Responsable: ${account.holderName}`
-        : `${account.label} ${account.number}`;
-      const textStartX = x + 52;
-      const textAreaWidth = chipWidth - 52 - 18;
-      const { fontSize, text } = fitFontSize(ctx, label, textAreaWidth, 24, 14, "700", bodyFont);
-      ctx.font = `600 ${fontSize}px ${bodyFont}`;
-      ctx.fillStyle = dark ? "#f5f3ff" : "#131218";
+      const measure = (scale: number) => {
+        ctx.font = `800 ${26 * scale}px ${headingFont}`;
+        const labelWidth = ctx.measureText(account.label).width;
+        ctx.font = `700 ${26 * scale}px ${bodyFont}`;
+        const numberWidth = ctx.measureText(number).width;
+        ctx.font = `600 ${20 * scale}px ${bodyFont}`;
+        const holderWidth = holder ? ctx.measureText(holder).width : 0;
+        const gap = 12 * scale;
+        const icon = 24 * scale;
+        const total = icon + gap + labelWidth + gap + numberWidth + (holder ? gap + holderWidth : 0);
+        return { labelWidth, numberWidth, gap, icon, total };
+      };
+
+      // Shrink the whole row first; only if it still overflows, shorten the
+      // responsable (the least essential part), then drop it.
+      let scale = 1;
+      let m = measure(scale);
+      while (m.total > rowMaxWidth && scale > 0.6) {
+        scale -= 0.05;
+        m = measure(scale);
+      }
+      while (holder && m.total > rowMaxWidth) {
+        const base = holder.endsWith("…") ? holder.slice(0, -1) : holder;
+        holder = base.length > 16 ? `${base.slice(0, -1)}…` : null;
+        m = measure(scale);
+      }
+
+      let x = CANVAS_WIDTH / 2 - m.total / 2;
+      drawWalletIcon(ctx, x + m.icon / 2, rowCy, m.icon, theme.numberColor);
+      x += m.icon + m.gap;
+
       ctx.textAlign = "left";
-      ctx.fillText(text, textStartX, iconCy + fontSize * 0.32);
+      ctx.font = `800 ${26 * scale}px ${headingFont}`;
+      ctx.fillStyle = theme.numberColor;
+      ctx.fillText(account.label, x, rowCy + 9 * scale);
+      x += m.labelWidth + m.gap;
+
+      ctx.font = `700 ${26 * scale}px ${bodyFont}`;
+      ctx.fillStyle = numberColor;
+      ctx.fillText(number, x, rowCy + 9 * scale);
+      x += m.numberWidth + m.gap;
+
+      if (holder) {
+        ctx.font = `600 ${20 * scale}px ${bodyFont}`;
+        ctx.fillStyle = mutedText;
+        ctx.fillText(holder, x, rowCy + 7 * scale);
+      }
     });
 
     cursorY += accountsHeight;
