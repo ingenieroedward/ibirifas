@@ -67,6 +67,29 @@ export function checkPublicRateLimit(ip: string): boolean {
   return true;
 }
 
+const reserveHits = new Map<string, number[]>();
+const RESERVE_WINDOW_MS = 60 * 60 * 1000;
+const RESERVE_MAX_HITS = 6;
+
+/** Reservations from the public link cost real numbers, so they get a much tighter allowance: 6 an hour per IP. */
+export function checkReserveRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const recent = (reserveHits.get(ip) ?? []).filter((ts) => now - ts < RESERVE_WINDOW_MS);
+  if (recent.length >= RESERVE_MAX_HITS) {
+    reserveHits.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  reserveHits.set(ip, recent);
+
+  if (reserveHits.size > 10_000) {
+    for (const [key, timestamps] of reserveHits) {
+      if (timestamps.every((ts) => now - ts >= RESERVE_WINDOW_MS)) reserveHits.delete(key);
+    }
+  }
+  return true;
+}
+
 /** Best-effort client IP extraction for App Router requests. */
 export function getClientIp(req: NextRequest): string {
   const forwardedFor = req.headers.get("x-forwarded-for");

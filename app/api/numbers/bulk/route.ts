@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
             updatedById: user.id,
             soldById: user.id,
             soldAt: new Date(),
+            online: false,
           },
         });
         if (count !== ids.length) {
@@ -162,6 +163,7 @@ export async function POST(req: NextRequest) {
             updatedById: user.id,
             soldById: null,
             soldAt: null,
+            online: false,
           },
         });
         return;

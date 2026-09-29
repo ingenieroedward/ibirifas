@@ -36,6 +36,10 @@ model AdminUser {
   // system the superadmin will configure — unused/unenforced today.
   plan          String         @default("free")
 
+  // Only meaningful for ORGANIZER: the organization's default for letting people
+  // reserve numbers from a raffle's public link. Each raffle can override it.
+  publicReservations Boolean    @default(false)
+
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]
   raffles       Raffle[]       @relation("RaffleOwner")
@@ -110,6 +114,12 @@ model Raffle {
   // on sale by themselves; otherwise the team is only warned (at most once a
   // day, `expiryNoticeAt` remembers when).
   holdDays        Int?
+
+  // Reservations from the public link: null follows the organization's default,
+  // "on" / "off" override it. They also need `holdDays` (an unpaid reservation
+  // must be able to expire) — see lib/reservations.ts.
+  publicReservations String?
+
   autoRelease     Boolean      @default(false)
   expiryNoticeAt  DateTime?
 
@@ -192,6 +202,8 @@ model RaffleNumber {
   soldById      String?
   soldBy        AdminUser? @relation("SoldBy", fields: [soldById], references: [id])
   soldAt        DateTime?
+  // Reserved by a visitor of the public link (nobody on the team sold it).
+  online        Boolean    @default(false)
 
   // Null = a loose number sold on its own; otherwise it can only be sold, paid
   // or released together with the rest of its group.

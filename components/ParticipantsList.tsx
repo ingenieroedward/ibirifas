@@ -356,6 +356,11 @@ function ParticipantCard({
         )}
       </div>
 
+      {p.numbers.some((n) => n.online) && (
+        <p className="mt-2 mr-1.5 inline-block rounded-full border border-gold-600/40 bg-gold-400/10 px-2.5 py-0.5 text-[11px] font-bold text-gold-300">
+          Reserva en línea
+        </p>
+      )}
       {holdDays !== null && unpaid.length > 0 && (
         <p
           className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${

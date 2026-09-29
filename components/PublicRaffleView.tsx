@@ -5,6 +5,7 @@ import { darken, lighten, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
+import { ReserveSheet } from "@/components/ReserveSheet";
 
 const REFRESH_MS = 20_000;
 
@@ -44,8 +45,41 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
     };
   }, [refresh]);
 
+  // What the visitor has picked to reserve (only used when the raffle allows reservations).
+  const [pickedNumbers, setPickedNumbers] = useState<Set<number>>(new Set());
+  const [pickedSets, setPickedSets] = useState<Set<string>>(new Set());
+  // Frozen when the sheet opens: the picks become sold (ours) while the sheet still shows the confirmation.
+  const [reserving, setReserving] = useState<{ numbers: number[]; sets: string[]; total: number } | null>(null);
+  const [limitNote, setLimitNote] = useState<string | null>(null);
+
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
+  const canReserve = raffle.reservations.open && !closed;
+  const { maxLoose, maxSets } = raffle.reservations;
+
+  // Someone else may take a pick while the page is open: only what is still free counts.
+  const freeNumbers = useMemo(() => new Set(raffle.numbers.filter((n) => !n.sold).map((n) => n.value)), [raffle.numbers]);
+  const freeSets = useMemo(() => new Set(raffle.groups.filter((g) => !g.sold).map((g) => g.label)), [raffle.groups]);
+  const numbersPicked = [...pickedNumbers].filter((v) => freeNumbers.has(v)).sort((a, b) => a - b);
+  const setsPicked = [...pickedSets].filter((l) => freeSets.has(l)).sort();
+  const pickedTotal =
+    numbersPicked.length * raffle.numberPrice +
+    setsPicked.reduce((sum, l) => sum + (raffle.groups.find((g) => g.label === l)?.price ?? 0), 0);
+  const pickedCount = numbersPicked.length + setsPicked.length;
+
+  const toggleNumber = (value: number) => {
+    setLimitNote(null);
+    if (numbersPicked.includes(value)) setPickedNumbers(new Set(numbersPicked.filter((v) => v !== value)));
+    else if (numbersPicked.length >= maxLoose) setLimitNote(`Puedes reservar hasta ${maxLoose} números a la vez.`);
+    else setPickedNumbers(new Set([...numbersPicked, value]));
+  };
+  const toggleSet = (label: string) => {
+    setLimitNote(null);
+    if (setsPicked.includes(label)) setPickedSets(new Set(setsPicked.filter((l) => l !== label)));
+    else if (setsPicked.length >= maxSets) setLimitNote(`Puedes reservar hasta ${maxSets} conjuntos a la vez.`);
+    else setPickedSets(new Set([...setsPicked, label]));
+  };
+
   const available = raffle.numbers.filter((n) => !n.sold).length;
   const loose = useMemo(() => raffle.numbers.filter((n) => n.group === null), [raffle.numbers]);
   const looseFree = loose.filter((n) => !n.sold).length;
@@ -151,7 +185,9 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           </p>
           {!closed && available > 0 && (
             <p className="mt-1 text-center text-xs text-text-muted">
-              Para apartar los tuyos, escríbele a quien te compartió este enlace.
+              {canReserve
+                ? `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"} para pagar.`
+                : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
             </p>
           )}
         </div>
@@ -170,9 +206,26 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                       aria-label={`Conjunto ${group.label}, ${group.sold ? "vendido" : "disponible"}, ${formatCurrency(group.price)}`}
                       className={`rounded-2xl border bg-bg-elevated p-3.5 shadow-card ${group.sold ? "border-line" : "border-gold-600/40"}`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div
+                        {...(canReserve && !group.sold
+                          ? {
+                              role: "button",
+                              tabIndex: 0,
+                              "aria-pressed": setsPicked.includes(group.label),
+                              "aria-label": `Reservar conjunto ${group.label}, ${formatCurrency(group.price)}`,
+                              onClick: () => toggleSet(group.label),
+                              onKeyDown: (e: React.KeyboardEvent) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleSet(group.label);
+                                }
+                              },
+                            }
+                          : {})}
+                        className={`flex items-center gap-3 ${canReserve && !group.sold ? "cursor-pointer" : ""}`}
+                      >
                         <span
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-[family-name:var(--font-heading)] text-2xl font-extrabold ${group.sold ? "border border-line bg-surface-2 text-text-muted" : freeTile}`}
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-[family-name:var(--font-heading)] text-2xl font-extrabold ${group.sold ? "border border-line bg-surface-2 text-text-muted" : freeTile} ${setsPicked.includes(group.label) ? "ring-4 ring-white ring-offset-2 ring-offset-bg" : ""}`}
                           style={group.sold ? undefined : tileStyle}
                         >
                           {group.label}
@@ -186,7 +239,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                         <span
                           className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${group.sold ? "border border-line bg-surface-2 text-text-muted" : "border border-gold-600/50 bg-gold-400/10 text-gold-400"}`}
                         >
-                          {group.sold ? "Vendido" : "Disponible"}
+                          {group.sold ? "Vendido" : setsPicked.includes(group.label) ? "Elegido ✓" : "Disponible"}
                         </span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -215,16 +268,36 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 </h2>
               )}
               <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-2.5 lg:grid-cols-10">
-                {loose.map((n) => (
-                  <span
-                    key={n.value}
-                    aria-label={`Número ${formatNumberValue(n.value)}, ${n.sold ? "ocupado" : "disponible"}${raffle.winnerValue === n.value ? ", ganador" : ""}`}
-                    className={`relative flex aspect-square items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold sm:text-lg ${n.sold ? soldTile : freeTile} ${raffle.winnerValue === n.value ? "opacity-100 ring-4 ring-gold-300 ring-offset-2 ring-offset-bg" : ""}`}
-                    style={n.sold ? undefined : tileStyle}
-                  >
-                    {formatNumberValue(n.value)}
-                  </span>
-                ))}
+                {loose.map((n) => {
+                  const picked = numbersPicked.includes(n.value);
+                  const className = `relative flex aspect-square items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold sm:text-lg ${n.sold ? soldTile : freeTile} ${raffle.winnerValue === n.value ? "opacity-100 ring-4 ring-gold-300 ring-offset-2 ring-offset-bg" : ""} ${picked ? "ring-4 ring-white ring-offset-2 ring-offset-bg" : ""}`;
+                  if (canReserve && !n.sold) {
+                    return (
+                      <button
+                        key={n.value}
+                        type="button"
+                        aria-pressed={picked}
+                        aria-label={`Número ${formatNumberValue(n.value)}, disponible${picked ? ", elegido" : ""}`}
+                        onClick={() => toggleNumber(n.value)}
+                        className={`${className} transition active:scale-90`}
+                        style={tileStyle}
+                      >
+                        {formatNumberValue(n.value)}
+                        {picked && <span aria-hidden="true" className="absolute right-1 top-0.5 text-[11px]">✓</span>}
+                      </button>
+                    );
+                  }
+                  return (
+                    <span
+                      key={n.value}
+                      aria-label={`Número ${formatNumberValue(n.value)}, ${n.sold ? "ocupado" : "disponible"}${raffle.winnerValue === n.value ? ", ganador" : ""}`}
+                      className={className}
+                      style={n.sold ? undefined : tileStyle}
+                    >
+                      {formatNumberValue(n.value)}
+                    </span>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -239,6 +312,51 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           </div>
         </div>
       </main>
+
+      {canReserve && pickedCount > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pb-safe backdrop-blur">
+          <div className="mx-auto w-full max-w-3xl py-3">
+            {limitNote && (
+              <p role="status" className="mb-2 text-xs font-medium text-gold-400">
+                {limitNote}
+              </p>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-[family-name:var(--font-heading)] text-base font-bold text-text">
+                  {pickedCount} {pickedCount === 1 ? "elegido" : "elegidos"}
+                </p>
+                <p className="text-xs text-text-muted">{formatCurrency(pickedTotal)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReserving({ numbers: numbersPicked, sets: setsPicked, total: pickedTotal })}
+                className="h-12 shrink-0 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 px-6 text-sm font-bold text-[#241a02] shadow-gold transition active:scale-[0.98]"
+              >
+                Reservar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reserving && (
+        <ReserveSheet
+          token={token}
+          raffle={raffle}
+          numbers={reserving.numbers}
+          sets={reserving.sets}
+          total={reserving.total}
+          onClose={(reserved) => {
+            setReserving(null);
+            if (reserved) {
+              setPickedNumbers(new Set());
+              setPickedSets(new Set());
+              void refresh();
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

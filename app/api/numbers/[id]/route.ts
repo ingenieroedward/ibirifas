@@ -111,6 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updatedBy: { connect: { id: user.id } },
       soldBy: { disconnect: true },
       soldAt: null,
+      online: false,
     };
   } else {
     const resultingBuyerName =
@@ -141,6 +142,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (existing.status === "available") {
       data.soldBy = { connect: { id: user.id } };
       data.soldAt = new Date();
+      data.online = false;
     }
 
     if (input.buyerName !== undefined) data.buyerName = input.buyerName;

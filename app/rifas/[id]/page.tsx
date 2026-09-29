@@ -452,14 +452,16 @@ export default function RaffleDashboardPage() {
         if (n.groupId) sets.set(n.groupId, n);
         else loose.push(n);
       }
-      const verbOf = (n: RaffleNumberDTO) => (n.status === "paid" ? "cobró" : n.status === "occupied" ? "vendió" : "liberó");
+      const verbOf = (n: RaffleNumberDTO) =>
+        n.status === "paid" ? "cobró" : n.status === "occupied" ? (n.online ? "reservó" : "vendió") : "liberó";
+      const who = (n: RaffleNumberDTO) => n.updatedByName ?? (n.online ? `${n.buyerName ?? "Alguien"} (en línea)` : "Alguien");
       for (const [groupId, n] of sets) {
         const label = groupLabelOf(raffleRef.current?.groups ?? [], groupId) ?? "";
-        messages.push(`${n.updatedByName ?? "Alguien"} ${verbOf(n)} el conjunto ${label}`.trim());
+        messages.push(`${who(n)} ${verbOf(n)} el conjunto ${label}`.trim());
       }
       if (loose.length === 1) {
         const n = loose[0]!;
-        messages.push(`${n.updatedByName ?? "Alguien"} ${verbOf(n)} el ${formatNumberValue(n.value)}`);
+        messages.push(`${who(n)} ${verbOf(n)} el ${formatNumberValue(n.value)}`);
       } else if (loose.length > 1) {
         messages.push(`${loose.length} números actualizados por el equipo`);
       }
@@ -833,6 +835,7 @@ export default function RaffleDashboardPage() {
           raffleName={raffle.name}
           token={raffle.publicToken}
           canManage={isOrganizer}
+          reservationsOpen={raffle.reservationsOpen}
           onClose={() => setPublicLinkOpen(false)}
           onChange={handlePublicLinkChange}
         />

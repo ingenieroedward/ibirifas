@@ -247,6 +247,7 @@ function SheetContent({
           <>
             <div className="space-y-3 rounded-2xl border border-line bg-surface-2 p-4">
               <InfoRow label="Comprador" value={number.buyerName || "Sin nombre"} />
+              {number.online && <InfoRow label="Origen" value="Reserva en línea" />}
               {number.updatedByName && (
                 <InfoRow label="Registrado por" value={number.updatedByName} />
               )}

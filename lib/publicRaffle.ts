@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { MAX_LOOSE_PER_RESERVATION, MAX_SETS_PER_RESERVATION, reservationsOpen } from "@/lib/reservations";
 import type { PublicRaffleDTO } from "@/lib/types";
 
 /** 128 bits of randomness, URL-safe (22 characters). Unguessable, so the link itself is the secret. */
@@ -30,6 +31,9 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       status: true,
       winnerValue: true,
       totalNumbers: true,
+      holdDays: true,
+      publicReservations: true,
+      owner: { select: { publicReservations: true } },
       themeBackground: true,
       themeNumberColor: true,
       themeTextColor: true,
@@ -66,5 +70,16 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       sold: numbers.filter((n) => n.group === g.label).every((n) => n.sold),
     })),
     numbers,
+    reservations: {
+      open: reservationsOpen({
+        raffleSetting: raffle.publicReservations,
+        organizationDefault: raffle.owner.publicReservations,
+        holdDays: raffle.holdDays,
+        status: raffle.status,
+      }),
+      holdDays: raffle.holdDays,
+      maxLoose: MAX_LOOSE_PER_RESERVATION,
+      maxSets: MAX_SETS_PER_RESERVATION,
+    },
   };
 }

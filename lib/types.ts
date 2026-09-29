@@ -4,6 +4,15 @@ export type Role = "SUPERADMIN" | "ORGANIZER" | "SELLER";
 // How a manual payment was collected in person — no gateway involved yet.
 export type PaymentMethod = "cash" | "nequi" | "transfer" | "other";
 
+/** A raffle's reservations from the public link: follow the organization, or force on/off. */
+export type ReservationSetting = "inherit" | "on" | "off";
+
+/** Settings that apply to a whole organization (its organizer changes them). */
+export interface OrgSettingsDTO {
+  /** Default for its raffles: may visitors of a public link reserve numbers? */
+  publicReservations: boolean;
+}
+
 export interface AdminUserDTO {
   id: string;
   name: string;
@@ -36,6 +45,8 @@ export interface RaffleNumberDTO {
   soldById: string | null;
   soldByName: string | null;
   soldAt: string | null;
+  /** Reserved by a visitor of the public link rather than sold by the team. */
+  online: boolean;
   updatedAt: string;
 }
 
@@ -95,6 +106,24 @@ export interface PublicRaffleDTO {
   groups: { label: string; price: number; sold: boolean }[];
   /** Every number: `sold` is true for anything taken (pending or paid); `group` is the set's letter. */
   numbers: { value: number; sold: boolean; group: string | null }[];
+  /** Whether visitors can reserve from this page, and how many days they get to pay. */
+  reservations: { open: boolean; holdDays: number | null; maxLoose: number; maxSets: number };
+}
+
+/** What a visitor sends to reserve: loose numbers and/or whole sets by letter. */
+export interface ReserveInput {
+  name: string;
+  phone: string;
+  numbers: number[];
+  sets: string[];
+}
+
+export interface ReserveResultDTO {
+  /** What the reservation comes to. */
+  total: number;
+  holdDays: number;
+  numbers: number[];
+  sets: string[];
 }
 
 export type PublicLinkAction = "enable" | "disable" | "regenerate";
@@ -122,6 +151,10 @@ export interface RaffleDTO {
   holdDays: number | null;
   /** Overdue numbers go back on sale by themselves (otherwise the team is only warned). */
   autoRelease: boolean;
+  /** This raffle's choice for reservations from the public link (inherit = the organization's default). */
+  publicReservations: ReservationSetting;
+  /** Whether reservations are open right now (the setting is on, there is a payment deadline, the raffle is active). */
+  reservationsOpen: boolean;
   /** Secret of the public read-only page (/p/<token>); null when there is none. */
   publicToken: string | null;
   numbers: RaffleNumberDTO[];
@@ -167,6 +200,7 @@ export interface CreateRaffleInput {
   accounts?: RaffleAccountInput[];
   holdDays?: number | null;
   autoRelease?: boolean;
+  publicReservations?: ReservationSetting;
   /** Sell in lettered sets; numbers not listed here remain loose and use `numberPrice`. */
   groups?: RaffleGroupInput[];
 }
@@ -192,6 +226,7 @@ export interface UpdateRaffleInput {
   /** Days a sold-but-unpaid number may wait before it is overdue; null = they never expire. */
   holdDays?: number | null;
   autoRelease?: boolean;
+  publicReservations?: ReservationSetting;
 }
 
 export interface UpdateNumberInput {

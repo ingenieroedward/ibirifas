@@ -160,6 +160,23 @@ producción. El superadmin entra **sin** código de organización.
   minutos, desde que arranca (`instrumentation.ts`, `lib/expirySweeper.ts`), y
   también se revisa al abrir la rifa, así una pantalla nunca muestra algo
   desactualizado. Como el resto del tiempo real, asume una sola instancia.
+- **Reservas desde el enlace público**: quien abre `/p/<token>` puede apartar
+  números o letras por su cuenta (toca lo que quiere, "Reservar", nombre y
+  teléfono). Se configura por **organización** y por **rifa**: en "Mi equipo" el
+  organizador marca el valor por defecto de todas sus rifas
+  (`AdminUser.publicReservations`), y en "Editar rifa" cada una puede seguirlo
+  ("Como mi organización"), forzarlo ("Permitir") o apagarlo ("No permitir")
+  (`Raffle.publicReservations`: `null` / `"on"` / `"off"`). Además la rifa debe
+  tener **plazo de pago** (`holdDays`): sin plazo las reservas no se abren, para
+  que nadie pueda dejar números apartados para siempre. Lo reservado queda como
+  apartado a nombre del visitante (`RaffleNumber.online`, sin vendedor: en el
+  reporte de ventas es la línea "Reservas en línea"), se avisa al equipo por push
+  y, si no se paga a tiempo, sigue las reglas de vencimiento (aviso o liberación
+  automática). Un conjunto se reserva completo. Límites: 10 números y 3
+  conjuntos por reserva, 20 números sin pagar por teléfono y por rifa, y 6
+  reservas por hora por IP; un número tomado entre tanto responde 409 y no se
+  aparta nada. La respuesta pública solo trae lo mismo que antes (nada de
+  compradores ni teléfonos ajenos). Endpoint: `POST /api/public/raffles/[token]/reserve`.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso
