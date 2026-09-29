@@ -339,41 +339,51 @@ function ParticipantCard({
         })}
       </div>
 
-      {p.pendingCount > 0 && (
-        <button
-          type="button"
-          onClick={() =>
-            onPayAll(
-              p.name,
-              p.numbers.filter((n) => n.status !== "paid"),
-            )
-          }
-          className="mt-3 flex h-11 w-full items-center justify-center rounded-xl border border-green-500/40 bg-green-500/10 text-sm font-semibold text-green-400 transition active:scale-[0.98]"
-        >
-          {pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} ·{" "}
-          {formatCurrency(owes)}
-        </button>
-      )}
-
-      {(reminderUrl || receiptUrl) && (
-        <div className="mt-2 flex gap-2">
-          {reminderUrl && (
-            <a
-              href={reminderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 text-sm font-semibold text-text transition active:scale-[0.98]"
-            >
-              <WhatsAppIcon className="h-4 w-4 text-green-400" />
-              Recordar pago
-            </a>
+      {(p.pendingCount > 0 || receiptUrl) && (
+        <div className="mt-3 space-y-2">
+          {p.pendingCount > 0 && (
+            // Collect and remind side by side. On a phone the labels shrink (the amount is
+            // already in the "Debe" badge above); from `sm` up they read in full.
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onPayAll(
+                    p.name,
+                    p.numbers.filter((n) => n.status !== "paid"),
+                  )
+                }
+                aria-label={`${pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · ${formatCurrency(owes)}`}
+                className="flex h-11 min-w-0 flex-[1.3] items-center justify-center rounded-xl border border-green-500/40 bg-green-500/10 px-3 text-sm font-semibold text-green-400 transition active:scale-[0.98]"
+              >
+                <span aria-hidden="true" className="truncate sm:hidden">
+                  {pendingItems === 1 ? "Cobrar" : "Cobrar todo"}
+                </span>
+                <span aria-hidden="true" className="hidden truncate sm:inline">
+                  {pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · {formatCurrency(owes)}
+                </span>
+              </button>
+              {reminderUrl && (
+                <a
+                  href={reminderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Recordar pago por WhatsApp"
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3 text-sm font-semibold text-text transition active:scale-[0.98] sm:flex-none sm:px-5"
+                >
+                  <WhatsAppIcon className="h-4 w-4 shrink-0 text-green-400" />
+                  <span aria-hidden="true" className="truncate sm:hidden">Recordar</span>
+                  <span aria-hidden="true" className="hidden sm:inline">Recordar pago</span>
+                </a>
+              )}
+            </div>
           )}
           {receiptUrl && (
             <a
               href={receiptUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 text-sm font-semibold text-text transition active:scale-[0.98]"
+              className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 text-sm font-semibold text-text transition active:scale-[0.98]"
             >
               <WhatsAppIcon className="h-4 w-4 text-green-400" />
               Enviar comprobante
