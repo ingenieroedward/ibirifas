@@ -100,6 +100,8 @@ export function ParticipantsList({
 }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // A payment receipt opened full screen from a buyer's card.
+  const [receiptOpen, setReceiptOpen] = useState<string | null>(null);
 
   // "Now" is read once per render pass of the data, not per card, so every card agrees.
   const [now] = useState(() => Date.now());
@@ -224,9 +226,30 @@ export function ParticipantsList({
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
               onPayAll={onPayAll}
+              onViewReceipt={setReceiptOpen}
             />
           ))}
         </ul>
+      )}
+
+      {receiptOpen && (
+        <div
+          role="dialog"
+          aria-label="Comprobante"
+          className="fixed inset-0 z-[110] flex animate-fade-in items-center justify-center bg-black/95 p-4"
+          onClick={() => setReceiptOpen(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={receiptOpen} alt="Comprobante ampliado" className="max-h-full max-w-full rounded-lg object-contain" />
+          <button
+            type="button"
+            onClick={() => setReceiptOpen(null)}
+            aria-label="Cerrar comprobante"
+            className="absolute right-5 top-[calc(env(safe-area-inset-top,0px)+1rem)] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white"
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   );
@@ -257,6 +280,7 @@ function ParticipantCard({
   isWinner,
   onSelect,
   onPayAll,
+  onViewReceipt,
 }: {
   participant: Participant;
   groups: RaffleGroupDTO[];
@@ -267,7 +291,11 @@ function ParticipantCard({
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
+  onViewReceipt: (photoDataUrl: string) => void;
 }) {
+  // Every distinct receipt this buyer sent (a set carries one copy on each of its numbers), viewable from here
+  // without opening each number or set.
+  const receipts = [...new Set(p.numbers.map((n) => n.photoDataUrl).filter((u): u is string => Boolean(u)))];
   const owes = priceOf(p.numbers.filter((n) => n.status !== "paid"));
   const holdings = holdingsOf(p.numbers, groups);
   const pendingItems = holdings.filter((h) => !h.paid).length;
@@ -365,6 +393,23 @@ function ParticipantCard({
         <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
           Con comprobante
         </p>
+      )}
+      {receipts.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {receipts.map((url, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onViewReceipt(url)}
+              aria-label={receipts.length > 1 ? `Ver comprobante ${i + 1}` : "Ver comprobante"}
+              className="relative block h-16 w-16 overflow-hidden rounded-xl border border-green-500/40 transition active:scale-95"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="h-full w-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[10px] font-bold text-white">Ver</span>
+            </button>
+          ))}
+        </div>
       )}
       {holdDays !== null && unpaid.length > 0 && (
         <p
