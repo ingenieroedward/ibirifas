@@ -9,6 +9,7 @@ import type { ManagedUserDTO, Role } from "@/lib/types";
 const BCRYPT_ROUNDS = 10;
 
 const updateUserSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
   active: z.boolean().optional(),
   code: z.string().optional(),
   plan: z.string().trim().min(1).max(40).optional(),
@@ -75,7 +76,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const input = parsed.data;
-  const data: { active?: boolean; codeHash?: string; plan?: string } = {};
+  const data: { name?: string; active?: boolean; codeHash?: string; plan?: string } = {};
+
+  if (input.name !== undefined) {
+    data.name = input.name;
+  }
 
   if (input.plan !== undefined) {
     if (user.role !== "SUPERADMIN" || target.role !== "ORGANIZER") {
@@ -108,7 +113,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.active = input.active;
   }
 
-  const updated = await prisma.adminUser.update({ where: { id: target.id }, data });
+  const [updated] = await prisma.$transaction([
+    prisma.adminUser.update({ where: { id: target.id }, data }),
+    // A new code is usually a reset (lost phone, someone who shouldn't have it):
+    // end the sessions opened with the old one instead of letting them live on.
+    ...(data.codeHash
+      ? [prisma.refreshToken.updateMany({ where: { userId: target.id, revokedAt: null }, data: { revokedAt: new Date() } })]
+      : []),
+  ]);
 
   return NextResponse.json(toManagedUserDTO(updated));
 }
