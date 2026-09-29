@@ -48,6 +48,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
 
   const [name, setName] = useState(raffle?.name ?? "");
   const [prizeLabel, setPrizeLabel] = useState(raffle?.prizeLabel ?? "");
+  const [lottery, setLottery] = useState(raffle?.lottery ?? "");
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
@@ -118,6 +119,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         await updateRaffle(raffle.id, {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
+          lottery: lottery.trim() || null,
           numberPrice: Math.round(price),
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
           accounts: accountsPayload,
@@ -128,6 +130,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         const created = await createRaffle({
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
+          lottery: lottery.trim() || null,
           numberPrice: Math.round(price),
           totalNumbers: total,
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
@@ -167,6 +170,22 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           value={prizeLabel}
           onChange={(e) => setPrizeLabel(e.target.value)}
           placeholder='Ej. Televisor 55"'
+          disabled={submitting}
+          className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+        />
+      </Field>
+
+      <Field
+        label="Lotería (opcional)"
+        htmlFor="lottery"
+        hint="La lotería oficial de la que sale el número ganador, ej. Sinuano Noche."
+      >
+        <input
+          id="lottery"
+          type="text"
+          value={lottery}
+          onChange={(e) => setLottery(e.target.value)}
+          placeholder="Ej. Sinuano Noche"
           disabled={submitting}
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />

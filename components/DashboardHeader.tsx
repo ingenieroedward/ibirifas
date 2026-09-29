@@ -110,10 +110,18 @@ export function DashboardHeader({
               </p>
             </div>
           </div>
-          {raffle.drawDate && (
+          {(raffle.drawDate || raffle.lottery) && (
             <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
               <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
-              <span>Sorteo el {formatDate(raffle.drawDate)}</span>
+              <span>
+                {raffle.drawDate ? `Sorteo el ${formatDate(raffle.drawDate)}` : "Sorteo"}
+                {raffle.lottery && (
+                  <>
+                    {raffle.drawDate && " · "}
+                    {raffle.lottery}
+                  </>
+                )}
+              </span>
             </div>
           )}
           {raffle.accounts.length > 0 && (
