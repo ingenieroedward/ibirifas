@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { ApiError, createUser } from "@/lib/api-client";
 import type { ManagedUserDTO } from "@/lib/types";
+import { AccessCodeTools } from "@/components/AccessCodeTools";
 import { CodeInput } from "@/components/CodeInput";
-import { isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP, slugifyOrgCode } from "@/lib/orgCode";
+import { generateAccessCode } from "@/lib/accessCode";
+import { generateOrgCode, isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP, slugifyOrgCode } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
 interface CreateUserSheetProps {
@@ -52,6 +54,7 @@ function SheetContent({
   // Follows the name until the person edits it by hand.
   const [orgCodeInput, setOrgCodeInput] = useState<string | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
+  const [fill, setFill] = useState({ value: "", signal: 0 });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -141,9 +144,19 @@ function SheetContent({
 
         {askOrgCode && (
           <div className="space-y-1.5">
-            <label htmlFor="newUserOrgCode" className="text-sm font-medium text-text-muted">
-              Código de organización <span className="text-gold-400">*</span>
-            </label>
+            <div className="flex items-end justify-between gap-2">
+              <label htmlFor="newUserOrgCode" className="text-sm font-medium text-text-muted">
+                Código de organización <span className="text-gold-400">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setOrgCodeInput(generateOrgCode())}
+                disabled={saving}
+                className="text-sm font-semibold text-gold-400 transition active:scale-95 disabled:opacity-40"
+              >
+                Aleatorio
+              </button>
+            </div>
             <input
               id="newUserOrgCode"
               type="text"
@@ -174,7 +187,14 @@ function SheetContent({
             autoFocus={false}
             onChange={setCode}
             resetSignal={resetSignal}
+            fillValue={fill.value}
+            fillSignal={fill.signal}
             ariaLabel="Código de acceso de 6 dígitos"
+          />
+          <AccessCodeTools
+            code={code}
+            disabled={saving}
+            onGenerate={() => setFill((f) => ({ value: generateAccessCode(), signal: f.signal + 1 }))}
           />
         </div>
 

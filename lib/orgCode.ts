@@ -38,6 +38,23 @@ export function slugifyOrgCode(name: string): string {
   return slug ? `${slug}-org` : "org";
 }
 
+// No 0/o, 1/l/i: easy to read out loud and to type from a message.
+const ORG_CODE_RANDOM_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+
+/** "org-k7m2xq": a random organization code for when a name-based one isn't wanted. */
+export function generateOrgCode(): string {
+  const bytes = new Uint32Array(6);
+  const limit = Math.floor(0x1_0000_0000 / ORG_CODE_RANDOM_ALPHABET.length) * ORG_CODE_RANDOM_ALPHABET.length;
+  let out = "";
+  while (out.length < 6) {
+    crypto.getRandomValues(bytes);
+    for (const n of bytes) {
+      if (n < limit && out.length < 6) out += ORG_CODE_RANDOM_ALPHABET[n % ORG_CODE_RANDOM_ALPHABET.length];
+    }
+  }
+  return `org-${out}`;
+}
+
 /** `base`, then `base-2`, `base-3`… (kept within the length limit) until `isTaken` says it's free. */
 export async function firstFreeOrgCode(base: string, isTaken: (code: string) => Promise<boolean>): Promise<string> {
   let candidate = base;

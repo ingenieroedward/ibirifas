@@ -4,8 +4,10 @@ import { useState } from "react";
 import { ApiError, updateUser } from "@/lib/api-client";
 import type { ManagedUserDTO, UpdateUserInput } from "@/lib/types";
 import { BottomSheet } from "@/components/BottomSheet";
+import { AccessCodeTools } from "@/components/AccessCodeTools";
 import { CodeInput } from "@/components/CodeInput";
-import { isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP } from "@/lib/orgCode";
+import { generateAccessCode } from "@/lib/accessCode";
+import { generateOrgCode, isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
 interface EditUserSheetProps {
@@ -25,6 +27,7 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
   const [orgCode, setOrgCode] = useState(user.orgCode ?? "");
   const [code, setCode] = useState("");
   const [resetSignal, setResetSignal] = useState(0);
+  const [fill, setFill] = useState({ value: "", signal: 0 });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -87,9 +90,19 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
 
       {canEditOrgCode && (
         <div className="space-y-1.5">
-          <label htmlFor="editUserOrgCode" className="text-sm font-medium text-text-muted">
-            Código de organización
-          </label>
+          <div className="flex items-end justify-between gap-2">
+            <label htmlFor="editUserOrgCode" className="text-sm font-medium text-text-muted">
+              Código de organización
+            </label>
+            <button
+              type="button"
+              onClick={() => setOrgCode(generateOrgCode())}
+              disabled={saving}
+              className="text-sm font-semibold text-gold-400 transition active:scale-95 disabled:opacity-40"
+            >
+              Aleatorio
+            </button>
+          </div>
           <input
             id="editUserOrgCode"
             type="text"
@@ -115,7 +128,14 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
           autoFocus={false}
           onChange={setCode}
           resetSignal={resetSignal}
+          fillValue={fill.value}
+          fillSignal={fill.signal}
           ariaLabel="Código de acceso nuevo de 6 dígitos"
+        />
+        <AccessCodeTools
+          code={code}
+          disabled={saving}
+          onGenerate={() => setFill((f) => ({ value: generateAccessCode(), signal: f.signal + 1 }))}
         />
         <p className="text-xs text-text-muted">
           Déjalo vacío para conservar el actual. Si lo cambias, esta persona tendrá que entrar de nuevo con el

@@ -80,6 +80,11 @@ uso" ya no revela nada de otras organizaciones.
 - El superadmin entra dejando la organización vacía. Al crear un organizador
   elige su código (o se genera a partir del nombre) y puede cambiarlo después
   desde el lápiz de su tarjeta.
+- Al crear o editar una cuenta, **Generar aleatorio** llena el código de 6
+  dígitos (sin repeticiones ni secuencias obvias como `111111` o `123456`) y
+  **Copiar código** lo copia. Es el único momento para anotarlo: se guarda
+  cifrado y no se puede volver a ver. Para organizadores, **Aleatorio** propone
+  un código de organización tipo `org-k7m2xq` (sin caracteres que se confunden).
 - Si se suspende (desactiva) a un organizador, todo su equipo deja de poder
   ingresar.
 - Al actualizar desde una versión anterior, cada organizador que ya existía
