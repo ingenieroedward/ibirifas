@@ -15,6 +15,9 @@
   --color-text: #f5f3ff;
   --color-text-muted: #a29dbd;
 
+  /* Text on gold/accent fills (buttons, tiles); a raffle with its own colors re-points it. */
+  --color-on-accent: #241a02;
+
   /* Gold / amber accent scale (poster brush-gold) */
   --color-gold-50: #fff8e1;
   --color-gold-100: #ffefb8;
@@ -44,6 +47,7 @@
 
   --color-text: var(--color-text);
   --color-text-muted: var(--color-text-muted);
+  --color-on-accent: var(--color-on-accent);
 
   --color-gold-50: var(--color-gold-50);
   --color-gold-100: var(--color-gold-100);

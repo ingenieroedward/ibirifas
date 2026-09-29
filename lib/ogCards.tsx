@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { luminance } from "@/lib/color";
+import { tileTextColor } from "@/lib/theme";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import type { PublicRaffleDTO } from "@/lib/types";
 
@@ -166,7 +167,7 @@ export function RaffleCard({ raffle }: { raffle: PublicRaffleDTO }) {
             padding: "8px 30px 6px",
             borderRadius: 999,
             background: closed || free === 0 ? panel : accent,
-            color: closed || free === 0 ? text : raffle.themeTextColor ?? "#241a02",
+            color: closed || free === 0 ? text : tileTextColor(raffle.themeNumberColor, raffle.themeTextColor),
             fontSize: 40,
             fontWeight: 800,
             whiteSpace: "nowrap",

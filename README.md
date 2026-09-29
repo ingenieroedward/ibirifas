@@ -59,6 +59,17 @@ producción. El superadmin entra **sin** código de organización.
   medio), la página pública pasa a un esquema claro (texto oscuro, tarjetas
   claras, dorado más profundo) para que todo se lea; el formulario avisa si el
   texto casi no se lee sobre el color de los números.
+- **Colores de marca del cliente**: el color de los números de la rifa es su
+  color de marca. En el enlace público reemplaza al dorado en todo (precios,
+  etiquetas "Disponible", botones, bordes, botones de copiar), con una variante
+  ajustada para que se lea como texto sobre el fondo, y el texto de los botones
+  y de los números se elige solo (blanco o casi negro, el que mejor contraste).
+  El color del texto de los números es **automático** por defecto; si alguien
+  elige uno que no se lee sobre el color de los números (contraste menor a 3, p.
+  ej. negro sobre azul oscuro), se usa el automático. El formulario ofrece 8
+  **estilos listos** (Clásico, Azul, Rojo, Verde, Morado, Naranja, Celeste,
+  Rosa) para partir de ahí, y la imagen para compartir y la vista previa del
+  enlace usan las mismas reglas. La aplicación del equipo sigue amarilla y negra.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.

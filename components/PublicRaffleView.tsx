@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
-import { pageThemeStyle } from "@/lib/theme";
+import { pageThemeStyle, tileTextColor } from "@/lib/theme";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
 import { CopyButton } from "@/components/CopyButton";
@@ -98,18 +98,18 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   const tileStyle: CSSProperties | undefined = raffle.themeNumberColor
     ? {
         backgroundImage: `linear-gradient(to bottom, ${lighten(raffle.themeNumberColor, 0.22)}, ${raffle.themeNumberColor})`,
-        color: raffle.themeTextColor || "#241a02",
+        color: tileTextColor(raffle.themeNumberColor, raffle.themeTextColor),
         boxShadow: `0 0 0 1px ${withAlpha(darken(raffle.themeNumberColor, 0.1), 0.18)} inset`,
       }
     : undefined;
 
-  const freeTile = "bg-gradient-to-b from-gold-300 to-gold-500 text-[#241a02] shadow-gold";
+  const freeTile = "bg-gradient-to-b from-gold-300 to-gold-500 text-on-accent shadow-gold";
   const soldTile = "border border-line bg-surface-2 text-text-muted line-through decoration-2 opacity-60";
 
   return (
     <div
       className="flex min-h-dvh flex-1 flex-col pb-12"
-      style={pageThemeStyle(raffle.themeBackground)}
+      style={pageThemeStyle({ background: raffle.themeBackground, numberColor: raffle.themeNumberColor })}
     >
       <header className="px-4 pt-safe sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
@@ -349,7 +349,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               <button
                 type="button"
                 onClick={() => setReserving({ numbers: numbersPicked, sets: setsPicked, total: pickedTotal })}
-                className="h-12 shrink-0 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 px-6 text-sm font-bold text-[#241a02] shadow-gold transition active:scale-[0.98]"
+                className="h-12 shrink-0 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 px-6 text-sm font-bold text-on-accent shadow-gold transition active:scale-[0.98]"
               >
                 Reservar
               </button>

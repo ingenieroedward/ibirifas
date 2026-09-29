@@ -4,9 +4,9 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, createRaffle, getOrgSettings, updateRaffle } from "@/lib/api-client";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
-import { lighten, luminance } from "@/lib/color";
+import { contrastRatio, lighten, luminance } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
-import { DEFAULT_THEME } from "@/lib/theme";
+import { DEFAULT_THEME, tileTextColor } from "@/lib/theme";
 import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
 import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { Spinner } from "@/components/Spinner";
@@ -42,6 +42,18 @@ function chosenSetCount(fit: number, countText: string): number {
   const asked = Number(countText);
   return countText.trim() !== "" && Number.isInteger(asked) && asked >= 1 ? Math.min(asked, fit) : fit;
 }
+
+/** Ready-made looks for people who don't want to pick colors: a page background and the tile color. */
+const THEME_PRESETS = [
+  { name: "Clásico", background: "#0b0b0f", numberColor: "#f5c518" },
+  { name: "Azul", background: "#ffffff", numberColor: "#1d4ed8" },
+  { name: "Rojo", background: "#ffffff", numberColor: "#dc2626" },
+  { name: "Verde", background: "#f4fbf6", numberColor: "#15803d" },
+  { name: "Morado", background: "#faf5ff", numberColor: "#7e22ce" },
+  { name: "Naranja", background: "#0b0b0f", numberColor: "#f97316" },
+  { name: "Celeste", background: "#f0f9ff", numberColor: "#0284c7" },
+  { name: "Rosa", background: "#fff1f5", numberColor: "#db2777" },
+] as const;
 
 function buildSets(
   total: number,
@@ -129,6 +141,9 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   // (null on create, unchanged on edit) instead of always writing the
   // defaults back as explicit values.
   const [themeTouched, setThemeTouched] = useState({ background: false, numberColor: false, textColor: false });
+  // The digits' color is chosen automatically (white or near-black, whichever reads better) unless the
+  // organizer picks one.
+  const [textAuto, setTextAuto] = useState(!raffle?.themeTextColor);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -267,7 +282,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       const themePayload = {
         themeBackground: themeTouched.background ? background : isEdit ? undefined : null,
         themeNumberColor: themeTouched.numberColor ? numberColor : isEdit ? undefined : null,
-        themeTextColor: themeTouched.textColor ? textColor : isEdit ? undefined : null,
+        themeTextColor: textAuto ? null : themeTouched.textColor ? textColor : isEdit ? undefined : null,
       };
 
       if (isEdit && raffle) {
@@ -732,12 +747,63 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
             disabled={submitting}
             onChange={(value) => {
               setTextColor(value);
+              setTextAuto(false);
               setThemeTouched((t) => ({ ...t, textColor: true }));
             }}
           />
         </div>
 
-        <ThemePreview background={background} numberColor={numberColor} textColor={textColor} />
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 text-xs text-text-muted">
+            {textAuto
+              ? "El texto de los números se elige solo (blanco o negro, el que mejor se lea)."
+              : "Elegiste el color del texto."}
+          </p>
+          {!textAuto && (
+            <button
+              type="button"
+              onClick={() => setTextAuto(true)}
+              disabled={submitting}
+              className="h-9 shrink-0 rounded-full border border-gold-600/50 px-3 text-xs font-semibold text-gold-400 transition active:scale-95"
+            >
+              Automático
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-text-muted">O parte de un estilo</p>
+          <div className="grid grid-cols-4 gap-2">
+            {THEME_PRESETS.map((preset) => (
+              <button
+                key={preset.name}
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  setBackground(preset.background);
+                  setNumberColor(preset.numberColor);
+                  setTextAuto(true);
+                  setThemeTouched({ background: true, numberColor: true, textColor: true });
+                }}
+                aria-label={`Estilo ${preset.name}`}
+                className="flex flex-col items-center gap-1 rounded-xl border border-line p-1.5 transition active:scale-95"
+              >
+                <span
+                  className="flex h-9 w-full items-center justify-center rounded-lg"
+                  style={{ backgroundColor: preset.background }}
+                >
+                  <span
+                    className="h-5 w-5 rounded-md"
+                    style={{ backgroundImage: `linear-gradient(to bottom, ${lighten(preset.numberColor, 0.22)}, ${preset.numberColor})` }}
+                  />
+                </span>
+                <span className="text-[10px] font-medium leading-tight text-text-muted">{preset.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <ThemePreview background={background} numberColor={numberColor} textColor={textAuto ? null : textColor} />
       </div>
 
       {error && <p className="text-sm font-medium text-red-400">{error}</p>}
@@ -795,11 +861,12 @@ function ThemePreview({
 }: {
   background: string;
   numberColor: string;
-  textColor: string;
+  /** null = automatic. */
+  textColor: string | null;
 }) {
-  // How readable the number is on its tile (WCAG contrast ratio; 3 is the floor for large bold text).
-  const [hi, lo] = [luminance(numberColor), luminance(textColor)].sort((x, y) => y - x);
-  const hardToRead = (hi! + 0.05) / (lo! + 0.05) < 3;
+  // A chosen text color that can't be read on the tile (contrast under 3) is replaced by an automatic one.
+  const shownText = tileTextColor(numberColor, textColor);
+  const hardToRead = textColor !== null && contrastRatio(textColor, numberColor) < 3;
   const lightBackground = luminance(background) >= 0.18;
 
   return (
@@ -812,7 +879,7 @@ function ThemePreview({
           className="flex aspect-square w-16 select-none items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-lg font-bold shadow-gold"
           style={{
             backgroundImage: `linear-gradient(to bottom, ${lighten(numberColor, 0.22)}, ${numberColor})`,
-            color: textColor,
+            color: shownText,
           }}
         >
           {formatNumberValue(7)}
@@ -823,8 +890,8 @@ function ThemePreview({
       </div>
       {hardToRead && (
         <p role="status" className="text-xs font-medium text-gold-400">
-          El texto casi no se lee sobre el color de los números. Prueba con otro color de texto (blanco o negro, el que
-          contraste más).
+          Ese color de texto casi no se lee sobre el color de los números, así que se usará blanco o negro
+          automáticamente. Toca &quot;Automático&quot; para dejarlo así.
         </p>
       )}
     </div>
