@@ -18,6 +18,8 @@ interface DashboardHeaderProps {
   downloadingImage: boolean;
   /** This browser can open the system share sheet with the image (phones), so the button says "Compartir". */
   canShareImage: boolean;
+  /** Opens the sheet with the raffle's public link for buyers. */
+  onOpenPublicLink: () => void;
   /** Organizer actions on the raffle's life cycle. */
   onCloseRaffle: () => void;
   onReopenRaffle: () => void;
@@ -33,6 +35,7 @@ export function DashboardHeader({
   onDownloadImage,
   downloadingImage,
   canShareImage,
+  onOpenPublicLink,
   onCloseRaffle,
   onReopenRaffle,
   onDeleteRaffle,
@@ -244,26 +247,52 @@ export function DashboardHeader({
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={onDownloadImage}
-          disabled={downloadingImage}
-          className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:w-auto sm:px-5"
-        >
-          {downloadingImage ? (
-            <>
-              <Spinner size={16} />
-              Generando imagen…
-            </>
-          ) : (
-            <>
-              <DownloadIcon className="h-4 w-4" />
-              {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
-            </>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onDownloadImage}
+            disabled={downloadingImage}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:w-auto sm:px-5"
+          >
+            {downloadingImage ? (
+              <>
+                <Spinner size={16} />
+                Generando imagen…
+              </>
+            ) : (
+              <>
+                <DownloadIcon className="h-4 w-4" />
+                {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
+              </>
+            )}
+          </button>
+          {(role === "ORGANIZER" || raffle.publicToken) && (
+            <button
+              type="button"
+              onClick={onOpenPublicLink}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:w-auto sm:px-5"
+            >
+              <LinkIcon className="h-4 w-4" />
+              {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+            </button>
           )}
-        </button>
+        </div>
       </div>
     </header>
+  );
+}
+
+function LinkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

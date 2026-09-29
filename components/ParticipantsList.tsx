@@ -2,7 +2,9 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
-import type { RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
+import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
+import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
+import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/whatsapp";
 
 interface ParticipantsListProps {
   numbers: RaffleNumberDTO[];
@@ -10,11 +12,23 @@ interface ParticipantsListProps {
   groups: RaffleGroupDTO[];
   /** Worth of some numbers, counting sets at their set price. */
   priceOf: (subset: RaffleNumberDTO[]) => number;
+  /** What the WhatsApp reminders and receipts say about the raffle. */
+  raffle: WhatsAppRaffle;
   /** The winning number of a closed raffle; whoever holds it is flagged. */
   winnerValue?: number | null;
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
+}
+
+type WhatsAppRaffle = Pick<RaffleDTO, "name" | "accounts" | "drawDate" | "lottery">;
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.04 2a9.9 9.9 0 0 0-8.46 15.04L2 22l5.1-1.34A9.9 9.9 0 1 0 12.04 2Zm0 1.8a8.1 8.1 0 1 1-4.2 15.03l-.3-.18-3.02.8.81-2.94-.2-.31A8.1 8.1 0 0 1 12.04 3.8Zm-3 3.6c-.2 0-.5.07-.75.35-.26.28-1 1-1 2.45 0 1.44 1.04 2.84 1.19 3.04.15.2 2.05 3.28 5.06 4.47 2.5.99 3.01.79 3.55.74.55-.05 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35-.3-.15-1.77-.87-2.04-.97-.28-.1-.48-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.27-.47-2.42-1.5-.9-.8-1.5-1.79-1.67-2.09-.17-.3-.02-.46.13-.61.14-.13.3-.35.45-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57Z" />
+    </svg>
+  );
 }
 
 type Filter = "all" | "pending" | "paid";
@@ -68,7 +82,7 @@ function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   return list;
 }
 
-export function ParticipantsList({ numbers, groups, priceOf, winnerValue, onSelect, onPayAll }: ParticipantsListProps) {
+export function ParticipantsList({ numbers, groups, priceOf, raffle, winnerValue, onSelect, onPayAll }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -175,6 +189,7 @@ export function ParticipantsList({ numbers, groups, priceOf, winnerValue, onSele
               participant={p}
               groups={groups}
               priceOf={priceOf}
+              raffle={raffle}
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
               onPayAll={onPayAll}
@@ -205,6 +220,7 @@ function ParticipantCard({
   participant: p,
   groups,
   priceOf,
+  raffle,
   isWinner,
   onSelect,
   onPayAll,
@@ -212,6 +228,7 @@ function ParticipantCard({
   participant: Participant;
   groups: RaffleGroupDTO[];
   priceOf: (subset: RaffleNumberDTO[]) => number;
+  raffle: WhatsAppRaffle;
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -220,6 +237,51 @@ function ParticipantCard({
   const holdings = holdingsOf(p.numbers, groups);
   const pendingItems = holdings.filter((h) => !h.paid).length;
   const paidItems = holdings.length - pendingItems;
+
+  // WhatsApp messages: one about what's still owed, one confirming what's paid.
+  const partOf = (wantPaid: boolean) => {
+    const chosen = holdings.filter((h) => h.paid === wantPaid);
+    return {
+      sets: chosen.flatMap((h) => (h.kind === "set" ? [h.group.label] : [])),
+      looseValues: chosen.flatMap((h) => (h.kind === "number" ? [h.number.value] : [])),
+      amount: priceOf(p.numbers.filter((n) => (n.status === "paid") === wantPaid)),
+      count: chosen.length,
+    };
+  };
+  const pendingPart = partOf(false);
+  const paidPart = partOf(true);
+  const methods = new Set(p.numbers.filter((n) => n.status === "paid").map((n) => n.paymentMethod));
+  const onlyMethod = methods.size === 1 ? [...methods][0] : null;
+  const reminderUrl =
+    pendingPart.count > 0
+      ? whatsAppUrl(
+          p.phone,
+          buildReminderMessage({
+            buyerName: p.name,
+            raffleName: raffle.name,
+            sets: pendingPart.sets,
+            looseValues: pendingPart.looseValues,
+            amount: pendingPart.amount,
+            accounts: raffle.accounts,
+            drawDate: raffle.drawDate,
+            lottery: raffle.lottery,
+          }),
+        )
+      : null;
+  const receiptUrl =
+    paidPart.count > 0
+      ? whatsAppUrl(
+          p.phone,
+          buildReceiptMessage({
+            buyerName: p.name,
+            raffleName: raffle.name,
+            sets: paidPart.sets,
+            looseValues: paidPart.looseValues,
+            amount: paidPart.amount,
+            paymentMethodLabel: onlyMethod ? PAYMENT_METHOD_LABEL[onlyMethod] : null,
+          }),
+        )
+      : null;
 
   return (
     <li
@@ -291,6 +353,33 @@ function ParticipantCard({
           {pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} ·{" "}
           {formatCurrency(owes)}
         </button>
+      )}
+
+      {(reminderUrl || receiptUrl) && (
+        <div className="mt-2 flex gap-2">
+          {reminderUrl && (
+            <a
+              href={reminderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 text-sm font-semibold text-text transition active:scale-[0.98]"
+            >
+              <WhatsAppIcon className="h-4 w-4 text-green-400" />
+              Recordar pago
+            </a>
+          )}
+          {receiptUrl && (
+            <a
+              href={receiptUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 text-sm font-semibold text-text transition active:scale-[0.98]"
+            >
+              <WhatsAppIcon className="h-4 w-4 text-green-400" />
+              Enviar comprobante
+            </a>
+          )}
+        </div>
       )}
 
       <p className="mt-3 text-xs text-text-muted">

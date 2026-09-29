@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { getMe, logout as apiLogout } from "@/lib/api-client";
 import type { MeDTO } from "@/lib/types";
 
@@ -24,8 +25,11 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // The public raffle pages (/p/<token>) are for people without an account:
+  // don't ask the server who they are (a guaranteed 401 plus a refresh attempt).
+  const isPublicPage = usePathname().startsWith("/p/");
   const [user, setUser] = useState<MeDTO | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isPublicPage);
 
   const refresh = useCallback(async () => {
     const me = await getMe();
@@ -33,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (isPublicPage) return;
     let cancelled = false;
 
     (async () => {
@@ -49,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isPublicPage]);
 
   const signOut = useCallback(async () => {
     try {

@@ -4,6 +4,7 @@ import type {
   CreateUserInput,
   ManagedUserDTO,
   MeDTO,
+  PublicLinkAction,
   RaffleDTO,
   RaffleNumberDTO,
   RaffleSummaryDTO,
@@ -234,6 +235,15 @@ export async function setRaffleStatus(
   input: { status: "active" } | { status: "closed"; winnerValue: number | null },
 ): Promise<RaffleDTO> {
   return request<RaffleDTO>(`/api/raffles/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+/** Turn the raffle's public read-only link on, off, or replace it with a new one. */
+export async function setPublicLink(id: string, action: PublicLinkAction): Promise<string | null> {
+  const { publicToken } = await request<{ publicToken: string | null }>(`/api/raffles/${id}/public-link`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+  return publicToken;
 }
 
 /** Permanently delete a closed raffle. */
