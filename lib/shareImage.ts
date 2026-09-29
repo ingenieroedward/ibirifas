@@ -55,11 +55,11 @@ async function ensureFontsReady(): Promise<void> {
 
 function pickColumns(total: number): number {
   if (total <= 20) return 4;
-  if (total <= 40) return 5;
-  if (total <= 80) return 6;
-  if (total <= 160) return 8;
-  if (total <= 400) return 10;
-  if (total <= 700) return 12;
+  if (total <= 50) return 5;
+  // 10 per row is the sweet spot for the common 100-number raffle — it's
+  // also the layout the reference brand poster itself uses.
+  if (total <= 500) return 10;
+  if (total <= 800) return 12;
   return 14;
 }
 
@@ -240,26 +240,6 @@ function drawDiceIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, siz
     ctx.arc(x, y, 1.6, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.restore();
-}
-
-/** A simple 5-point star, used as the "premio" badge glyph. */
-function drawStarIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string): void {
-  const outerR = size / 2;
-  const innerR = outerR * 0.45;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? outerR : innerR;
-    const angle = (Math.PI / 5) * i - Math.PI / 2;
-    const x = cx + r * Math.cos(angle);
-    const y = cy + r * Math.sin(angle);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fill();
   ctx.restore();
 }
 
@@ -471,8 +451,9 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const UNDERLINE_HEIGHT = 8;
   const KICKER_GAP = 20;
   const KICKER_HEIGHT = 46;
-  const FACTS_GAP = 26;
-  const FACTS_HEIGHT = 116;
+  const HERO_GAP = 26;
+  const HERO_TOP_HEIGHT = 132;
+  const HERO_META_HEIGHT = 54;
   const ACCOUNTS_GAP = 18;
   // 2 per row (not 3): a chip carrying "Label number · Responsable: Name" needs
   // real width to stay legible instead of truncating the one detail — the
@@ -500,13 +481,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const titleLineHeight = titleSize * TITLE_LINE_HEIGHT;
   const titleBlockHeight = titleLines.length * titleLineHeight;
 
-  // "Key facts" band: premio · valor · fecha as short badge-style columns in
-  // one compact card, instead of separate full-width centered lines.
-  const factsColumns: { label: string; value: string; icon: "star" | "coin" | "calendar" | "dice" }[] = [];
-  if (raffle.prizeLabel) factsColumns.push({ label: "Premio", value: raffle.prizeLabel, icon: "star" });
-  if (raffle.lottery) factsColumns.push({ label: "Lotería", value: raffle.lottery, icon: "dice" });
-  factsColumns.push({ label: "Valor", value: formatCurrency(raffle.numberPrice), icon: "coin" });
-  if (raffle.drawDate) factsColumns.push({ label: "Fecha", value: formatDate(raffle.drawDate), icon: "calendar" });
+  // Hero fact banner: premio (big) + valor (smaller) side by side, echoing
+  // the reference poster's two-column banner instead of treating every fact
+  // as an equal-weight column. Fecha/lotería fold into one slim meta line
+  // below it, omitted entirely when neither is set.
+  const hasPrize = Boolean(raffle.prizeLabel);
+  const hasMeta = Boolean(raffle.drawDate || raffle.lottery);
+  const heroHeight = HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
 
   const accountsCount = raffle.accounts.length;
   const accountsRows = accountsCount > 0 ? Math.ceil(accountsCount / ACCOUNTS_PER_ROW) : 0;
@@ -522,8 +503,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     UNDERLINE_HEIGHT +
     KICKER_GAP +
     KICKER_HEIGHT +
-    FACTS_GAP +
-    FACTS_HEIGHT +
+    HERO_GAP +
+    heroHeight +
     (accountsRows > 0 ? ACCOUNTS_GAP + accountsHeight : 0) +
     DIVIDER_GAP +
     LEGEND_HEIGHT;
@@ -612,64 +593,118 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     ctx.textAlign = "center";
     ctx.fillText(text, CANVAS_WIDTH / 2, kickerY + 40 / 2 + fontSize * 0.35);
   }
-  cursorY += KICKER_HEIGHT + FACTS_GAP;
+  cursorY += KICKER_HEIGHT + HERO_GAP;
 
-  // Facts card: premio / valor / fecha as icon-badged columns in a bordered,
-  // glowing banner — closer to the reference poster's dark "premio" banner
-  // than a plain grey info strip.
-  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, FACTS_HEIGHT, 24);
+  // Hero banner: bordered, glowing card like the previous facts card, but
+  // with premio and valor as an unequal two-column split — premio gets the
+  // big, bold treatment, valor a visibly smaller one — instead of every
+  // fact reading at the same weight.
+  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, heroHeight, 24);
   ctx.fillStyle = dark ? withAlpha("#000000", 0.32) : withAlpha("#ffffff", 0.55);
   ctx.fill();
   ctx.strokeStyle = withAlpha(theme.numberColor, 0.4);
   ctx.lineWidth = 1.5;
-  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, FACTS_HEIGHT, 24);
+  drawRoundedRect(ctx, gridStartX, cursorY, gridWidth, heroHeight, 24);
   ctx.stroke();
 
-  const colWidth = gridWidth / factsColumns.length;
-  const colPaddingX = 16;
-  ctx.textAlign = "center";
-  factsColumns.forEach((col, i) => {
-    const colCenterX = gridStartX + colWidth * i + colWidth / 2;
-    if (i > 0) {
-      ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(gridStartX + colWidth * i, cursorY + 18);
-      ctx.lineTo(gridStartX + colWidth * i, cursorY + FACTS_HEIGHT - 18);
-      ctx.stroke();
-    }
+  const valorText = formatCurrency(raffle.numberPrice);
 
-    const badgeY = cursorY + 28;
+  if (hasPrize) {
+    const splitX = gridStartX + gridWidth * 0.62;
+
+    ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.14);
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(colCenterX, badgeY, 17, 0, Math.PI * 2);
-    ctx.fillStyle = withAlpha(theme.numberColor, dark ? 0.18 : 0.14);
-    ctx.fill();
-    ctx.strokeStyle = withAlpha(theme.numberColor, 0.5);
-    ctx.lineWidth = 1.3;
+    ctx.moveTo(splitX, cursorY + 20);
+    ctx.lineTo(splitX, cursorY + HERO_TOP_HEIGHT - 20);
     ctx.stroke();
-    if (col.icon === "star") drawStarIcon(ctx, colCenterX, badgeY, 18, theme.numberColor);
-    else if (col.icon === "calendar") drawCalendarIcon(ctx, colCenterX, badgeY, 18, theme.numberColor);
-    else if (col.icon === "dice") drawDiceIcon(ctx, colCenterX, badgeY, 18, theme.numberColor);
-    else {
-      ctx.fillStyle = theme.numberColor;
-      ctx.font = `800 18px ${headingFont}`;
-      ctx.textAlign = "center";
-      ctx.fillText("$", colCenterX, badgeY + 6);
-    }
 
-    ctx.font = `700 14px ${bodyFont}`;
-    ctx.fillStyle = mutedText;
+    const premioCenterX = gridStartX + (splitX - gridStartX) / 2;
+    const valorCenterX = splitX + (gridStartX + gridWidth - splitX) / 2;
+
     ctx.textAlign = "center";
-    ctx.fillText(col.label.toUpperCase(), colCenterX, cursorY + 62);
+    ctx.font = `700 15px ${bodyFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("PREMIO", premioCenterX, cursorY + 32);
 
-    const maxValueWidth = colWidth - colPaddingX * 2;
-    const { fontSize, text } = fitFontSize(ctx, col.value, maxValueWidth, 24, 14, "800", headingFont);
+    const premioMaxWidth = splitX - gridStartX - 40;
+    const { fontSize: premioSize, text: premioText } = fitFontSize(
+      ctx,
+      raffle.prizeLabel!,
+      premioMaxWidth,
+      42,
+      24,
+      "800",
+      headingFont,
+    );
+    ctx.font = `800 ${premioSize}px ${headingFont}`;
+    ctx.fillStyle = theme.numberColor;
+    ctx.fillText(premioText, premioCenterX, cursorY + HERO_TOP_HEIGHT - 28);
+
+    ctx.font = `700 13px ${bodyFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("VALOR", valorCenterX, cursorY + 32);
+
+    const valorMaxWidth = gridStartX + gridWidth - splitX - 32;
+    const { fontSize: valorSize, text: valorFitText } = fitFontSize(
+      ctx,
+      valorText,
+      valorMaxWidth,
+      26,
+      16,
+      "800",
+      headingFont,
+    );
+    ctx.font = `800 ${valorSize}px ${headingFont}`;
+    ctx.fillStyle = theme.numberColor;
+    ctx.fillText(valorFitText, valorCenterX, cursorY + HERO_TOP_HEIGHT - 26);
+  } else {
+    // No prize set: valor is the only fact, so it gets the spotlight instead
+    // of sitting small in a corner.
+    const centerX = gridStartX + gridWidth / 2;
+    ctx.textAlign = "center";
+    ctx.font = `700 15px ${bodyFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("VALOR DEL NÚMERO", centerX, cursorY + 36);
+
+    const maxWidth = gridWidth - 80;
+    const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 40, 26, "800", headingFont);
     ctx.font = `800 ${fontSize}px ${headingFont}`;
     ctx.fillStyle = theme.numberColor;
-    ctx.fillText(text, colCenterX, cursorY + FACTS_HEIGHT - 20);
-  });
+    ctx.fillText(text, centerX, cursorY + HERO_TOP_HEIGHT - 30);
+  }
 
-  cursorY += FACTS_HEIGHT;
+  if (hasMeta) {
+    const metaY = cursorY + HERO_TOP_HEIGHT;
+    ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(gridStartX + 24, metaY);
+    ctx.lineTo(gridStartX + gridWidth - 24, metaY);
+    ctx.stroke();
+
+    const metaText = raffle.drawDate
+      ? `Sorteo el ${formatDate(raffle.drawDate)}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
+      : `Lotería: ${raffle.lottery}`;
+    const metaIconSize = 20;
+    const metaIconGap = 8;
+    ctx.font = `600 18px ${bodyFont}`;
+    const metaTextWidth = ctx.measureText(metaText).width;
+    const metaBlockWidth = metaIconSize + metaIconGap + metaTextWidth;
+    const metaBlockStartX = gridStartX + gridWidth / 2 - metaBlockWidth / 2;
+    const metaCenterY = metaY + HERO_META_HEIGHT / 2;
+
+    if (raffle.drawDate) {
+      drawCalendarIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+    } else {
+      drawDiceIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+    }
+    ctx.textAlign = "left";
+    ctx.fillStyle = mutedText;
+    ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 6);
+  }
+
+  cursorY += heroHeight;
 
   // Payment accounts: compact pill chips, wrapped at a fixed count per row so
   // the reserved height only ever depends on how many accounts there are —
