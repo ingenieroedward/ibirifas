@@ -23,6 +23,7 @@ import {
 } from "@/lib/shareImage";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
+import { buildAvailabilityText } from "@/lib/shareText";
 import { isOverdue } from "@/lib/holds";
 import { useRaffleLive } from "@/lib/useRaffleLive";
 import type {
@@ -39,7 +40,7 @@ import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DeleteRaffleSheet } from "@/components/DeleteRaffleSheet";
 import { ImagePreviewSheet } from "@/components/ImagePreviewSheet";
-import { PublicLinkSheet } from "@/components/PublicLinkSheet";
+import { PublicLinkSheet, publicLinkUrl } from "@/components/PublicLinkSheet";
 import { GroupedBoard } from "@/components/GroupedBoard";
 import { GroupSheet } from "@/components/GroupSheet";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -181,6 +182,32 @@ export default function RaffleDashboardPage() {
     await signOut();
     router.push("/login");
   }, [signOut, router]);
+
+  // The raffle and what is still free, as a message to paste into a chat.
+  const handleCopyText = useCallback(async () => {
+    if (!raffle) return;
+    const link = raffle.publicToken ? publicLinkUrl(raffle.publicToken) : null;
+    const text = buildAvailabilityText(raffle, link);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Clipboard blocked (some in-app browsers): the old textarea trick still works from a tap.
+      const box = document.createElement("textarea");
+      box.value = text;
+      box.setAttribute("readonly", "");
+      box.style.position = "fixed";
+      box.style.opacity = "0";
+      document.body.appendChild(box);
+      box.select();
+      const ok = document.execCommand("copy");
+      box.remove();
+      if (!ok) {
+        show("No se pudo copiar el texto. Inténtalo de nuevo.", "error");
+        return;
+      }
+    }
+    show("Texto copiado: pégalo en tu chat", "success");
+  }, [raffle, show]);
 
   const handleDownloadImage = useCallback(async () => {
     if (!raffle || downloadingImage) return;
@@ -603,6 +630,7 @@ export default function RaffleDashboardPage() {
           showBackToPicker={raffleCount > 1}
           onLogout={handleLogout}
           onDownloadImage={handleDownloadImage}
+          onCopyText={handleCopyText}
           downloadingImage={downloadingImage}
           canShareImage={canShareImage}
           onOpenPublicLink={() => setPublicLinkOpen(true)}
