@@ -56,6 +56,13 @@ producción. El superadmin entra **sin** código de organización.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.
+- **Cobrar por WhatsApp**: en Participantes, cada comprador que debe tiene
+  "Recordar pago" y el que ya pagó algo tiene "Enviar comprobante". Abren
+  WhatsApp (`wa.me`) con el mensaje escrito: sus números o letras, el total, las
+  cuentas de pago de la rifa y la fecha del sorteo. Un celular colombiano de 10
+  dígitos recibe el `57` solo; uno con código de país se respeta; sin teléfono se
+  abre el selector de contactos de WhatsApp. No hay integración ni costo: el
+  mensaje sale del WhatsApp del propio vendedor.
 - **Imagen para compartir**: en el celular el botón "Compartir imagen" abre
   directo el menú del sistema (Guardar imagen en Fotos, WhatsApp, etc.) usando
   la Web Share API con archivos. Si el navegador lo rechaza (por ejemplo, pasó

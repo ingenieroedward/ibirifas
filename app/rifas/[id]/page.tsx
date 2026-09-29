@@ -711,6 +711,7 @@ export default function RaffleDashboardPage() {
                   numbers={raffle.numbers}
                   groups={raffle.groups}
                   priceOf={pricer}
+                  raffle={raffle}
                   winnerValue={raffle.winnerValue}
                   onSelect={openNumber}
                   onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
