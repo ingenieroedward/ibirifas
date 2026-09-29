@@ -41,6 +41,32 @@ export function checkLoginRateLimit(ip: string): boolean {
   return true;
 }
 
+const publicHits = new Map<string, number[]>();
+const PUBLIC_WINDOW_MS = 60 * 1000;
+const PUBLIC_MAX_HITS = 60;
+
+/**
+ * Allowance for the anonymous public raffle page: 60 requests a minute per IP.
+ * One open page polls a few times a minute, so this only stops scraping.
+ */
+export function checkPublicRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const recent = (publicHits.get(ip) ?? []).filter((ts) => now - ts < PUBLIC_WINDOW_MS);
+  if (recent.length >= PUBLIC_MAX_HITS) {
+    publicHits.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  publicHits.set(ip, recent);
+
+  if (publicHits.size > 10_000) {
+    for (const [key, timestamps] of publicHits) {
+      if (timestamps.every((ts) => now - ts >= PUBLIC_WINDOW_MS)) publicHits.delete(key);
+    }
+  }
+  return true;
+}
+
 /** Best-effort client IP extraction for App Router requests. */
 export function getClientIp(req: NextRequest): string {
   const forwardedFor = req.headers.get("x-forwarded-for");

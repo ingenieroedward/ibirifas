@@ -69,6 +69,32 @@ export interface RaffleAccountDTO {
   holderName: string | null;
 }
 
+/**
+ * What anyone with the public link sees. Deliberately narrow: whether each
+ * number is still free, never who has it, their phone, receipts or payments.
+ */
+export interface PublicRaffleDTO {
+  name: string;
+  prizeLabel: string | null;
+  lottery: string | null;
+  numberPrice: number;
+  drawDate: string | null;
+  status: "active" | "closed";
+  /** Only for a closed raffle. */
+  winnerValue: number | null;
+  totalNumbers: number;
+  themeBackground: string | null;
+  themeNumberColor: string | null;
+  themeTextColor: string | null;
+  accounts: RaffleAccountDTO[];
+  /** Lettered sets in order; `sold` once someone has the whole set. */
+  groups: { label: string; price: number; sold: boolean }[];
+  /** Every number: `sold` is true for anything taken (pending or paid); `group` is the set's letter. */
+  numbers: { value: number; sold: boolean; group: string | null }[];
+}
+
+export type PublicLinkAction = "enable" | "disable" | "regenerate";
+
 /** A lettered set of numbers sold as one unit at `price`. */
 export interface RaffleGroupDTO {
   id: string;
@@ -88,6 +114,8 @@ export interface RaffleDTO {
   /** The winning number once the raffle is closed; null while open or when closed without a draw. */
   winnerValue: number | null;
   closedAt: string | null;
+  /** Secret of the public read-only page (/p/<token>); null when there is none. */
+  publicToken: string | null;
   numbers: RaffleNumberDTO[];
   accounts: RaffleAccountDTO[];
   /** Lettered sets in order (A, B, C…); empty for a raffle sold number by number. */

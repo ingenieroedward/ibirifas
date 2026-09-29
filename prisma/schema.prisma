@@ -98,6 +98,12 @@ model Raffle {
   winnerValue  Int?
   closedAt     DateTime?
 
+  // Secret in the raffle's public, read-only page (/p/<token>): buyers see what
+  // is still available without logging in. Null = no public page. Random and
+  // unguessable; the organizer can rotate it (the old link stops working) or
+  // switch it off.
+  publicToken  String?        @unique
+
   // Per-raffle grid theme override (hex strings like "#0b0b0f"). Null means
   // "use the app's default gold/black look" — these are opt-in, not required.
   themeBackground   String?

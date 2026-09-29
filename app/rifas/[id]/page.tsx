@@ -9,6 +9,7 @@ import {
   deleteRaffle,
   getRaffleById,
   getRaffles,
+  setPublicLink,
   setRaffleStatus,
   updateNumber,
   updateNumbersBulk,
@@ -27,6 +28,7 @@ import type {
   BulkActionBody,
   BulkNumberInput,
   PaymentMethod,
+  PublicLinkAction,
   RaffleDTO,
   RaffleGroupDTO,
   RaffleNumberDTO,
@@ -36,6 +38,7 @@ import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DeleteRaffleSheet } from "@/components/DeleteRaffleSheet";
 import { ImagePreviewSheet } from "@/components/ImagePreviewSheet";
+import { PublicLinkSheet } from "@/components/PublicLinkSheet";
 import { GroupedBoard } from "@/components/GroupedBoard";
 import { GroupSheet } from "@/components/GroupSheet";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -73,6 +76,7 @@ export default function RaffleDashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The lettered set whose sheet is open (raffles sold in sets).
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [publicLinkOpen, setPublicLinkOpen] = useState(false);
   const [closingRaffle, setClosingRaffle] = useState(false);
   const [deletingRaffle, setDeletingRaffle] = useState(false);
   // Only used to decide whether the "back to picker" link is worth showing.
@@ -265,6 +269,14 @@ export default function RaffleDashboardPage() {
       }
     },
     [raffleId, show],
+  );
+
+  const handlePublicLinkChange = useCallback(
+    async (action: PublicLinkAction) => {
+      const publicToken = await setPublicLink(raffleId, action);
+      setRaffle((current) => (current ? { ...current, publicToken } : current));
+    },
+    [raffleId],
   );
 
   const handleReopenRaffle = useCallback(async () => {
@@ -575,6 +587,7 @@ export default function RaffleDashboardPage() {
           onDownloadImage={handleDownloadImage}
           downloadingImage={downloadingImage}
           canShareImage={canShareImage}
+          onOpenPublicLink={() => setPublicLinkOpen(true)}
           onCloseRaffle={() => setClosingRaffle(true)}
           onReopenRaffle={handleReopenRaffle}
           onDeleteRaffle={() => setDeletingRaffle(true)}
@@ -753,6 +766,16 @@ export default function RaffleDashboardPage() {
         onClose={() => setSelectedId(null)}
         onSave={handleSave}
       />
+
+      {publicLinkOpen && raffle && (
+        <PublicLinkSheet
+          raffleName={raffle.name}
+          token={raffle.publicToken}
+          canManage={isOrganizer}
+          onClose={() => setPublicLinkOpen(false)}
+          onChange={handlePublicLinkChange}
+        />
+      )}
 
       {imagePreview && (
         <ImagePreviewSheet

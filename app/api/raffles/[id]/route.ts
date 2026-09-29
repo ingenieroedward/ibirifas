@@ -51,6 +51,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     status: raffle.status as "active" | "closed",
     winnerValue: raffle.winnerValue,
     closedAt: raffle.closedAt ? raffle.closedAt.toISOString() : null,
+    publicToken: raffle.publicToken,
     numbers,
     accounts,
     groups,

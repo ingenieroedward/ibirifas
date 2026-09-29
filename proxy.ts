@@ -14,12 +14,13 @@ export function proxy(req: NextRequest) {
 }
 
 // Soft UX guard only — real enforcement is the 401s in the API routes.
-// Excludes /login itself, the service worker script (browsers fetch it
+// Excludes /login itself, the public raffle pages (/p/<token>, no account
+// needed), the service worker script (browsers fetch it
 // without going through the app), all /api routes (auth endpoints must be reachable
 // unauthenticated, and other API routes should return JSON 401s rather than
 // redirect), Next internals, and common static assets.
 export const config = {
   matcher: [
-    "/((?!login|api|_next|favicon.ico|manifest.json|sw.js|icons|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
+    "/((?!login|p/|api|_next|favicon.ico|manifest.json|sw.js|icons|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
   ],
 };

@@ -56,6 +56,19 @@ producción. El superadmin entra **sin** código de organización.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.
+- **Enlace para compradores** (`/p/<token>`): página pública y de solo lectura
+  para que un comprador vea, sin cuenta, qué números o letras siguen
+  disponibles. Viene **apagada**: el organizador la activa desde "Crear enlace
+  para compradores", y puede copiarla, compartirla, generar una nueva (la
+  anterior deja de funcionar al instante) o desactivarla. `Raffle.publicToken`
+  guarda un secreto aleatorio de 128 bits. Quien la abre ve premio, precios,
+  fecha, cuentas de pago y disponible/vendido por número y letra (y el número
+  ganador si la rifa está cerrada), **nunca** nombres, teléfonos, comprobantes
+  ni pagos: `lib/publicRaffle.ts` es el único camino de datos anónimo y elige
+  los campos uno por uno. La página se actualiza sola cada 20 s, no se indexa
+  en buscadores, el endpoint público limita 60 consultas por minuto por IP y
+  eliminar la rifa mata el enlace. Los vendedores pueden copiarlo si está
+  activo, pero solo el organizador lo administra.
 - **Cobrar por WhatsApp**: en Participantes, cada comprador que debe tiene
   "Recordar pago" y el que ya pagó algo tiene "Enviar comprobante". Abren
   WhatsApp (`wa.me`) con el mensaje escrito: sus números o letras, el total, las
