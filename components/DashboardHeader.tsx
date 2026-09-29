@@ -247,22 +247,35 @@ export function DashboardHeader({
           </p>
         )}
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        {/* One row on every screen. On a phone the labels shrink to one word (the icons carry the rest);
+            from `sm` up they read in full. The aria-label always holds the full text. */}
+        <div className="mt-4 flex gap-2">
           <button
             type="button"
             onClick={onDownloadImage}
             disabled={downloadingImage}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:w-auto sm:px-5"
+            aria-label={
+              downloadingImage
+                ? "Generando imagen"
+                : canShareImage
+                  ? "Compartir imagen"
+                  : "Descargar imagen para compartir"
+            }
+            className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:flex-none sm:px-5"
           >
             {downloadingImage ? (
               <>
                 <Spinner size={16} />
-                Generando imagen…
+                <span aria-hidden="true" className="sm:hidden">Generando…</span>
+                <span aria-hidden="true" className="hidden sm:inline">Generando imagen…</span>
               </>
             ) : (
               <>
-                <DownloadIcon className="h-4 w-4" />
-                {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
+                <DownloadIcon className="h-4 w-4 shrink-0" />
+                <span aria-hidden="true" className="truncate sm:hidden">Imagen</span>
+                <span aria-hidden="true" className="hidden sm:inline">
+                  {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
+                </span>
               </>
             )}
           </button>
@@ -270,10 +283,14 @@ export function DashboardHeader({
             <button
               type="button"
               onClick={onOpenPublicLink}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:w-auto sm:px-5"
+              aria-label={raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:px-5"
             >
-              <LinkIcon className="h-4 w-4" />
-              {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+              <LinkIcon className="h-4 w-4 shrink-0" />
+              <span aria-hidden="true" className="truncate sm:hidden">Enlace</span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+              </span>
             </button>
           )}
         </div>
