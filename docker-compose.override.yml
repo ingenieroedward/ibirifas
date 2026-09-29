@@ -1,0 +1,8 @@
+# Only for local `docker compose up` (plain Compose auto-merges this file).
+# Dokploy runs `docker compose -f ./docker-compose.yml ...` explicitly, so it
+# never sees this file — publishing a host port here can't collide with
+# other apps on the server, which is what broke the Dokploy deploy before.
+services:
+  app:
+    ports:
+      - "${APP_PORT:-3000}:3000"

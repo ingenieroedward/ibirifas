@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/app/data/prod.db
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?set ACCESS_TOKEN_SECRET in Dokploy's environment variables}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?set REFRESH_TOKEN_PEPPER in Dokploy's environment variables}
+      SEED_SUPERADMIN_CODE: ${SEED_SUPERADMIN_CODE:-}
+      SEED_ORGANIZER_CODE: ${SEED_ORGANIZER_CODE:-}
+      SEED_SELLER_CODE: ${SEED_SELLER_CODE:-}
+      # Push notifications. Optional: without the two keys the app runs
+      # normally and the bell button simply doesn't appear.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    volumes:
+      - ibirifas_data:/app/data
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ibirifas_data:
