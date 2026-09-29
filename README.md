@@ -56,6 +56,12 @@ producción. El superadmin entra **sin** código de organización.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.
+- **Imagen para compartir**: en el celular el botón "Compartir imagen" abre
+  directo el menú del sistema (Guardar imagen en Fotos, WhatsApp, etc.) usando
+  la Web Share API con archivos. Si el navegador lo rechaza (por ejemplo, pasó
+  mucho tiempo desde el toque), o no puede compartir archivos, se abre una hoja
+  con la imagen para compartirla, descargarla o guardarla manteniéndola
+  presionada. En computador sigue siendo una descarga directa.
 - `RaffleNumber`: cada número con su estado (`available` / `occupied` /
   `paid`), datos del comprador y foto del comprobante en base64.
   `paymentMethod` (`cash` / `nequi` / `transfer` / `other`) registra cómo se

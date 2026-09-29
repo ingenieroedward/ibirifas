@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
@@ -13,7 +13,13 @@ import {
   updateNumber,
   updateNumbersBulk,
 } from "@/lib/api-client";
-import { downloadBlob, generateRaffleShareImage } from "@/lib/shareImage";
+import {
+  canShareImageFiles,
+  downloadBlob,
+  generateRaffleShareImage,
+  isTouchDevice,
+  shareImageFile,
+} from "@/lib/shareImage";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
 import { useRaffleLive } from "@/lib/useRaffleLive";
@@ -29,6 +35,7 @@ import type {
 import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DeleteRaffleSheet } from "@/components/DeleteRaffleSheet";
+import { ImagePreviewSheet } from "@/components/ImagePreviewSheet";
 import { GroupedBoard } from "@/components/GroupedBoard";
 import { GroupSheet } from "@/components/GroupSheet";
 import { NumberGrid } from "@/components/NumberGrid";
@@ -37,6 +44,9 @@ import { ParticipantsList } from "@/components/ParticipantsList";
 import { PayManySheet } from "@/components/PayManySheet";
 import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
+
+/** For useSyncExternalStore values that never change while the page is open (browser capabilities). */
+const subscribeNever = () => () => {};
 
 /** The newest `updatedAt` among the numbers — where a full load leaves the board in sync with the server. */
 function newestUpdate(numbers: RaffleNumberDTO[]): string | null {
@@ -68,6 +78,16 @@ export default function RaffleDashboardPage() {
   // Only used to decide whether the "back to picker" link is worth showing.
   const [raffleCount, setRaffleCount] = useState(1);
   const [downloadingImage, setDownloadingImage] = useState(false);
+  // The finished poster, shown for saving when the share sheet couldn't open straight away.
+  const [imagePreview, setImagePreview] = useState<{ blob: Blob; url: string; filename: string; title: string } | null>(null);
+  // Decided after mount: the server render can't know what this browser supports.
+  const canShareImage = useSyncExternalStore(subscribeNever, canShareImageFiles, () => false);
+  const closeImagePreview = useCallback(() => {
+    setImagePreview((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  }, []);
   const [view, setView] = useState<"board" | "participants">("board");
   // "Pick several" mode: the numbers one buyer wants, sold in a single step.
   const [selecting, setSelecting] = useState(false);
@@ -158,8 +178,25 @@ export default function RaffleDashboardPage() {
     try {
       const blob = await generateRaffleShareImage(raffle);
       const safeName = raffle.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-      downloadBlob(blob, `rifa-${safeName || raffle.id}.png`);
-      show("Imagen descargada", "success");
+      const filename = `rifa-${safeName || raffle.id}.png`;
+
+      const openPreview = () =>
+        setImagePreview((previous) => {
+          if (previous) URL.revokeObjectURL(previous.url);
+          return { blob, url: URL.createObjectURL(blob), filename, title: raffle.name };
+        });
+
+      if (canShareImageFiles()) {
+        // Phones: straight to the system share sheet (Fotos, WhatsApp…).
+        const outcome = await shareImageFile(blob, filename, raffle.name);
+        if (outcome === "failed") openPreview();
+      } else if (isTouchDevice()) {
+        // A phone without file sharing: a preview to save from beats a bare download.
+        openPreview();
+      } else {
+        downloadBlob(blob, filename);
+        show("Imagen descargada", "success");
+      }
     } catch {
       show("No se pudo generar la imagen. Inténtalo de nuevo.", "error");
     } finally {
@@ -537,6 +574,7 @@ export default function RaffleDashboardPage() {
           onLogout={handleLogout}
           onDownloadImage={handleDownloadImage}
           downloadingImage={downloadingImage}
+          canShareImage={canShareImage}
           onCloseRaffle={() => setClosingRaffle(true)}
           onReopenRaffle={handleReopenRaffle}
           onDeleteRaffle={() => setDeletingRaffle(true)}
@@ -714,6 +752,16 @@ export default function RaffleDashboardPage() {
         onClose={() => setSelectedId(null)}
         onSave={handleSave}
       />
+
+      {imagePreview && (
+        <ImagePreviewSheet
+          blob={imagePreview.blob}
+          url={imagePreview.url}
+          filename={imagePreview.filename}
+          title={imagePreview.title}
+          onClose={closeImagePreview}
+        />
+      )}
 
       {closingRaffle && raffle && isOrganizer && (
         <CloseRaffleSheet raffle={raffle} onClose={() => setClosingRaffle(false)} onConfirm={handleCloseRaffle} />

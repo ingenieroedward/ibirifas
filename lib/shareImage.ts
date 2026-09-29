@@ -1056,5 +1056,43 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Not right away: iOS Safari reads the file after the click returns, and a
+  // revoked URL leaves it with an empty preview.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Whether this browser can hand a PNG to the system share sheet (iPhone/Android: yes; most desktops: no). */
+export function canShareImageFiles(): boolean {
+  if (typeof navigator === "undefined" || typeof navigator.canShare !== "function" || typeof navigator.share !== "function") {
+    return false;
+  }
+  try {
+    return navigator.canShare({ files: [new File([""], "rifa.png", { type: "image/png" })] });
+  } catch {
+    return false;
+  }
+}
+
+export type ShareOutcome = "shared" | "cancelled" | "failed";
+
+/**
+ * Opens the system share sheet with the image, where "Guardar imagen" puts it in
+ * Fotos and WhatsApp & co. take it directly. "cancelled" means the person closed
+ * the sheet; "failed" is anything else (typically the browser refusing because
+ * too much time passed since the tap), and the caller should offer a fallback.
+ */
+export async function shareImageFile(blob: Blob, filename: string, title: string): Promise<ShareOutcome> {
+  try {
+    const file = new File([blob], filename, { type: "image/png" });
+    if (!navigator.canShare?.({ files: [file] })) return "failed";
+    await navigator.share({ files: [file], title });
+    return "shared";
+  } catch (err) {
+    return err instanceof DOMException && err.name === "AbortError" ? "cancelled" : "failed";
+  }
+}
+
+/** A phone or tablet: where a direct file download is awkward and a preview to save from is friendlier. */
+export function isTouchDevice(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 }

@@ -16,6 +16,8 @@ interface DashboardHeaderProps {
   onLogout: () => void;
   onDownloadImage: () => void;
   downloadingImage: boolean;
+  /** This browser can open the system share sheet with the image (phones), so the button says "Compartir". */
+  canShareImage: boolean;
   /** Organizer actions on the raffle's life cycle. */
   onCloseRaffle: () => void;
   onReopenRaffle: () => void;
@@ -30,6 +32,7 @@ export function DashboardHeader({
   onLogout,
   onDownloadImage,
   downloadingImage,
+  canShareImage,
   onCloseRaffle,
   onReopenRaffle,
   onDeleteRaffle,
@@ -255,7 +258,7 @@ export function DashboardHeader({
           ) : (
             <>
               <DownloadIcon className="h-4 w-4" />
-              Descargar imagen para compartir
+              {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
             </>
           )}
         </button>
