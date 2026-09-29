@@ -594,10 +594,7 @@ export default function RaffleDashboardPage() {
   }
 
   return (
-    <div
-      className={`flex min-h-dvh flex-1 flex-col ${selecting ? "pb-32" : "pb-10"}`}
-      style={raffle?.themeBackground ? { backgroundColor: raffle.themeBackground } : undefined}
-    >
+    <div className={`flex min-h-dvh flex-1 flex-col ${selecting ? "pb-32" : "pb-10"}`}>
       {raffle && (
         <DashboardHeader
           raffle={raffle}
@@ -716,8 +713,6 @@ export default function RaffleDashboardPage() {
                         numbers={raffle.numbers}
                         onOpenGroup={openGroupCard}
                         winnerValue={raffle.winnerValue}
-                        themeNumberColor={raffle.themeNumberColor}
-                        themeTextColor={raffle.themeTextColor}
                       />
                     </section>
                   )}
@@ -751,8 +746,6 @@ export default function RaffleDashboardPage() {
                         numbers={looseNumbers}
                         onSelect={handleGridSelect}
                         onLongPress={selecting || raffleClosed ? undefined : handleLongPress}
-                        themeNumberColor={raffle.themeNumberColor}
-                        themeTextColor={raffle.themeTextColor}
                         selectedIds={selecting ? pickedIds : undefined}
                         winnerValue={raffle.winnerValue}
                       />
@@ -938,7 +931,7 @@ function PeopleChip({
       aria-selected={active}
       onClick={onClick}
       className={`h-10 flex-1 rounded-full text-xs font-semibold transition active:scale-95 ${
-        active ? "bg-gold-400 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
+        active ? "bg-gold-300 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
       }`}
     >
       {children}

@@ -52,7 +52,13 @@ producción. El superadmin entra **sin** código de organización.
   número, fecha del sorteo, y colores de tema opcionales
   (`themeBackground`/`themeNumberColor`/`themeTextColor`) — si están vacíos
   se usa el look dorado/negro por defecto. Editable desde `/rifas/[id]/editar`
-  (no se puede cambiar `totalNumbers` una vez creada).
+  (no se puede cambiar `totalNumbers` una vez creada). **La aplicación
+  siempre se ve en amarillo y negro**; los colores de la rifa solo se aplican
+  al enlace público para compradores, a la imagen para compartir y a la
+  vista previa al compartir el enlace. Si el fondo elegido es claro (o de tono
+  medio), la página pública pasa a un esquema claro (texto oscuro, tarjetas
+  claras, dorado más profundo) para que todo se lea; el formulario avisa si el
+  texto casi no se lee sobre el color de los números.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.

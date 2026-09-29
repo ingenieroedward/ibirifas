@@ -87,7 +87,7 @@ export function GroupedBoard({ groups, numbers, onOpenGroup, themeNumberColor, t
                     {buyer && ` · ${buyer}`}
                   </p>
                   {wins && (
-                    <p className="text-xs font-bold text-gold-300">
+                    <p className="text-xs font-bold text-gold-400">
                       Ganó el {formatNumberValue(winnerValue!)}
                     </p>
                   )}

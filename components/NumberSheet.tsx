@@ -300,7 +300,7 @@ function SheetContent({
                           disabled={saving}
                           className={`h-11 rounded-xl text-xs font-semibold transition active:scale-[0.97] ${
                             paymentMethod === method
-                              ? "bg-gold-400 text-[#241a02]"
+                              ? "bg-gold-300 text-[#241a02]"
                               : "border border-line bg-surface-2 text-text-muted"
                           }`}
                         >

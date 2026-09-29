@@ -153,7 +153,7 @@ function SellerCard({ row, percent }: { row: SellerSales; percent: number }) {
         <Figure label="Por cobrar" value={row.pending} tone="text-gold-400" />
       </dl>
       {percent > 0 && (
-        <p className="mt-3 rounded-xl border border-gold-600/40 bg-gold-400/10 px-3 py-2 text-sm font-semibold text-gold-300">
+        <p className="mt-3 rounded-xl border border-gold-600/40 bg-gold-400/10 px-3 py-2 text-sm font-semibold text-gold-400">
           Comisión {percent}%: {formatCurrency(commissionOn(row.collected, percent))}
         </p>
       )}

@@ -48,7 +48,7 @@ export function PayManySheet({ buyerName, numbers, groups, total, onClose, onCon
         {sets.map((g) => (
           <span
             key={g.id}
-            className="flex h-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-3 font-[family-name:var(--font-heading)] text-base font-bold text-gold-300"
+            className="flex h-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-3 font-[family-name:var(--font-heading)] text-base font-bold text-gold-400"
           >
             Conjunto {g.label}
           </span>
@@ -56,7 +56,7 @@ export function PayManySheet({ buyerName, numbers, groups, total, onClose, onCon
         {loose.map((n) => (
           <span
             key={n.id}
-            className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-gold-300"
+            className="flex h-10 min-w-10 items-center justify-center rounded-xl border border-gold-600/60 bg-gold-400/10 px-2.5 font-[family-name:var(--font-heading)] text-base font-bold text-gold-400"
           >
             {formatNumberValue(n.value)}
           </span>
@@ -73,7 +73,7 @@ export function PayManySheet({ buyerName, numbers, groups, total, onClose, onCon
               onClick={() => setMethod(m)}
               disabled={saving}
               className={`h-11 rounded-xl text-xs font-semibold transition active:scale-[0.97] ${
-                method === m ? "bg-gold-400 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
+                method === m ? "bg-gold-300 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
               }`}
             >
               {PAYMENT_METHOD_LABEL[m]}

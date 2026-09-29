@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, createRaffle, getOrgSettings, updateRaffle } from "@/lib/api-client";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
-import { lighten } from "@/lib/color";
+import { lighten, luminance } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME } from "@/lib/theme";
 import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
@@ -701,8 +701,9 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         <div>
           <p className="text-sm font-semibold text-text">Colores de la rifa (opcional)</p>
           <p className="mt-0.5 text-xs text-text-muted">
-            Personaliza el tablero de números para esta rifa. Si no cambias nada, se usa el diseño
-            dorado de siempre.
+            Personaliza cómo se ve la rifa en el enlace público para compradores y en la imagen para
+            compartir. La aplicación siempre se ve en amarillo y negro. Si no cambias nada, se usa el
+            diseño dorado de siempre.
           </p>
         </div>
 
@@ -796,23 +797,36 @@ function ThemePreview({
   numberColor: string;
   textColor: string;
 }) {
+  // How readable the number is on its tile (WCAG contrast ratio; 3 is the floor for large bold text).
+  const [hi, lo] = [luminance(numberColor), luminance(textColor)].sort((x, y) => y - x);
+  const hardToRead = (hi! + 0.05) / (lo! + 0.05) < 3;
+  const lightBackground = luminance(background) >= 0.18;
+
   return (
-    <div
-      className="flex items-center justify-center gap-4 rounded-xl border border-line px-4 py-5"
-      style={{ backgroundColor: background }}
-    >
+    <div className="space-y-2">
       <div
-        className="flex aspect-square w-16 select-none items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-lg font-bold shadow-gold"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, ${lighten(numberColor, 0.22)}, ${numberColor})`,
-          color: textColor,
-        }}
+        className="flex items-center justify-center gap-4 rounded-xl border border-line px-4 py-5"
+        style={{ backgroundColor: background }}
       >
-        {formatNumberValue(7)}
+        <div
+          className="flex aspect-square w-16 select-none items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-lg font-bold shadow-gold"
+          style={{
+            backgroundImage: `linear-gradient(to bottom, ${lighten(numberColor, 0.22)}, ${numberColor})`,
+            color: textColor,
+          }}
+        >
+          {formatNumberValue(7)}
+        </div>
+        <p className="max-w-[10rem] text-xs" style={{ color: lightBackground ? "#3a3548" : lighten(background, 0.5) }}>
+          Así se verán los números disponibles en el enlace público y en la imagen.
+        </p>
       </div>
-      <p className="max-w-[10rem] text-xs text-text-muted" style={{ color: lighten(background, 0.5) }}>
-        Así se verán los números disponibles en tu rifa.
-      </p>
+      {hardToRead && (
+        <p role="status" className="text-xs font-medium text-gold-400">
+          El texto casi no se lee sobre el color de los números. Prueba con otro color de texto (blanco o negro, el que
+          contraste más).
+        </p>
+      )}
     </div>
   );
 }
