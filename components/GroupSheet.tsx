@@ -177,6 +177,7 @@ export function GroupSheet({ group, members, knownBuyers, canRelease = true, onC
         <>
           <div className="space-y-3 rounded-2xl border border-line bg-surface-2 p-4">
             <InfoRow label="Precio del conjunto" value={formatCurrency(group.price)} />
+            {first?.online && <InfoRow label="Origen" value="Reserva en línea" />}
             {first?.updatedByName && <InfoRow label="Registrado por" value={first.updatedByName} />}
             <InfoRow
               label="Pago"

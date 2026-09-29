@@ -11,6 +11,8 @@ interface PublicLinkSheetProps {
   token: string | null;
   /** Only the organizer can turn it on/off or replace it; sellers can copy and share it. */
   canManage: boolean;
+  /** Whether visitors can reserve numbers from the public page right now. */
+  reservationsOpen: boolean;
   onClose: () => void;
   onChange: (action: PublicLinkAction) => Promise<void>;
 }
@@ -20,7 +22,7 @@ export function publicLinkUrl(token: string): string {
 }
 
 /** The raffle's public, read-only page: for buyers to check what's still available without an account. */
-export function PublicLinkSheet({ raffleName, token, canManage, onClose, onChange }: PublicLinkSheetProps) {
+export function PublicLinkSheet({ raffleName, token, canManage, reservationsOpen, onClose, onChange }: PublicLinkSheetProps) {
   const [busy, setBusy] = useState<PublicLinkAction | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [confirmingRenew, setConfirmingRenew] = useState(false);
@@ -114,11 +116,24 @@ export function PublicLinkSheet({ raffleName, token, canManage, onClose, onChang
         </p>
       )}
 
+      {url && (
+        <p
+          className={`rounded-2xl border px-4 py-3 text-xs ${
+            reservationsOpen ? "border-green-500/40 bg-green-500/10 text-green-400" : "border-line bg-surface-2 text-text-muted"
+          }`}
+        >
+          {reservationsOpen
+            ? "Reservas activadas: quien abre el enlace puede apartar números y tiene el plazo de la rifa para pagar."
+            : "Reservas desactivadas: el enlace solo muestra qué está disponible. Se activan en Editar rifa o en Mi equipo (y necesitan un plazo de pago)."}
+        </p>
+      )}
+
       <div className="space-y-1 rounded-2xl border border-line bg-surface-2 p-4 text-xs text-text-muted">
         <p className="font-semibold text-text">Qué ve quien lo abre</p>
         <p>
           El premio, los precios, la fecha del sorteo, las cuentas de pago y qué números o letras están disponibles o
-          vendidos. Nunca ven nombres ni teléfonos de compradores, ni comprobantes. No pueden apartar ni cambiar nada.
+          vendidos. Nunca ven nombres ni teléfonos de otros compradores, ni comprobantes.{" "}
+          {reservationsOpen ? "Solo pueden apartar lo que siga libre." : "No pueden apartar ni cambiar nada."}
         </p>
       </div>
 

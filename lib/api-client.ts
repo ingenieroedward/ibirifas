@@ -4,6 +4,7 @@ import type {
   CreateUserInput,
   ManagedUserDTO,
   MeDTO,
+  OrgSettingsDTO,
   PublicLinkAction,
   RaffleDTO,
   RaffleNumberDTO,
@@ -279,4 +280,13 @@ export async function updateUser(
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+/** The organization's settings (organizer only). */
+export async function getOrgSettings(): Promise<OrgSettingsDTO> {
+  return request<OrgSettingsDTO>("/api/org/settings");
+}
+
+export async function updateOrgSettings(input: Partial<OrgSettingsDTO>): Promise<OrgSettingsDTO> {
+  return request<OrgSettingsDTO>("/api/org/settings", { method: "PATCH", body: JSON.stringify(input) });
 }

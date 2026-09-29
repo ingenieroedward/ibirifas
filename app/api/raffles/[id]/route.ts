@@ -7,6 +7,7 @@ import { formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { sweepRaffle } from "@/lib/expiry";
+import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
 import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 
@@ -19,6 +20,7 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
     };
     accounts: true;
     groups: true;
+    owner: { select: { publicReservations: true } };
   };
 }>;
 
@@ -54,6 +56,13 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     closedAt: raffle.closedAt ? raffle.closedAt.toISOString() : null,
     holdDays: raffle.holdDays,
     autoRelease: raffle.autoRelease,
+    publicReservations: settingFromDb(raffle.publicReservations),
+    reservationsOpen: reservationsOpen({
+      raffleSetting: raffle.publicReservations,
+      organizationDefault: raffle.owner.publicReservations,
+      holdDays: raffle.holdDays,
+      status: raffle.status,
+    }),
     publicToken: raffle.publicToken,
     numbers,
     accounts,
@@ -90,6 +99,7 @@ const updateRaffleSchema = z.object({
   accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
   holdDays: z.number().int().min(1).max(365).nullable().optional(),
   autoRelease: z.boolean().optional(),
+  publicReservations: z.enum(["inherit", "on", "off"]).optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -110,6 +120,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         },
         accounts: true,
         groups: true,
+        owner: { select: { publicReservations: true } },
       },
     });
   let raffle = await load();
@@ -182,6 +193,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.themeTextColor !== undefined) data.themeTextColor = input.themeTextColor;
   if (input.holdDays !== undefined) data.holdDays = input.holdDays;
   if (input.autoRelease !== undefined) data.autoRelease = input.autoRelease;
+  if (input.publicReservations !== undefined) data.publicReservations = settingToDb(input.publicReservations);
 
   // Closing and reopening. Closing records the winner (or none) and the moment;
   // reopening forgets both. The winner can also be corrected while it's closed.
@@ -241,6 +253,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
       accounts: true,
       groups: true,
+      owner: { select: { publicReservations: true } },
     },
   });
 

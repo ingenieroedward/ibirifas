@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, createRaffle, updateRaffle } from "@/lib/api-client";
+import { ApiError, createRaffle, getOrgSettings, updateRaffle } from "@/lib/api-client";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { lighten } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME } from "@/lib/theme";
-import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput } from "@/lib/types";
+import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
 import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { Spinner } from "@/components/Spinner";
 
@@ -76,6 +76,21 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [holdOn, setHoldOn] = useState(Boolean(raffle?.holdDays));
   const [holdDays, setHoldDays] = useState(String(raffle?.holdDays ?? DEFAULT_HOLD_DAYS));
   const [autoRelease, setAutoRelease] = useState(raffle?.autoRelease ?? false);
+
+  // Reservations from the public link: follow the organization's default, or decide for this raffle.
+  const [reservations, setReservations] = useState<ReservationSetting>(raffle?.publicReservations ?? "inherit");
+  const [orgAllows, setOrgAllows] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getOrgSettings()
+      .then((s) => {
+        if (!cancelled) setOrgAllows(s.publicReservations);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Selling in lettered sets (A, B, C…) is chosen when the raffle is created.
   const [useSets, setUseSets] = useState(false);
@@ -210,7 +225,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       setError("Los días para pagar deben ser un número entre 1 y 365.");
       return;
     }
-    const holdPayload = { holdDays: holdOn ? holdValue : null, autoRelease: holdOn && autoRelease };
+    const holdPayload = { holdDays: holdOn ? holdValue : null, autoRelease: holdOn && autoRelease, publicReservations: reservations };
     const accountsPayload: RaffleAccountInput[] = nonEmptyAccounts.map((a) => ({
       label: a.label.trim(),
       number: a.number.trim(),
@@ -378,6 +393,33 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
+
+      <div className="space-y-2 rounded-2xl border border-line bg-surface-2/60 p-4">
+        <Field
+          label="Reservas desde el enlace público"
+          htmlFor="publicReservations"
+          hint="Quien abre el enlace de la rifa puede apartar números o letras por su cuenta. Necesita un plazo de pago (arriba) para que lo no pagado se libere."
+        >
+          <select
+            id="publicReservations"
+            value={reservations}
+            onChange={(e) => setReservations(e.target.value as ReservationSetting)}
+            disabled={submitting}
+            className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+          >
+            <option value="inherit">
+              Como mi organización{orgAllows === null ? "" : orgAllows ? " (permitidas)" : " (no permitidas)"}
+            </option>
+            <option value="on">Permitir en esta rifa</option>
+            <option value="off">No permitir en esta rifa</option>
+          </select>
+        </Field>
+        {(reservations === "on" || (reservations === "inherit" && orgAllows === true)) && !holdOn && (
+          <p role="status" className="text-xs font-medium text-gold-400">
+            Para recibir reservas activa arriba &quot;Los apartados sin pagar vencen&quot; y elige los días.
+          </p>
+        )}
+      </div>
 
       {isEdit && existingSets.length > 0 ? (
         <div className="space-y-1 rounded-2xl border border-line bg-surface-2/60 p-4">

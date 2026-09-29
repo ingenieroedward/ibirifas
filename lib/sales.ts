@@ -28,8 +28,13 @@ export function salesBySeller(
   const buckets = new Map<string, { id: string | null; name: string; rows: RaffleNumberDTO[] }>();
   for (const n of numbers) {
     if (n.status === "available") continue;
-    const key = n.soldById ?? "";
-    const bucket = buckets.get(key) ?? { id: n.soldById, name: n.soldByName ?? "Sin vendedor registrado", rows: [] };
+    // Reservations made by visitors of the public link have no seller: they get their own line.
+    const key = n.soldById ?? (n.online ? "online" : "");
+    const bucket = buckets.get(key) ?? {
+      id: n.soldById,
+      name: n.soldByName ?? (n.online ? "Reservas en línea" : "Sin vendedor registrado"),
+      rows: [],
+    };
     bucket.rows.push(n);
     buckets.set(key, bucket);
   }

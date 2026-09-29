@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { MAX_GROUPS } from "@/lib/groups";
+import { settingToDb } from "@/lib/reservations";
 import type { CreateRaffleInput, RaffleSummaryDTO } from "@/lib/types";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
@@ -41,6 +42,7 @@ const createRaffleSchema = z.object({
   groups: z.array(groupSchema).max(MAX_GROUPS).optional(),
   holdDays: z.number().int().min(1).max(365).nullable().optional(),
   autoRelease: z.boolean().optional(),
+  publicReservations: z.enum(["inherit", "on", "off"]).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -206,6 +208,7 @@ export async function POST(req: NextRequest) {
         holdDays: input.holdDays ?? null,
         // Releasing on its own only makes sense with a deadline.
         autoRelease: input.holdDays ? (input.autoRelease ?? false) : false,
+        publicReservations: settingToDb(input.publicReservations ?? "inherit"),
       },
     });
 

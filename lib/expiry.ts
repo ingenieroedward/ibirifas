@@ -95,6 +95,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
         paymentMethod: null,
         soldById: null,
         soldAt: null,
+        online: false,
         updatedById: null,
       },
     });

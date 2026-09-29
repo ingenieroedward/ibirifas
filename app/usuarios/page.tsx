@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
-import { ApiError, getUsers, updateUser } from "@/lib/api-client";
+import { ApiError, getOrgSettings, getUsers, updateOrgSettings, updateUser } from "@/lib/api-client";
 import type { ManagedUserDTO } from "@/lib/types";
 import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
@@ -152,6 +152,7 @@ export default function UsersPage() {
       <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-2xl">
           {!isSuperadmin && user.orgCode && <OrgCodeCard orgCode={user.orgCode} onCopied={show} />}
+          {!isSuperadmin && <ReservationsCard onError={show} />}
 
           {loading && (
             <div className="flex flex-1 items-center justify-center py-24">
@@ -278,6 +279,64 @@ function OrgCodeCard({ orgCode, onCopied }: { orgCode: string; onCopied: (messag
           Copiar enlace
         </button>
       </div>
+    </section>
+  );
+}
+
+/** The organization-wide default for reservations from public links; each raffle can still override it. */
+function ReservationsCard({ onError }: { onError: (message: string, variant?: "success" | "error" | "info") => void }) {
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getOrgSettings()
+      .then((s) => {
+        if (!cancelled) setAllowed(s.publicReservations);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggle = async (next: boolean) => {
+    // Shown at once; put back if the server doesn't accept it.
+    const previous = allowed;
+    setAllowed(next);
+    setSaving(true);
+    try {
+      const saved = await updateOrgSettings({ publicReservations: next });
+      setAllowed(saved.publicReservations);
+    } catch {
+      setAllowed(previous);
+      onError("No se pudo guardar el cambio. Inténtalo de nuevo.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (allowed === null) return null;
+
+  return (
+    <section className="mb-4 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          id="orgReservations"
+          type="checkbox"
+          checked={allowed}
+          disabled={saving}
+          onChange={(e) => void toggle(e.target.checked)}
+          className="mt-1 h-5 w-5 accent-[#f5c542]"
+        />
+        <span>
+          <span className="block text-sm font-semibold text-text">Reservas desde el enlace público</span>
+          <span className="mt-0.5 block text-xs text-text-muted">
+            Por defecto en todas tus rifas: quien abre el enlace puede apartar números o letras por su cuenta y tiene el plazo
+            de pago de la rifa para pagar. Cada rifa puede cambiarlo en &quot;Editar rifa&quot; y necesita tener un plazo de pago.
+          </span>
+        </span>
+      </label>
     </section>
   );
 }

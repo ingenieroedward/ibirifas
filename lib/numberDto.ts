@@ -25,6 +25,7 @@ export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
     soldById: n.soldById,
     soldByName: n.soldBy?.name ?? null,
     soldAt: n.soldAt ? n.soldAt.toISOString() : null,
+    online: n.online,
     updatedAt: n.updatedAt.toISOString(),
   };
 }
