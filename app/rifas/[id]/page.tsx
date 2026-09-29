@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
@@ -10,6 +10,7 @@ import type { RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types"
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { NumberGrid } from "@/components/NumberGrid";
 import { NumberSheet } from "@/components/NumberSheet";
+import { ParticipantsList } from "@/components/ParticipantsList";
 import { Spinner } from "@/components/Spinner";
 
 /** `undefined` in a PATCH input means "leave unchanged"; `null` means "clear". */
@@ -31,6 +32,7 @@ export default function RaffleDashboardPage() {
   // Only used to decide whether the "back to picker" link is worth showing.
   const [raffleCount, setRaffleCount] = useState(1);
   const [downloadingImage, setDownloadingImage] = useState(false);
+  const [view, setView] = useState<"board" | "participants">("board");
 
   // Middleware already redirects unauthenticated requests server-side; this
   // is the client-side fallback for when the session expires in-app.
@@ -191,12 +193,35 @@ export default function RaffleDashboardPage() {
           )}
 
           {!raffleLoading && !raffleError && raffle && (
-            <NumberGrid
-              numbers={raffle.numbers}
-              onSelect={(n) => setSelectedId(n.id)}
-              themeNumberColor={raffle.themeNumberColor}
-              themeTextColor={raffle.themeTextColor}
-            />
+            <>
+              <div
+                role="tablist"
+                aria-label="Vista de la rifa"
+                className="mb-4 grid grid-cols-2 gap-1 rounded-2xl border border-line bg-bg-elevated p-1"
+              >
+                <ViewTab active={view === "board"} onClick={() => setView("board")}>
+                  Tablero
+                </ViewTab>
+                <ViewTab active={view === "participants"} onClick={() => setView("participants")}>
+                  Participantes
+                </ViewTab>
+              </div>
+
+              {view === "board" ? (
+                <NumberGrid
+                  numbers={raffle.numbers}
+                  onSelect={(n) => setSelectedId(n.id)}
+                  themeNumberColor={raffle.themeNumberColor}
+                  themeTextColor={raffle.themeTextColor}
+                />
+              ) : (
+                <ParticipantsList
+                  numbers={raffle.numbers}
+                  numberPrice={raffle.numberPrice}
+                  onSelect={(n) => setSelectedId(n.id)}
+                />
+              )}
+            </>
           )}
         </div>
       </main>
@@ -224,6 +249,32 @@ function successMessage(number: RaffleNumberDTO): string {
   if (number.status === "available") return `Número ${value} liberado`;
   if (number.status === "paid") return `Número ${value} marcado como pagado`;
   return `Número ${value} vendido`;
+}
+
+function ViewTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`h-11 rounded-xl text-sm font-semibold transition active:scale-[0.98] ${
+        active
+          ? "bg-gradient-to-b from-gold-300 to-gold-500 text-[#241a02] shadow-gold"
+          : "text-text-muted"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function FullScreenSpinner() {
