@@ -69,6 +69,12 @@ producción. El superadmin entra **sin** código de organización.
   en buscadores, el endpoint público limita 60 consultas por minuto por IP y
   eliminar la rifa mata el enlace. Los vendedores pueden copiarlo si está
   activo, pero solo el organizador lo administra.
+- **Encabezado plegable**: en el tablero, el botón "Detalles / Ocultar" pliega
+  la tarjeta de premio y precio, las cuentas de pago y los botones de imagen y
+  enlace, para que en el celular el tablero de números quede a la vista. Nombre,
+  contadores, lo recaudado y el aviso de rifa cerrada siempre se ven, y una
+  flecha lleva a "Mis rifas". La elección se recuerda en el dispositivo
+  (`localStorage`); la primera vez todo aparece abierto.
 - **Cobrar por WhatsApp**: en Participantes, cada comprador que debe tiene
   "Recordar pago" y el que ya pagó algo tiene "Enviar comprobante". Abren
   WhatsApp (`wa.me`) con el mensaje escrito: sus números o letras, el total, las

@@ -1,3 +1,6 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
@@ -6,6 +9,41 @@ import { describeHolder } from "@/components/CloseRaffleSheet";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
 import { Spinner } from "@/components/Spinner";
+
+// Whether the folding part of the header is hidden. Remembered on the device (localStorage),
+// with an in-memory fallback for browsers that refuse storage.
+const COLLAPSED_KEY = "ibirifas_header_collapsed";
+const COLLAPSED_EVENT = "ibirifas:header-collapsed";
+let collapsedInMemory = false;
+
+function subscribeCollapsed(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(COLLAPSED_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(COLLAPSED_EVENT, onChange);
+  };
+}
+
+function readCollapsed(): boolean {
+  try {
+    const stored = localStorage.getItem(COLLAPSED_KEY);
+    if (stored !== null) return stored === "1";
+  } catch {
+    // Storage blocked: fall back to memory.
+  }
+  return collapsedInMemory;
+}
+
+function setHeaderCollapsed(next: boolean): void {
+  collapsedInMemory = next;
+  try {
+    localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    // Kept in memory for this visit.
+  }
+  window.dispatchEvent(new Event(COLLAPSED_EVENT));
+}
 
 interface DashboardHeaderProps {
   raffle: RaffleDTO;
@@ -40,6 +78,7 @@ export function DashboardHeader({
   onReopenRaffle,
   onDeleteRaffle,
 }: DashboardHeaderProps) {
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const closed = raffle.status === "closed";
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
@@ -81,44 +120,6 @@ export function DashboardHeader({
           </div>
         </div>
 
-        {(showBackToPicker || role === "ORGANIZER") && (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {/* An organizer always needs the way home: it is where "Crear rifa" lives. */}
-            <Link
-              href="/"
-              className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
-            >
-              <BackIcon className="h-3.5 w-3.5" />
-              Mis rifas
-            </Link>
-            {role === "ORGANIZER" && (
-              <>
-                <Link
-                  href="/rifas/nueva"
-                  className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
-                >
-                  Crear rifa
-                </Link>
-                <Link
-                  href="/usuarios"
-                  className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
-                >
-                  Mi equipo
-                </Link>
-                {!closed && (
-                  <button
-                    type="button"
-                    onClick={onCloseRaffle}
-                    className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
-                  >
-                    Cerrar rifa
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
         {closed && (
           <div className="mb-3 rounded-2xl border border-gold-600/50 bg-gold-400/10 p-4" role="status">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Rifa cerrada</p>
@@ -156,6 +157,16 @@ export function DashboardHeader({
         )}
 
         <div className="flex items-center gap-2">
+          {/* The way home stays in reach even with the details folded. */}
+          {(showBackToPicker || role === "ORGANIZER") && (
+            <Link
+              href="/"
+              aria-label="Mis rifas"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
+            >
+              <BackIcon className="h-4 w-4" />
+            </Link>
+          )}
           <h1 className="min-w-0 flex-1 font-[family-name:var(--font-heading)] text-2xl font-bold leading-tight text-text">
             {raffle.name}
           </h1>
@@ -168,62 +179,19 @@ export function DashboardHeader({
               <EditIcon className="h-3.5 w-3.5" />
             </Link>
           )}
+          <button
+            type="button"
+            onClick={() => setHeaderCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-controls="raffle-details"
+            className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-text-muted transition active:scale-95"
+          >
+            {collapsed ? "Detalles" : "Ocultar"}
+            <ChevronIcon className={`h-3.5 w-3.5 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+          </button>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
-          <div className="flex divide-x divide-line">
-            <div className="flex-1 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                Premio
-              </p>
-              <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                {raffle.prizeLabel || "Por definir"}
-              </p>
-            </div>
-            <div className="flex-1 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                {hasGroups ? "Valor del conjunto" : "Valor del número"}
-              </p>
-              <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                {hasGroups ? setPriceText : formatCurrency(raffle.numberPrice)}
-              </p>
-              {hasGroups && looseCount > 0 && (
-                <p className="truncate text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
-              )}
-            </div>
-          </div>
-          {(raffle.drawDate || raffle.lottery) && (
-            <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
-              <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
-              <span>
-                {raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo"}
-                {raffle.lottery && (
-                  <>
-                    {raffle.drawDate && " · "}
-                    {raffle.lottery}
-                  </>
-                )}
-              </span>
-            </div>
-          )}
-          {raffle.accounts.length > 0 && (
-            <div className="space-y-1 border-t border-line px-4 py-2.5 text-sm text-text-muted">
-              {raffle.accounts.map((account) => (
-                <div key={account.id} className="flex items-start gap-2">
-                  <WalletIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
-                  <span>
-                    <span className="font-medium text-text">{account.label}</span> {account.number}
-                    {account.holderName && (
-                      <span className="text-text-muted"> · Responsable: {account.holderName}</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 flex items-center gap-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span className="flex items-center gap-1.5 font-medium text-text">
             <span className="h-2.5 w-2.5 rounded-full bg-gold-400" />
             {available} disponibles
@@ -247,55 +215,162 @@ export function DashboardHeader({
           </p>
         )}
 
-        {/* One row on every screen. On a phone the labels shrink to one word (the icons carry the rest);
-            from `sm` up they read in full. The aria-label always holds the full text. */}
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={onDownloadImage}
-            disabled={downloadingImage}
-            aria-label={
-              downloadingImage
-                ? "Generando imagen"
-                : canShareImage
-                  ? "Compartir imagen"
-                  : "Descargar imagen para compartir"
-            }
-            className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:flex-none sm:px-5"
-          >
-            {downloadingImage ? (
-              <>
-                <Spinner size={16} />
-                <span aria-hidden="true" className="sm:hidden">Generando…</span>
-                <span aria-hidden="true" className="hidden sm:inline">Generando imagen…</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-4 w-4 shrink-0" />
-                <span aria-hidden="true" className="truncate sm:hidden">Imagen</span>
-                <span aria-hidden="true" className="hidden sm:inline">
-                  {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
+        {/* Everything below the counts folds away, so a phone can show the board itself.
+            The choice is remembered on this device. */}
+        {!collapsed && (
+          <div id="raffle-details" className="mt-4 space-y-4">
+          {(showBackToPicker || role === "ORGANIZER") && (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* An organizer always needs the way home: it is where "Crear rifa" lives. */}
+              <Link
+                href="/"
+                className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+              >
+                <BackIcon className="h-3.5 w-3.5" />
+                Mis rifas
+              </Link>
+              {role === "ORGANIZER" && (
+                <>
+                  <Link
+                    href="/rifas/nueva"
+                    className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                  >
+                    Crear rifa
+                  </Link>
+                  <Link
+                    href="/usuarios"
+                    className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                  >
+                    Mi equipo
+                  </Link>
+                  {!closed && (
+                    <button
+                      type="button"
+                      onClick={onCloseRaffle}
+                      className="rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+                    >
+                      Cerrar rifa
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
+            <div className="flex divide-x divide-line">
+              <div className="flex-1 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Premio
+                </p>
+                <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
+                  {raffle.prizeLabel || "Por definir"}
+                </p>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  {hasGroups ? "Valor del conjunto" : "Valor del número"}
+                </p>
+                <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
+                  {hasGroups ? setPriceText : formatCurrency(raffle.numberPrice)}
+                </p>
+                {hasGroups && looseCount > 0 && (
+                  <p className="truncate text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
+                )}
+              </div>
+            </div>
+            {(raffle.drawDate || raffle.lottery) && (
+              <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
+                <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
+                <span>
+                  {raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo"}
+                  {raffle.lottery && (
+                    <>
+                      {raffle.drawDate && " · "}
+                      {raffle.lottery}
+                    </>
+                  )}
                 </span>
-              </>
+              </div>
             )}
-          </button>
-          {(role === "ORGANIZER" || raffle.publicToken) && (
+            {raffle.accounts.length > 0 && (
+              <div className="space-y-1 border-t border-line px-4 py-2.5 text-sm text-text-muted">
+                {raffle.accounts.map((account) => (
+                  <div key={account.id} className="flex items-start gap-2">
+                    <WalletIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
+                    <span>
+                      <span className="font-medium text-text">{account.label}</span> {account.number}
+                      {account.holderName && (
+                        <span className="text-text-muted"> · Responsable: {account.holderName}</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* One row on every screen. On a phone the labels shrink to one word (the icons carry the rest);
+              from `sm` up they read in full. The aria-label always holds the full text. */}
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={onOpenPublicLink}
-              aria-label={raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
-              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:px-5"
+              onClick={onDownloadImage}
+              disabled={downloadingImage}
+              aria-label={
+                downloadingImage
+                  ? "Generando imagen"
+                  : canShareImage
+                    ? "Compartir imagen"
+                    : "Descargar imagen para compartir"
+              }
+              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:flex-none sm:px-5"
             >
-              <LinkIcon className="h-4 w-4 shrink-0" />
-              <span aria-hidden="true" className="truncate sm:hidden">Enlace</span>
-              <span aria-hidden="true" className="hidden sm:inline">
-                {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
-              </span>
+              {downloadingImage ? (
+                <>
+                  <Spinner size={16} />
+                  <span aria-hidden="true" className="sm:hidden">Generando…</span>
+                  <span aria-hidden="true" className="hidden sm:inline">Generando imagen…</span>
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="h-4 w-4 shrink-0" />
+                  <span aria-hidden="true" className="truncate sm:hidden">Imagen</span>
+                  <span aria-hidden="true" className="hidden sm:inline">
+                    {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
+                  </span>
+                </>
+              )}
             </button>
-          )}
-        </div>
+            {(role === "ORGANIZER" || raffle.publicToken) && (
+              <button
+                type="button"
+                onClick={onOpenPublicLink}
+                aria-label={raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+                className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:px-5"
+              >
+                <LinkIcon className="h-4 w-4 shrink-0" />
+                <span aria-hidden="true" className="truncate sm:hidden">Enlace</span>
+                <span aria-hidden="true" className="hidden sm:inline">
+                  {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
+                </span>
+              </button>
+            )}
+          </div>
+
+          </div>
+        )}
+
       </div>
     </header>
+  );
+}
+
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
