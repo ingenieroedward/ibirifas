@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { pageThemeStyle } from "@/lib/theme";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
@@ -107,7 +108,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   return (
     <div
       className="flex min-h-dvh flex-1 flex-col pb-12"
-      style={raffle.themeBackground ? { backgroundColor: raffle.themeBackground } : undefined}
+      style={pageThemeStyle(raffle.themeBackground)}
     >
       <header className="px-4 pt-safe sm:px-6">
         <div className="mx-auto w-full max-w-3xl">

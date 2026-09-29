@@ -58,7 +58,7 @@ export function NotificationsButton() {
             </p>
           )}
 
-          {message && <p className="text-sm font-medium text-gold-300">{message}</p>}
+          {message && <p className="text-sm font-medium text-gold-400">{message}</p>}
 
           {status === "off" && (
             <button

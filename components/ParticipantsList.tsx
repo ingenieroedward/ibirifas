@@ -357,7 +357,7 @@ function ParticipantCard({
       </div>
 
       {p.numbers.some((n) => n.online) && (
-        <p className="mt-2 mr-1.5 inline-block rounded-full border border-gold-600/40 bg-gold-400/10 px-2.5 py-0.5 text-[11px] font-bold text-gold-300">
+        <p className="mt-2 mr-1.5 inline-block rounded-full border border-gold-600/40 bg-gold-400/10 px-2.5 py-0.5 text-[11px] font-bold text-gold-400">
           Reserva en línea
         </p>
       )}
@@ -396,7 +396,7 @@ function ParticipantCard({
               className={`flex h-11 min-w-11 items-center justify-center rounded-xl px-2.5 font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 ${
                 paid
                   ? "bg-gradient-to-b from-green-400 to-green-600 text-[#052012]"
-                  : "border border-gold-600/60 bg-gold-400/10 text-gold-300"
+                  : "border border-gold-600/60 bg-gold-400/10 text-gold-400"
               }`}
             >
               {h.kind === "set" ? `Conjunto ${h.group.label}` : formatNumberValue(h.number.value)}
@@ -483,7 +483,7 @@ function FilterChip({
       aria-selected={active}
       onClick={onClick}
       className={`h-10 flex-1 rounded-full text-xs font-semibold transition active:scale-95 ${
-        active ? "bg-gold-400 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
+        active ? "bg-gold-300 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
       }`}
     >
       {children}
