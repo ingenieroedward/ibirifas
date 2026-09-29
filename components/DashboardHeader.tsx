@@ -56,6 +56,8 @@ interface DashboardHeaderProps {
   downloadingImage: boolean;
   /** This browser can open the system share sheet with the image (phones), so the button says "Compartir". */
   canShareImage: boolean;
+  /** Copies the raffle and what is still available as a chat message. */
+  onCopyText: () => void;
   /** Opens the sheet with the raffle's public link for buyers. */
   onOpenPublicLink: () => void;
   /** Organizer actions on the raffle's life cycle. */
@@ -73,6 +75,7 @@ export function DashboardHeader({
   onDownloadImage,
   downloadingImage,
   canShareImage,
+  onCopyText,
   onOpenPublicLink,
   onCloseRaffle,
   onReopenRaffle,
@@ -332,7 +335,7 @@ export function DashboardHeader({
                     ? "Compartir imagen"
                     : "Descargar imagen para compartir"
               }
-              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:flex-none sm:px-5"
+              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-2 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-60 sm:flex-none sm:px-5"
             >
               {downloadingImage ? (
                 <>
@@ -342,7 +345,7 @@ export function DashboardHeader({
                 </>
               ) : (
                 <>
-                  <DownloadIcon className="h-4 w-4 shrink-0" />
+                  <DownloadIcon className="hidden h-4 w-4 shrink-0 min-[360px]:block" />
                   <span aria-hidden="true" className="truncate sm:hidden">Imagen</span>
                   <span aria-hidden="true" className="hidden sm:inline">
                     {canShareImage ? "Compartir imagen" : "Descargar imagen para compartir"}
@@ -355,13 +358,25 @@ export function DashboardHeader({
                 type="button"
                 onClick={onOpenPublicLink}
                 aria-label={raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
-                className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-3 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:px-5"
+                className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-gold-600/40 bg-bg-elevated px-2 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:px-5"
               >
-                <LinkIcon className="h-4 w-4 shrink-0" />
+                <LinkIcon className="hidden h-4 w-4 shrink-0 min-[360px]:block" />
                 <span aria-hidden="true" className="truncate sm:hidden">Enlace</span>
                 <span aria-hidden="true" className="hidden sm:inline">
                   {raffle.publicToken ? "Enlace para compradores" : "Crear enlace para compradores"}
                 </span>
+              </button>
+            )}
+            {!closed && (
+              <button
+                type="button"
+                onClick={onCopyText}
+                aria-label="Copiar disponibles como texto"
+                className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-gold-600/40 bg-bg-elevated px-2 text-sm font-semibold text-gold-400 transition active:scale-[0.98] sm:flex-none sm:gap-2 sm:px-5"
+              >
+                <TextIcon className="hidden h-4 w-4 shrink-0 min-[360px]:block" />
+                <span aria-hidden="true" className="truncate sm:hidden">Texto</span>
+                <span aria-hidden="true" className="hidden sm:inline">Copiar como texto</span>
               </button>
             )}
           </div>
@@ -378,6 +393,15 @@ function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
       <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TextIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 4h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9 9h7M9 12.5h7M9 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }

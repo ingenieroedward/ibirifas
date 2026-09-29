@@ -109,6 +109,17 @@ producción. El superadmin entra **sin** código de organización.
   dígitos recibe el `57` solo; uno con código de país se respeta; sin teléfono se
   abre el selector de contactos de WhatsApp. No hay integración ni costo: el
   mensaje sale del WhatsApp del propio vendedor.
+- **Copiar como texto**: en la cabecera del tablero, el botón "Texto" (rifa
+  abierta) copia un mensaje listo para pegar en WhatsApp o Telegram: nombre,
+  premio, sorteo, valor, lo que sigue disponible, las cuentas de pago y el
+  enlace público si existe ("Reserva y mira lo disponible aquí" cuando las
+  reservas están abiertas). Una rifa normal lista sus números libres; una rifa
+  por conjuntos lista cada letra libre con sus números y su precio (un conjunto
+  vendido no aparece), y después los números sueltos libres.
+- **Imagen de una rifa por letras**: solo dibuja lo que todavía se puede
+  comprar (los conjuntos vendidos y los números sueltos tomados no aparecen, y
+  la leyenda solo explica "Disponible"); si ya no queda nada, lo dice. La imagen
+  de una rifa normal sigue mostrando todos los números, los vendidos atenuados.
 - **Imagen para compartir**: en el celular el botón "Compartir imagen" abre
   directo el menú del sistema (Guardar imagen en Fotos, WhatsApp, etc.) usando
   la Web Share API con archivos. Si el navegador lo rechaza (por ejemplo, pasó

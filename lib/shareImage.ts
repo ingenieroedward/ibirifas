@@ -435,19 +435,22 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   }
   const sections: Section[] = [];
   if (hasSets) {
+    // By letters the poster shows only what can still be bought: sold sets and taken loose
+    // numbers are left out (a plain raffle keeps showing everything, sold ones muted).
     for (const group of raffle.groups) {
       const members = sorted.filter((n) => n.groupId === group.id);
-      if (members.length === 0) continue;
+      if (members.length === 0 || members.some((n) => n.status !== "available")) continue;
       sections.push({
         set: { label: group.label, price: group.price, sold: members.every((n) => n.status !== "available") },
         title: null,
         numbers: members,
       });
     }
-    const loose = sorted.filter((n) => n.groupId === null);
+    const loose = sorted.filter((n) => n.groupId === null && n.status === "available");
     if (loose.length > 0) {
       sections.push({ set: null, title: `NÚMEROS SUELTOS · ${formatCurrency(raffle.numberPrice)} C/U`, numbers: loose });
     }
+    if (sections.length === 0) sections.push({ set: null, title: "YA NO QUEDAN DISPONIBLES", numbers: [] });
   } else {
     sections.push({ set: null, title: null, numbers: sorted });
   }
@@ -886,10 +889,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   ctx.fillText("Disponible", legendX, legendY);
   legendX += ctx.measureText("Disponible").width + 32;
 
-  ctx.drawImage(legendSold, legendX, legendY - swatch + 2);
-  legendX += swatch + 10;
-  ctx.fillStyle = mutedText;
-  ctx.fillText("Vendido / apartado", legendX, legendY);
+  // By letters only what is free is drawn, so there is nothing sold to explain.
+  if (!hasSets) {
+    ctx.drawImage(legendSold, legendX, legendY - swatch + 2);
+    legendX += swatch + 10;
+    ctx.fillStyle = mutedText;
+    ctx.fillText("Vendido / apartado", legendX, legendY);
+  }
 
   cursorY += LEGEND_HEIGHT + GRID_TOP_GAP;
 
