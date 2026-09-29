@@ -62,6 +62,18 @@ producción. El superadmin entra **sin** código de organización.
   cobró en persona. `paymentRef` sigue sin usarse, reservado para cuando se
   conecte una pasarela de pago (Wompi, PSE, Stripe, etc.) sin tener que
   migrar el esquema — hoy el cobro es 100% manual por decisión de producto.
+- `RaffleGroup`: un **conjunto** con letra (A, B, C…) y precio propio. Al
+  crear una rifa se puede activar "Vender por conjuntos": se elige cuántos
+  números lleva cada letra y su precio, y los números se reparten **al azar**
+  (con "Sortear de nuevo") o **a mano** (eliges una letra y tocas sus
+  números). `RaffleNumber.groupId` dice a qué conjunto pertenece; los que
+  quedan sin conjunto son **sueltos** y se venden de a uno al "valor por
+  número suelto". Los conjuntos se definen al crear la rifa y no se editan.
+  Un conjunto siempre se vende, cobra y libera **completo** a un solo
+  comprador: `/api/numbers/bulk` rechaza (400) un pedido que traiga solo parte
+  de un conjunto y `/api/numbers/[id]` rechaza tocar un número que es de un
+  conjunto. Además de `sell` y `pay`, el endpoint acepta `unpay`, `release` y
+  `edit` (corregir nombre/teléfono del comprador), todos atómicos.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso

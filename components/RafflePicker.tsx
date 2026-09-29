@@ -44,10 +44,10 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
       <div className="mt-3 flex divide-x divide-line border-t border-line">
         <div className="flex-1 px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-            Valor
+            {raffle.groupCount > 0 ? "Conjuntos" : "Valor"}
           </p>
           <p className="mt-0.5 font-[family-name:var(--font-heading)] text-base font-extrabold text-gold-400">
-            {formatCurrency(raffle.numberPrice)}
+            {raffle.groupCount > 0 ? `${raffle.groupCount} letras` : formatCurrency(raffle.numberPrice)}
           </p>
         </div>
         <div className="flex-1 px-4 py-2.5">
@@ -73,9 +73,7 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
 
       {raffle.paidCount > 0 && (
         <p className="px-4 pb-3 text-xs text-text-muted">
-          <span className="font-semibold text-green-400">
-            {formatCurrency(raffle.paidCount * raffle.numberPrice)}
-          </span>{" "}
+          <span className="font-semibold text-green-400">{formatCurrency(raffle.collected)}</span>{" "}
           recaudados
         </p>
       )}

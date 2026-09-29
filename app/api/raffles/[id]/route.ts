@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
-import type {
-  NumberStatus,
-  PaymentMethod,
-  PaymentStatus,
-  RaffleAccountDTO,
-  RaffleDTO,
-  RaffleNumberDTO,
-} from "@/lib/types";
+import { toNumberDTO } from "@/lib/numberDto";
+import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 
 const MAX_ACCOUNTS = 5;
@@ -20,24 +14,18 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
       include: { updatedBy: { select: { name: true } } };
     };
     accounts: true;
+    groups: true;
   };
 }>;
 
 /** Shared GET/PATCH response mapping — keep this the single source of truth for RaffleDTO shape. */
 function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
-  const numbers: RaffleNumberDTO[] = raffle.numbers.map((n) => ({
-    id: n.id,
-    value: n.value,
-    status: n.status as NumberStatus,
-    buyerName: n.buyerName,
-    buyerPhone: n.buyerPhone,
-    photoDataUrl: n.photoDataUrl,
-    paymentStatus: n.paymentStatus as PaymentStatus,
-    paymentMethod: n.paymentMethod as PaymentMethod | null,
-    notes: n.notes,
-    updatedByName: n.updatedBy?.name ?? null,
-    updatedAt: n.updatedAt.toISOString(),
-  }));
+  const numbers = raffle.numbers.map(toNumberDTO);
+
+  const groups: RaffleGroupDTO[] = raffle.groups
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((g) => ({ id: g.id, label: g.label, price: g.price }));
 
   const accounts: RaffleAccountDTO[] = raffle.accounts
     .slice()
@@ -60,6 +48,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     status: raffle.status as "active" | "closed",
     numbers,
     accounts,
+    groups,
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,
     themeTextColor: raffle.themeTextColor,
@@ -106,6 +95,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         include: { updatedBy: { select: { name: true } } },
       },
       accounts: true,
+      groups: true,
     },
   });
 
@@ -200,6 +190,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         include: { updatedBy: { select: { name: true } } },
       },
       accounts: true,
+      groups: true,
     },
   });
 

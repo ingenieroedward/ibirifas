@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatCurrency, formatDrawDate } from "@/lib/format";
+import { makePricer } from "@/lib/groups";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
@@ -28,7 +29,16 @@ export function DashboardHeader({
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
-  const collected = paid * raffle.numberPrice;
+  const pricer = makePricer(raffle);
+  const collected = pricer(raffle.numbers.filter((n) => n.status === "paid"));
+  const hasGroups = raffle.groups.length > 0;
+  const looseCount = raffle.numbers.filter((n) => n.groupId === null).length;
+  const setPrices = raffle.groups.map((g) => g.price);
+  const setPriceText = hasGroups
+    ? Math.min(...setPrices) === Math.max(...setPrices)
+      ? formatCurrency(setPrices[0]!)
+      : `${formatCurrency(Math.min(...setPrices))} – ${formatCurrency(Math.max(...setPrices))}`
+    : null;
 
   return (
     <header className="px-4 pt-safe sm:px-6 lg:px-8">
@@ -112,11 +122,14 @@ export function DashboardHeader({
             </div>
             <div className="flex-1 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                Valor del número
+                {hasGroups ? "Valor del conjunto" : "Valor del número"}
               </p>
               <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                {formatCurrency(raffle.numberPrice)}
+                {hasGroups ? setPriceText : formatCurrency(raffle.numberPrice)}
               </p>
+              {hasGroups && looseCount > 0 && (
+                <p className="truncate text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
+              )}
             </div>
           </div>
           {(raffle.drawDate || raffle.lottery) && (

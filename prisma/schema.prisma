@@ -100,7 +100,29 @@ model Raffle {
 
   accounts     RaffleAccount[]
 
+  // Optional "sets" (A, B, C…). When a raffle has groups, each group's numbers
+  // are sold together at the group's price; numbers without a group stay loose
+  // and sell one by one at `numberPrice`.
+  groups       RaffleGroup[]
+
   @@index([ownerId])
+}
+
+// A lettered set of numbers sold as one unit. Which numbers belong to it is
+// decided when the raffle is created (drawn at random or picked by hand) and
+// never changes afterwards, so a sale can rely on it.
+model RaffleGroup {
+  id        String         @id @default(cuid())
+  raffleId  String
+  raffle    Raffle         @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  label     String         // "A", "B"… unique within the raffle
+  price     Int            // what the whole set costs
+  position  Int            @default(0)
+  createdAt DateTime       @default(now())
+  numbers   RaffleNumber[]
+
+  @@unique([raffleId, label])
+  @@index([raffleId])
 }
 
 // A payment account the organizer publishes on the raffle (Nequi, Bancolombia,
@@ -143,6 +165,12 @@ model RaffleNumber {
   updatedAt     DateTime   @updatedAt
   createdAt     DateTime   @default(now())
 
+  // Null = a loose number sold on its own; otherwise it can only be sold, paid
+  // or released together with the rest of its group.
+  groupId       String?
+  group         RaffleGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
   @@unique([raffleId, value])
   @@index([raffleId, status])
+  @@index([groupId])
 }

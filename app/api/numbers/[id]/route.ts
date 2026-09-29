@@ -44,7 +44,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const existing = await prisma.raffleNumber.findUnique({
     where: { id },
-    include: { raffle: { select: { ownerId: true, name: true, numberPrice: true } } },
+    include: {
+      raffle: { select: { ownerId: true, name: true, numberPrice: true } },
+      group: { select: { label: true } },
+    },
   });
   if (!existing) {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
@@ -53,6 +56,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const tenantId = tenantIdFor(user);
   if (!tenantId || existing.raffle.ownerId !== tenantId) {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
+  }
+
+  // A number in a lettered set moves with the whole set: selling, collecting or
+  // freeing it alone would break the set (see /api/numbers/bulk).
+  if (existing.group) {
+    return NextResponse.json(
+      { error: `Este número es del conjunto ${existing.group.label}. Se vende, cobra y libera el conjunto completo.` },
+      { status: 400 },
+    );
   }
 
   let rawBody: unknown;
@@ -160,6 +172,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     paymentStatus: updated.paymentStatus as PaymentStatus,
     paymentMethod: updated.paymentMethod as PaymentMethod | null,
     notes: updated.notes,
+    groupId: updated.groupId,
     // We just set updatedBy to the caller in this same request, so no extra
     // join is needed to know the name.
     updatedByName: status === "available" ? null : user.name,
