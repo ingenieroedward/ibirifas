@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { checkReserveRateLimit, getClientIp } from "@/lib/rateLimit";
 import { publishRaffleChange } from "@/lib/realtime";
+import { newPublicToken } from "@/lib/publicRaffle";
 import {
   MAX_LOOSE_PER_RESERVATION,
   MAX_SETS_PER_RESERVATION,
@@ -118,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     );
   }
 
+  const receiptKey = newPublicToken();
   try {
     await prisma.$transaction(async (tx) => {
       const { count } = await tx.raffleNumber.updateMany({
@@ -133,6 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           soldById: null,
           soldAt: new Date(),
           online: true,
+          holdToken: receiptKey,
         },
       });
       if (count !== ids.length) throw new TakenError();
@@ -162,5 +165,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     holdDays: raffle.holdDays!,
     numbers: values.sort((a, b) => a - b),
     sets: labels.sort(),
+    receiptKey,
   } satisfies ReserveResultDTO);
 }

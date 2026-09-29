@@ -10,10 +10,14 @@ interface PhotoPickerProps {
   onError: (message: string) => void;
   /** Lets the parent hold its save button while a photo is still being compressed. */
   onBusyChange?: (busy: boolean) => void;
+  /** Heading above the picker. */
+  label?: string;
+  /** "camera" opens the camera straight away (the team, in person); "any" also offers the gallery, for screenshots of a transfer. */
+  source?: "camera" | "any";
 }
 
 /** Camera/gallery picker for the payment-proof photo, compressed before it leaves the phone. */
-export function PhotoPicker({ value, onChange, onError, onBusyChange }: PhotoPickerProps) {
+export function PhotoPicker({ value, onChange, onError, onBusyChange, label = "Foto del comprobante", source = "camera" }: PhotoPickerProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -35,12 +39,12 @@ export function PhotoPicker({ value, onChange, onError, onBusyChange }: PhotoPic
 
   return (
     <div className="space-y-1.5">
-      <span className="text-sm font-medium text-text-muted">Foto del comprobante</span>
+      <span className="text-sm font-medium text-text-muted">{label}</span>
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
+        {...(source === "camera" ? { capture: "environment" as const } : {})}
         onChange={handleChange}
         className="hidden"
       />
@@ -68,7 +72,7 @@ export function PhotoPicker({ value, onChange, onError, onBusyChange }: PhotoPic
           ) : (
             <>
               <CameraIcon className="h-7 w-7 text-gold-400" />
-              <span className="text-sm font-medium">Tomar foto</span>
+              <span className="text-sm font-medium">{source === "camera" ? "Tomar foto" : "Tomar foto o elegir imagen"}</span>
             </>
           )}
         </button>

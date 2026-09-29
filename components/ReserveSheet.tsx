@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
+import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import type { PublicRaffleDTO, ReserveResultDTO } from "@/lib/types";
@@ -41,6 +42,13 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReserveResultDTO | null>(null);
 
+  // The payment receipt, attached after reserving (photos are compressed by PhotoPicker before they get here).
+  const [receipt, setReceipt] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+  const [receiptSent, setReceiptSent] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
   const holdDays = raffle.reservations.holdDays ?? 0;
   const items = [
     ...sets.map((s) => `Conjunto ${s}`),
@@ -78,6 +86,29 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
     }
   };
 
+  const sendReceipt = async () => {
+    if (!receipt || !result) return;
+    setSendingReceipt(true);
+    setReceiptError(null);
+    try {
+      const res = await fetch(`/api/public/raffles/${token}/receipt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: result.receiptKey, photoDataUrl: receipt }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setReceiptError(body.error ?? "No se pudo enviar el comprobante. Inténtalo de nuevo.");
+        return;
+      }
+      setReceiptSent(true);
+    } catch {
+      setReceiptError("No se pudo enviar el comprobante. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
+
   if (result) {
     return (
       <BottomSheet title="¡Reserva hecha!" subtitle={`${formatCurrency(result.total)} en total`} onClose={() => onClose(true)}>
@@ -107,6 +138,52 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
             ))}
           </div>
         )}
+        <div className="space-y-2 rounded-2xl border border-line bg-surface-2 p-4">
+          {receiptSent ? (
+            <p role="status" className="text-sm font-semibold text-green-400">
+              ✓ Comprobante enviado. Quien organiza la rifa lo revisará y confirmará tu pago.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-text">¿Ya pagaste? Sube tu comprobante</p>
+              <PhotoPicker
+                label="Foto o captura del pago"
+                source="any"
+                value={receipt}
+                onChange={setReceipt}
+                onError={setReceiptError}
+                onBusyChange={setPreparing}
+              />
+              {receipt && (
+                <p className="text-xs text-text-muted">
+                  Se comprime antes de enviarse ({Math.max(1, Math.round((receipt.length * 0.75) / 1024))} KB).
+                </p>
+              )}
+              {receiptError && (
+                <p role="alert" className="text-sm font-medium text-red-400">
+                  {receiptError}
+                </p>
+              )}
+              {receipt && (
+                <button
+                  type="button"
+                  onClick={sendReceipt}
+                  disabled={sendingReceipt || preparing}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 text-sm font-bold text-[#241a02] shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {sendingReceipt ? (
+                    <>
+                      <Spinner size={18} />
+                      Enviando…
+                    </>
+                  ) : (
+                    "Enviar comprobante"
+                  )}
+                </button>
+              )}
+            </>
+          )}
+        </div>
         <p className="text-xs text-text-muted">Quien organiza la rifa te va a escribir para confirmar tu pago.</p>
         <button
           type="button"

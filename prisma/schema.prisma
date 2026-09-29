@@ -204,6 +204,10 @@ model RaffleNumber {
   soldAt        DateTime?
   // Reserved by a visitor of the public link (nobody on the team sold it).
   online        Boolean    @default(false)
+  // Secret handed to the visitor who reserved it, so they (and only they) can
+  // attach their payment receipt afterwards. Same value on all of one
+  // reservation's numbers; cleared when the numbers are freed or resold.
+  holdToken     String?
 
   // Null = a loose number sold on its own; otherwise it can only be sold, paid
   // or released together with the rest of its group.
@@ -214,4 +218,5 @@ model RaffleNumber {
   @@index([raffleId, status])
   @@index([groupId])
   @@index([soldById])
+  @@index([holdToken])
 }

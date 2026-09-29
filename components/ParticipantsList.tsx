@@ -361,6 +361,11 @@ function ParticipantCard({
           Reserva en línea
         </p>
       )}
+      {p.numbers.some((n) => n.photoDataUrl) && (
+        <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
+          Con comprobante
+        </p>
+      )}
       {holdDays !== null && unpaid.length > 0 && (
         <p
           className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
