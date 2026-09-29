@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CopyButton } from "@/components/CopyButton";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
@@ -131,10 +132,13 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
           <div className="space-y-1 rounded-2xl border border-line bg-surface-2 p-4 text-sm text-text-muted">
             <p className="text-[11px] font-semibold uppercase tracking-wide">Paga aquí</p>
             {raffle.accounts.map((account) => (
-              <p key={account.id}>
-                <span className="font-semibold text-text">{account.label}</span> {account.number}
-                {account.holderName && <span> · {account.holderName}</span>}
-              </p>
+              <div key={account.id} className="flex items-center justify-between gap-3">
+                <p className="min-w-0 break-words">
+                  <span className="font-semibold text-text">{account.label}</span> {account.number}
+                  {account.holderName && <span> · {account.holderName}</span>}
+                </p>
+                <CopyButton text={account.number} label={`número de ${account.label}`} />
+              </div>
             ))}
           </div>
         )}

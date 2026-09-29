@@ -109,6 +109,10 @@ producción. El superadmin entra **sin** código de organización.
   dígitos recibe el `57` solo; uno con código de país se respeta; sin teléfono se
   abre el selector de contactos de WhatsApp. No hay integración ni costo: el
   mensaje sale del WhatsApp del propio vendedor.
+- **Copiar la cuenta de pago**: cada cuenta de pago tiene un botón "Copiar" que
+  copia solo el número (sin nombre ni responsable) y muestra "¡Copiado!". Está
+  en la página pública, en la confirmación de la reserva y en la cabecera del
+  tablero.
 - **Copiar como texto**: en la cabecera del tablero, el botón "Texto" (rifa
   abierta) copia un mensaje listo para pegar en WhatsApp o Telegram: nombre,
   premio, sorteo, valor, lo que sigue disponible, las cuentas de pago y el
