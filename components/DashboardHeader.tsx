@@ -58,22 +58,29 @@ export function DashboardHeader({
 
         {(showBackToPicker || role === "ORGANIZER") && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            {showBackToPicker && (
-              <Link
-                href="/"
-                className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
-              >
-                <BackIcon className="h-3.5 w-3.5" />
-                Mis rifas
-              </Link>
-            )}
+            {/* An organizer always needs the way home: it is where "Crear rifa" lives. */}
+            <Link
+              href="/"
+              className="flex items-center gap-1 rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95"
+            >
+              <BackIcon className="h-3.5 w-3.5" />
+              Mis rifas
+            </Link>
             {role === "ORGANIZER" && (
-              <Link
-                href="/usuarios"
-                className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
-              >
-                Mi equipo
-              </Link>
+              <>
+                <Link
+                  href="/rifas/nueva"
+                  className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                >
+                  Crear rifa
+                </Link>
+                <Link
+                  href="/usuarios"
+                  className="rounded-full border border-gold-600/40 px-3.5 py-1.5 text-xs font-semibold text-gold-400 transition active:scale-95"
+                >
+                  Mi equipo
+                </Link>
+              </>
             )}
           </div>
         )}
