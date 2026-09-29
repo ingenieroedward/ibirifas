@@ -127,6 +127,13 @@ producción. El superadmin entra **sin** código de organización.
   de un conjunto y `/api/numbers/[id]` rechaza tocar un número que es de un
   conjunto. Además de `sell` y `pay`, el endpoint acepta `unpay`, `release` y
   `edit` (corregir nombre/teléfono del comprador), todos atómicos.
+- **Precio individual con conjuntos**: al vender por conjuntos, el formulario
+  muestra siempre "Precio individual (números sueltos)" justo debajo del precio
+  del conjunto. Es obligatorio solo si quedan números fuera de los conjuntos; si
+  todos caben en letras es opcional (y se explica por qué). Para dejar números
+  sueltos, el campo "Cantidad de conjuntos" (por defecto, todos los que caben)
+  permite hacer menos conjuntos, o se sacan números de una letra en el modo "Elegir
+  yo". Los sueltos se venden de a uno a ese precio.
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación
