@@ -32,6 +32,10 @@ export interface RaffleNumberDTO {
   groupId: string | null;
   /** Name of whoever last sold/registered this number — useful when a raffle has several sellers. */
   updatedByName: string | null;
+  /** Who sold it (kept when someone else later collects the payment) and when; null while available. */
+  soldById: string | null;
+  soldByName: string | null;
+  soldAt: string | null;
   updatedAt: string;
 }
 
@@ -114,6 +118,10 @@ export interface RaffleDTO {
   /** The winning number once the raffle is closed; null while open or when closed without a draw. */
   winnerValue: number | null;
   closedAt: string | null;
+  /** Days a sold-but-unpaid number may wait before it is overdue; null = never. */
+  holdDays: number | null;
+  /** Overdue numbers go back on sale by themselves (otherwise the team is only warned). */
+  autoRelease: boolean;
   /** Secret of the public read-only page (/p/<token>); null when there is none. */
   publicToken: string | null;
   numbers: RaffleNumberDTO[];
@@ -157,6 +165,8 @@ export interface CreateRaffleInput {
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
   accounts?: RaffleAccountInput[];
+  holdDays?: number | null;
+  autoRelease?: boolean;
   /** Sell in lettered sets; numbers not listed here remain loose and use `numberPrice`. */
   groups?: RaffleGroupInput[];
 }
@@ -179,6 +189,9 @@ export interface UpdateRaffleInput {
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
   accounts?: RaffleAccountInput[];
+  /** Days a sold-but-unpaid number may wait before it is overdue; null = they never expire. */
+  holdDays?: number | null;
+  autoRelease?: boolean;
 }
 
 export interface UpdateNumberInput {

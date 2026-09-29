@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
-import { toNumberDTO } from "@/lib/numberDto";
+import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import { formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
+import { sweepRaffle } from "@/lib/expiry";
 import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 
@@ -14,7 +15,7 @@ const MAX_ACCOUNTS = 5;
 type RaffleWithNumbers = Prisma.RaffleGetPayload<{
   include: {
     numbers: {
-      include: { updatedBy: { select: { name: true } } };
+      include: typeof numberInclude;
     };
     accounts: true;
     groups: true;
@@ -51,6 +52,8 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     status: raffle.status as "active" | "closed",
     winnerValue: raffle.winnerValue,
     closedAt: raffle.closedAt ? raffle.closedAt.toISOString() : null,
+    holdDays: raffle.holdDays,
+    autoRelease: raffle.autoRelease,
     publicToken: raffle.publicToken,
     numbers,
     accounts,
@@ -85,6 +88,8 @@ const updateRaffleSchema = z.object({
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
   accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
+  holdDays: z.number().int().min(1).max(365).nullable().optional(),
+  autoRelease: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -95,17 +100,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
 
-  const raffle = await prisma.raffle.findUnique({
-    where: { id },
-    include: {
-      numbers: {
-        orderBy: { value: "asc" },
-        include: { updatedBy: { select: { name: true } } },
+  const load = () =>
+    prisma.raffle.findUnique({
+      where: { id },
+      include: {
+        numbers: {
+          orderBy: { value: "asc" },
+          include: numberInclude,
+        },
+        accounts: true,
+        groups: true,
       },
-      accounts: true,
-      groups: true,
-    },
-  });
+    });
+  let raffle = await load();
 
   if (!raffle) {
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
@@ -114,6 +121,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const tenantId = tenantIdFor(user);
   if (!tenantId || raffle.ownerId !== tenantId) {
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
+  }
+
+  // Opening a raffle also applies its deadline for unpaid holds, so what is shown is never stale.
+  if (raffle.status === "active" && raffle.holdDays) {
+    const swept = await sweepRaffle(id);
+    if (swept.released > 0) raffle = (await load()) ?? raffle;
   }
 
   return NextResponse.json(toRaffleDTO(raffle));
@@ -167,6 +180,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.themeBackground !== undefined) data.themeBackground = input.themeBackground;
   if (input.themeNumberColor !== undefined) data.themeNumberColor = input.themeNumberColor;
   if (input.themeTextColor !== undefined) data.themeTextColor = input.themeTextColor;
+  if (input.holdDays !== undefined) data.holdDays = input.holdDays;
+  if (input.autoRelease !== undefined) data.autoRelease = input.autoRelease;
 
   // Closing and reopening. Closing records the winner (or none) and the moment;
   // reopening forgets both. The winner can also be corrected while it's closed.
@@ -222,7 +237,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     include: {
       numbers: {
         orderBy: { value: "asc" },
-        include: { updatedBy: { select: { name: true } } },
+        include: numberInclude,
       },
       accounts: true,
       groups: true,

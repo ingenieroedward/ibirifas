@@ -23,6 +23,7 @@ import {
 } from "@/lib/shareImage";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
+import { isOverdue } from "@/lib/holds";
 import { useRaffleLive } from "@/lib/useRaffleLive";
 import type {
   BulkActionBody,
@@ -45,6 +46,7 @@ import { NumberGrid } from "@/components/NumberGrid";
 import { NumberSheet } from "@/components/NumberSheet";
 import { ParticipantsList } from "@/components/ParticipantsList";
 import { PayManySheet } from "@/components/PayManySheet";
+import { SellersReport } from "@/components/SellersReport";
 import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
 
@@ -93,6 +95,10 @@ export default function RaffleDashboardPage() {
     });
   }, []);
   const [view, setView] = useState<"board" | "participants">("board");
+  // Inside "Participantes": who bought, or who sold.
+  const [people, setPeople] = useState<"buyers" | "sellers">("buyers");
+  // Read once when the board opens; overdue holds are counted against this moment.
+  const [openedAt] = useState(() => Date.now());
   // "Pick several" mode: the numbers one buyer wants, sold in a single step.
   const [selecting, setSelecting] = useState(false);
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
@@ -217,6 +223,19 @@ export default function RaffleDashboardPage() {
     () => (raffle?.numbers ?? []).filter((n) => n.groupId === null),
     [raffle],
   );
+  // Sold-but-unpaid numbers past the raffle's deadline (a closed raffle has no deadline to keep).
+  const overdueHolds = useMemo(
+    () =>
+      raffle && raffle.status === "active" && raffle.holdDays
+        ? raffle.numbers.filter((n) => isOverdue(n, raffle.holdDays, openedAt))
+        : [],
+    [raffle, openedAt],
+  );
+  const overdueBuyers = useMemo(
+    () => new Set(overdueHolds.map((n) => (n.buyerName ?? "").trim().toLowerCase())).size,
+    [overdueHolds],
+  );
+
   const pricer = useMemo(() => (raffle ? makePricer(raffle) : () => 0), [raffle]);
   const openGroup = raffle?.groups.find((g) => g.id === openGroupId) ?? null;
   const openGroupMembers = useMemo(
@@ -654,6 +673,27 @@ export default function RaffleDashboardPage() {
                 </button>
               </div>
 
+              {overdueHolds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    exitSelection();
+                    setPeople("buyers");
+                    setView("participants");
+                  }}
+                  aria-label="Ver apartados vencidos"
+                  className="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="min-w-0 text-sm font-semibold text-red-300">
+                    {overdueBuyers === 1 ? "1 comprador tiene" : `${overdueBuyers} compradores tienen`} apartados vencidos
+                    <span className="block text-xs font-normal text-red-300/80">
+                      Más de {raffle.holdDays} {raffle.holdDays === 1 ? "día" : "días"} sin pagar
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-red-300">Ver</span>
+                </button>
+              )}
+
               {live.status === "reconnecting" && (
                 <p role="status" className="-mt-2 mb-3 text-xs font-medium text-gold-400">
                   Sin conexión en vivo. Reconectando… puedes seguir usando el tablero.
@@ -718,15 +758,38 @@ export default function RaffleDashboardPage() {
                   )}
                 </>
               ) : (
-                <ParticipantsList
-                  numbers={raffle.numbers}
-                  groups={raffle.groups}
-                  priceOf={pricer}
-                  raffle={raffle}
-                  winnerValue={raffle.winnerValue}
-                  onSelect={openNumber}
-                  onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
-                />
+                <>
+                  <div role="tablist" aria-label="Ver por" className="mb-4 flex gap-2">
+                    <PeopleChip active={people === "buyers"} onClick={() => setPeople("buyers")}>
+                      Compradores
+                    </PeopleChip>
+                    <PeopleChip active={people === "sellers"} onClick={() => setPeople("sellers")}>
+                      {isOrganizer ? "Vendedores" : "Mis ventas"}
+                    </PeopleChip>
+                  </div>
+                  {people === "buyers" ? (
+                    <ParticipantsList
+                      numbers={raffle.numbers}
+                      groups={raffle.groups}
+                      priceOf={pricer}
+                      raffle={raffle}
+                      winnerValue={raffle.winnerValue}
+                      holdDays={raffleClosed ? null : raffle.holdDays}
+                      autoRelease={raffle.autoRelease}
+                      onSelect={openNumber}
+                      onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
+                    />
+                  ) : (
+                    <SellersReport
+                      raffleId={raffle.id}
+                      raffleName={raffle.name}
+                      numbers={raffle.numbers}
+                      priceOf={pricer}
+                      viewerId={user?.id ?? ""}
+                      canSeeAll={isOrganizer}
+                    />
+                  )}
+                </>
               )}
             </>
           )}
@@ -854,6 +917,30 @@ function successMessage(number: RaffleNumberDTO): string {
   if (number.status === "available") return `Número ${value} liberado`;
   if (number.status === "paid") return `Número ${value} marcado como pagado`;
   return `Número ${value} vendido`;
+}
+
+function PeopleChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`h-10 flex-1 rounded-full text-xs font-semibold transition active:scale-95 ${
+        active ? "bg-gold-400 text-[#241a02]" : "border border-line bg-surface-2 text-text-muted"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function ViewTab({
