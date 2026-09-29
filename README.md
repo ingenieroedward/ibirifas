@@ -229,6 +229,11 @@ producción. El superadmin entra **sin** código de organización.
   respuesta de "no encontramos" no dice si el teléfono existe o si la reserva se
   liberó. Endpoint: `POST /api/public/raffles/[token]/receipt` con `key` (justo
   después de reservar) o con `phone`.
+  **Ver el comprobante**: en Participantes, la tarjeta de cada comprador muestra
+  miniaturas de sus comprobantes ("Ver"), así se ven desde afuera sin abrir cada
+  número o conjunto; un conjunto (que lleva la misma imagen en todos sus
+  números) muestra una sola, y varias reservas con imágenes distintas muestran
+  una miniatura por imagen. Al tocar se abre a pantalla completa.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso
