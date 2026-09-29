@@ -17,6 +17,9 @@ interface CodeInputProps {
   onChange: (code: string) => void;
   /** Bump this value to clear the boxes and refocus the first one (e.g. after a submit error). */
   resetSignal?: number;
+  /** Bump `fillSignal` to put `fillValue` into the boxes (e.g. a generated code). */
+  fillValue?: string;
+  fillSignal?: number;
 }
 
 /** Six-box numeric code entry, shared by the login screen and the "create user" form. */
@@ -27,6 +30,8 @@ export function CodeInput({
   ariaLabel = "Código de 6 dígitos",
   onChange,
   resetSignal,
+  fillValue,
+  fillSignal,
 }: CodeInputProps) {
   const [digits, setDigits] = useState<string[]>(Array(length).fill(""));
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
@@ -48,6 +53,17 @@ export function CodeInput({
     requestAnimationFrame(() => focusInput(0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetSignal]);
+
+  const filledOnce = useRef(false);
+  useEffect(() => {
+    if (!filledOnce.current) {
+      filledOnce.current = true;
+      return;
+    }
+    const chars = (fillValue ?? "").replace(/\D/g, "").slice(0, length).split("");
+    setDigits(Array.from({ length }, (_, i) => chars[i] ?? ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillSignal]);
 
   // Intentionally omits `onChange` from deps: it's typically a fresh closure
   // on every parent render, and we only want to notify on an actual edit.

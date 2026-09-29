@@ -119,10 +119,10 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
-export async function login(code: string): Promise<MeDTO> {
+export async function login(code: string, orgCode: string): Promise<MeDTO> {
   const { user } = await request<{ user: MeDTO }>(
     "/api/auth/login",
-    { method: "POST", body: JSON.stringify({ code }) },
+    { method: "POST", body: JSON.stringify({ code, orgCode }) },
     { skipRefresh: true, skipRedirectOn401: true },
   );
   return user;

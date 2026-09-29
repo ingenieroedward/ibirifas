@@ -1,18 +1,22 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, login } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CrownIcon } from "@/components/icons/Crown";
 import { CodeInput } from "@/components/CodeInput";
+import { normalizeOrgCode } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
 const CODE_LENGTH = 6;
+// The organization is remembered on the device so people only type it once.
+const ORG_STORAGE_KEY = "ibirifas_org";
 
 export default function LoginPage() {
   const router = useRouter();
   const { refresh } = useAuth();
+  const [orgCode, setOrgCode] = useState("");
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,9 +24,29 @@ export default function LoginPage() {
 
   const isComplete = code.length === CODE_LENGTH;
 
+  // Prefill the organization from a shared link (?org=…) or from the last login,
+  // then put the cursor where the person still has something to type.
+  useEffect(() => {
+    let initial = "";
+    try {
+      initial = normalizeOrgCode(new URLSearchParams(window.location.search).get("org") ?? "");
+      if (!initial) initial = window.localStorage.getItem(ORG_STORAGE_KEY) ?? "";
+    } catch {
+      // Storage can be unavailable (private mode); the field just starts empty.
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time prefill from browser-only sources
+    setOrgCode(initial);
+    const target = initial
+      ? document.querySelector<HTMLInputElement>('input[aria-label="Dígito 1"]')
+      : document.getElementById("orgCode");
+    target?.focus();
+  }, []);
+
   const handleCodeChange = useCallback((next: string) => {
     setCode(next);
-    setError(null);
+    // Clearing the boxes after a failed attempt also reports "" — that must not
+    // wipe the error message that was just shown. Only typing dismisses it.
+    if (next !== "") setError(null);
   }, []);
 
   const handleSubmit = useCallback(
@@ -32,7 +56,13 @@ export default function LoginPage() {
       setSubmitting(true);
       setError(null);
       try {
-        const user = await login(code);
+        const normalizedOrg = normalizeOrgCode(orgCode);
+        const user = await login(code, normalizedOrg);
+        try {
+          if (normalizedOrg) window.localStorage.setItem(ORG_STORAGE_KEY, normalizedOrg);
+        } catch {
+          // Not remembering is fine.
+        }
         await refresh();
         router.push(user.role === "SUPERADMIN" ? "/usuarios" : "/");
       } catch (err) {
@@ -41,7 +71,7 @@ export default function LoginPage() {
             ? err.status === 429
               ? "Demasiados intentos. Espera un momento e inténtalo de nuevo."
               : err.status === 401 || err.status === 400
-                ? "Código incorrecto. Verifica e inténtalo de nuevo."
+                ? "Organización o código incorrectos. Verifica e inténtalo de nuevo."
                 : err.message
             : "No se pudo conectar. Inténtalo de nuevo.";
         setError(message);
@@ -49,7 +79,7 @@ export default function LoginPage() {
         setResetSignal((n) => n + 1);
       }
     },
-    [code, isComplete, submitting, refresh, router],
+    [code, orgCode, isComplete, submitting, refresh, router],
   );
 
   return (
@@ -77,12 +107,39 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="mt-10 flex w-full flex-col items-center gap-6"
         >
-          <CodeInput
-            disabled={submitting}
-            onChange={handleCodeChange}
-            resetSignal={resetSignal}
-            ariaLabel="Código de acceso de 6 dígitos"
-          />
+          <div className="w-full space-y-1.5">
+            <label htmlFor="orgCode" className="text-sm font-medium text-text-muted">
+              Código de organización
+            </label>
+            <input
+              id="orgCode"
+              type="text"
+              value={orgCode}
+              onChange={(e) => {
+                setOrgCode(e.target.value);
+                setError(null);
+              }}
+              placeholder="ej. rifas-norte"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
+              enterKeyHint="next"
+              disabled={submitting}
+              className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none placeholder:text-text-muted focus:border-gold-400 disabled:opacity-60"
+            />
+          </div>
+
+          <div className="w-full space-y-1.5">
+            <span className="text-sm font-medium text-text-muted">Código de acceso</span>
+            <CodeInput
+              autoFocus={false}
+              disabled={submitting}
+              onChange={handleCodeChange}
+              resetSignal={resetSignal}
+              ariaLabel="Código de acceso de 6 dígitos"
+            />
+          </div>
 
           {error && (
             <p role="alert" className="animate-fade-in text-center text-sm font-medium text-red-400">
@@ -107,7 +164,8 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-8 max-w-xs text-center text-xs text-text-muted">
-          Ingresa el código de 6 dígitos que te compartió el administrador de la rifa.
+          Usa el código de organización y el de 6 dígitos que te compartió tu organizador. El celular
+          recuerda la organización. ¿Eres el administrador de la plataforma? Déjalo vacío.
         </p>
       </div>
     </div>

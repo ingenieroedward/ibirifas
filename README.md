@@ -35,17 +35,19 @@ npm run db:seed        # crea la rifa de ejemplo (100 números) y los códigos d
 npm run dev
 ```
 
-El seed imprime tres códigos de acceso de 6 dígitos (superadmin, organizador
-y vendedor) — úsalos para el primer login y luego crea tus propias cuentas
-desde la app (`/usuarios`); no dependas de estos códigos de ejemplo en
-producción.
+El seed imprime el código de organización de la demo (`demo`, o el que fijes con
+`SEED_ORG_CODE`) y tres códigos de acceso de 6 dígitos (superadmin,
+organizador y vendedor) — úsalos para el primer login y luego crea tus propias
+cuentas desde la app (`/usuarios`); no dependas de estos códigos de ejemplo en
+producción. El superadmin entra **sin** código de organización.
 
 ## Modelo de datos
 
 - `AdminUser`: usuario con código de acceso, `role` (`SUPERADMIN` /
   `ORGANIZER` / `SELLER`), `ownerId` (un vendedor pertenece a su
-  organizador) y `plan` (placeholder para futuros planes de pago, hoy sin
-  límites reales).
+  organizador), `orgCode` (solo en organizadores; ver "Organizaciones y
+  acceso") y `plan` (placeholder para futuros planes de pago, hoy sin límites
+  reales).
 - `Raffle`: pertenece a un organizador (`ownerId`); premio, precio por
   número, fecha del sorteo, y colores de tema opcionales
   (`themeBackground`/`themeNumberColor`/`themeTextColor`) — si están vacíos
@@ -62,7 +64,45 @@ producción.
   migrar el esquema — hoy el cobro es 100% manual por decisión de producto.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
+## Organizaciones y acceso
+
+Cada organizador es una **organización** (él y sus vendedores forman su
+equipo) y tiene un **código de organización** corto, por ejemplo
+`rifas-norte` (3 a 30 caracteres: minúsculas, números y guiones). Para
+ingresar se escribe ese código y el de 6 dígitos personal. Como el de 6
+dígitos solo se compara dentro del equipo, dos organizaciones distintas pueden
+tener cada una un vendedor con el mismo código, y el mensaje de "código en
+uso" ya no revela nada de otras organizaciones.
+
+- El celular recuerda la organización después del primer ingreso, y un enlace
+  `/login?org=rifas-norte` la deja escrita (el organizador lo copia desde
+  "Mi equipo").
+- El superadmin entra dejando la organización vacía. Al crear un organizador
+  elige su código (o se genera a partir del nombre) y puede cambiarlo después
+  desde el lápiz de su tarjeta.
+- Al crear o editar una cuenta, **Generar aleatorio** llena el código de 6
+  dígitos (sin repeticiones ni secuencias obvias como `111111` o `123456`) y
+  **Copiar código** lo copia. Es el único momento para anotarlo: se guarda
+  cifrado y no se puede volver a ver. Para organizadores, **Aleatorio** propone
+  un código de organización tipo `org-k7m2xq` (sin caracteres que se confunden).
+- Si se suspende (desactiva) a un organizador, todo su equipo deja de poder
+  ingresar.
+- Al actualizar desde una versión anterior, cada organizador que ya existía
+  recibe un código generado de su nombre (`Rifas del Norte` → `rifas-del-norte`,
+  con `-2`, `-3`… si se repite). Se asigna solo al arrancar y el superadmin lo
+  ve en "Organizadores".
+- El seed (`prisma/seed.ts`) corre en cada arranque del contenedor y por eso
+  el `Dockerfile` copia `lib/orgCode.ts` a la imagen: es lo único de `lib/`
+  que importa.
+
 ## Seguridad del login
+
+Los códigos de organización no son secretos (los conocen todos los vendedores),
+pero tampoco se regalan: un código de organización inexistente y un código de 6
+dígitos incorrecto reciben exactamente la misma respuesta. Un observador muy
+paciente aún podría inferir por el tiempo de respuesta que una organización
+existe (compara contra cada persona del equipo), y por eso el límite por IP de
+abajo es la defensa real contra probar códigos.
 
 El código de 6 dígitos tiene un espacio de búsqueda pequeño, así que el login
 está limitado por IP (`lib/rateLimit.ts`, en memoria — para producción con
@@ -80,7 +120,8 @@ de tipo **Docker Compose** en Dokploy.
 2. En **Environment Variables** de la app, define al menos:
    - `ACCESS_TOKEN_SECRET` — string aleatorio largo (`openssl rand -hex 32`).
    - `REFRESH_TOKEN_PEPPER` — otro string aleatorio largo, distinto al anterior.
-   - Opcional: `SEED_SUPERADMIN_CODE` / `SEED_ORGANIZER_CODE` /
+   - Opcional: `SEED_ORG_CODE` (código de organización de la demo, por defecto
+     `demo`) y `SEED_SUPERADMIN_CODE` / `SEED_ORGANIZER_CODE` /
      `SEED_SELLER_CODE` (6 dígitos cada uno) para fijar los códigos de acceso
      iniciales. Si no los defines, el primer arranque genera códigos
      aleatorios y los imprime una sola vez en los logs del contenedor —

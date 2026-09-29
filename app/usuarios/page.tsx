@@ -151,6 +151,8 @@ export default function UsersPage() {
 
       <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-2xl">
+          {!isSuperadmin && user.orgCode && <OrgCodeCard orgCode={user.orgCode} onCopied={show} />}
+
           {loading && (
             <div className="flex flex-1 items-center justify-center py-24">
               <Spinner size={32} className="text-gold-400" />
@@ -188,6 +190,7 @@ export default function UsersPage() {
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-text">{u.name}</p>
                     <p className="text-xs text-text-muted">
+                      {isSuperadmin && u.orgCode ? `Organización: ${u.orgCode} · ` : ""}
                       Desde {formatDate(u.createdAt)} · Plan {u.plan}
                     </p>
                   </div>
@@ -223,6 +226,7 @@ export default function UsersPage() {
           key={editing.id}
           user={editing}
           targetRoleLabel={targetRoleLabel}
+          canEditOrgCode={isSuperadmin}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
         />
@@ -231,10 +235,50 @@ export default function UsersPage() {
       <CreateUserSheet
         open={sheetOpen}
         targetRoleLabel={targetRoleLabel}
+        askOrgCode={isSuperadmin}
         onClose={() => setSheetOpen(false)}
         onCreated={handleCreated}
       />
     </div>
+  );
+}
+
+function OrgCodeCard({ orgCode, onCopied }: { orgCode: string; onCopied: (message: string, variant?: "success" | "error" | "info") => void }) {
+  const copy = async (text: string, message: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      onCopied(message, "success");
+    } catch {
+      onCopied("No se pudo copiar. Cópialo a mano.", "error");
+    }
+  };
+
+  return (
+    <section className="mb-4 rounded-2xl border border-gold-600/30 bg-bg-elevated p-4 shadow-card">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Código de organización</p>
+      <p className="mt-0.5 break-all font-[family-name:var(--font-heading)] text-2xl font-extrabold text-gold-400">
+        {orgCode}
+      </p>
+      <p className="mt-1 text-xs text-text-muted">
+        Tus vendedores lo escriben una sola vez al ingresar (el celular lo recuerda), junto con su código de 6 dígitos.
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => copy(orgCode, "Código copiado")}
+          className="h-10 flex-1 rounded-xl border border-gold-600/50 text-sm font-semibold text-gold-400 transition active:scale-[0.98]"
+        >
+          Copiar código
+        </button>
+        <button
+          type="button"
+          onClick={() => copy(`${window.location.origin}/login?org=${encodeURIComponent(orgCode)}`, "Enlace copiado")}
+          className="h-10 flex-1 rounded-xl border border-line text-sm font-semibold text-text-muted transition active:scale-[0.98]"
+        >
+          Copiar enlace
+        </button>
+      </div>
+    </section>
   );
 }
 
