@@ -1,9 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
-type NumberWithAuthor = Prisma.RaffleNumberGetPayload<{ include: { updatedBy: { select: { name: true } } } }>;
+/** What has to be loaded with a number to turn it into a DTO (who last touched it, who sold it). */
+export const numberInclude = {
+  updatedBy: { select: { name: true } },
+  soldBy: { select: { name: true } },
+} satisfies Prisma.RaffleNumberInclude;
 
-export function toNumberDTO(n: NumberWithAuthor): RaffleNumberDTO {
+type NumberWithAuthors = Prisma.RaffleNumberGetPayload<{ include: typeof numberInclude }>;
+
+export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
   return {
     id: n.id,
     value: n.value,
@@ -16,6 +22,9 @@ export function toNumberDTO(n: NumberWithAuthor): RaffleNumberDTO {
     notes: n.notes,
     groupId: n.groupId,
     updatedByName: n.updatedBy?.name ?? null,
+    soldById: n.soldById,
+    soldByName: n.soldBy?.name ?? null,
+    soldAt: n.soldAt ? n.soldAt.toISOString() : null,
     updatedAt: n.updatedAt.toISOString(),
   };
 }

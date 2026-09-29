@@ -135,6 +135,31 @@ producción. El superadmin entra **sin** código de organización.
   pide escribir el nombre de la rifa y borra todo (números, compradores,
   comprobantes) sin vuelta atrás. Los tableros abiertos se enteran en vivo:
   `/api/raffles/[id]/numbers` devuelve también el estado de la rifa.
+- **Ventas por vendedor**: en Participantes, el selector "Vendedores" (el
+  vendedor lo ve como "Mis ventas") muestra cuánto vendió cada persona, cuánto de
+  eso ya está cobrado y cuánto falta, con conjuntos a su precio de conjunto. Sirve
+  para liquidar comisiones: un campo opcional de % calcula la comisión sobre lo
+  **cobrado**, y "Enviar resumen por WhatsApp" manda el resumen. Una venta se
+  acredita a quien vendió (`RaffleNumber.soldById` y `soldAt`, que no cambian
+  cuando otra persona registra el pago; a diferencia de `updatedBy`, que es solo
+  el último que tocó el número), aunque otro haya recibido el dinero. El
+  organizador ve a todo el equipo; un vendedor solo su propia línea. Los números
+  vendidos antes de existir este dato se acreditan a quien los tocó por última
+  vez (la migración lo rellena así). Liberar un número borra su vendedor y fecha.
+- **Apartados que vencen**: en "Editar rifa" (o al crearla) el organizador puede
+  activar "Los apartados sin pagar vencen" con un plazo en días
+  (`Raffle.holdDays`, 1–365), contado desde `soldAt`. Pasado el plazo, un número
+  vendido y sin pagar está **vencido**: aparece un aviso rojo en el tablero, el
+  comprador sube al inicio de Participantes con "Vencido · N días sin pagar" (los
+  demás muestran "Vence en N días") y el equipo recibe una notificación push, como
+  máximo una vez al día (`expiryNoticeAt`). Con "Liberarlos automáticamente"
+  (`Raffle.autoRelease`) los números vuelven a estar disponibles solos (un
+  conjunto siempre completo, aunque solo uno de sus números esté vencido), y el
+  equipo recibe "apartados liberados" con quién y cuánto. Lo pagado nunca vence,
+  y una rifa cerrada no se toca. Lo aplica un temporizador del servidor cada 10
+  minutos, desde que arranca (`instrumentation.ts`, `lib/expirySweeper.ts`), y
+  también se revisa al abrir la rifa, así una pantalla nunca muestra algo
+  desactualizado. Como el resto del tiempo real, asume una sola instancia.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
 ## Organizaciones y acceso

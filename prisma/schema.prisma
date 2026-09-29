@@ -40,6 +40,7 @@ model AdminUser {
   pushSubscriptions PushSubscription[]
   raffles       Raffle[]       @relation("RaffleOwner")
   updates       RaffleNumber[] @relation("UpdatedBy")
+  sales         RaffleNumber[] @relation("SoldBy")
 
   @@index([ownerId])
 }
@@ -103,6 +104,14 @@ model Raffle {
   // unguessable; the organizer can rotate it (the old link stops working) or
   // switch it off.
   publicToken  String?        @unique
+
+  // Sold-but-unpaid numbers ("apartados") that sit for more than `holdDays`
+  // days are overdue. Null = they never expire. With `autoRelease` they go back
+  // on sale by themselves; otherwise the team is only warned (at most once a
+  // day, `expiryNoticeAt` remembers when).
+  holdDays        Int?
+  autoRelease     Boolean      @default(false)
+  expiryNoticeAt  DateTime?
 
   // Per-raffle grid theme override (hex strings like "#0b0b0f"). Null means
   // "use the app's default gold/black look" — these are opt-in, not required.
@@ -177,6 +186,13 @@ model RaffleNumber {
   updatedAt     DateTime   @updatedAt
   createdAt     DateTime   @default(now())
 
+  // Who sold the number and when it left the "available" state — unlike
+  // updatedBy, these don't change when someone else later collects the payment,
+  // so they are what sales reports and overdue holds are based on.
+  soldById      String?
+  soldBy        AdminUser? @relation("SoldBy", fields: [soldById], references: [id])
+  soldAt        DateTime?
+
   // Null = a loose number sold on its own; otherwise it can only be sold, paid
   // or released together with the rest of its group.
   groupId       String?
@@ -185,4 +201,5 @@ model RaffleNumber {
   @@unique([raffleId, value])
   @@index([raffleId, status])
   @@index([groupId])
+  @@index([soldById])
 }

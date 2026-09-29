@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
-import { toNumberDTO } from "@/lib/numberDto";
+import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
 
 const MAX_IDS = 100;
@@ -134,6 +134,8 @@ export async function POST(req: NextRequest) {
             photoDataUrl: input.photoDataUrl ?? null,
             notes: null,
             updatedById: user.id,
+            soldById: user.id,
+            soldAt: new Date(),
           },
         });
         if (count !== ids.length) {
@@ -158,6 +160,8 @@ export async function POST(req: NextRequest) {
             paymentStatus: "pending" satisfies PaymentStatus,
             paymentMethod: null,
             updatedById: user.id,
+            soldById: null,
+            soldAt: null,
           },
         });
         return;
@@ -235,7 +239,7 @@ export async function POST(req: NextRequest) {
   const updated = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
     orderBy: { value: "asc" },
-    include: { updatedBy: { select: { name: true } } },
+    include: numberInclude,
   });
 
   const raffle = await prisma.raffle.findUnique({

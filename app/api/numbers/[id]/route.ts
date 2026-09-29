@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam, type SaleEvent } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
-import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
+import { numberInclude, toNumberDTO } from "@/lib/numberDto";
+import type { NumberStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
 // decoding, but we just need a sane upper bound to protect the DB/response).
@@ -108,6 +109,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       paymentStatus: "pending" satisfies PaymentStatus,
       paymentMethod: null,
       updatedBy: { connect: { id: user.id } },
+      soldBy: { disconnect: true },
+      soldAt: null,
     };
   } else {
     const resultingBuyerName =
@@ -134,13 +137,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updatedBy: { connect: { id: user.id } },
     };
 
+    // The sale is credited to whoever takes the number off the market, once.
+    if (existing.status === "available") {
+      data.soldBy = { connect: { id: user.id } };
+      data.soldAt = new Date();
+    }
+
     if (input.buyerName !== undefined) data.buyerName = input.buyerName;
     if (input.buyerPhone !== undefined) data.buyerPhone = input.buyerPhone;
     if (input.notes !== undefined) data.notes = input.notes;
     if (input.photoDataUrl !== undefined) data.photoDataUrl = input.photoDataUrl;
   }
 
-  const updated = await prisma.raffleNumber.update({ where: { id }, data });
+  const updated = await prisma.raffleNumber.update({ where: { id }, data, include: numberInclude });
   publishRaffleChange(existing.raffleId);
 
   // Tell the rest of the team, but only for real changes of state — re-saving a
@@ -168,22 +177,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
-  const dto: RaffleNumberDTO = {
-    id: updated.id,
-    value: updated.value,
-    status: updated.status as NumberStatus,
-    buyerName: updated.buyerName,
-    buyerPhone: updated.buyerPhone,
-    photoDataUrl: updated.photoDataUrl,
-    paymentStatus: updated.paymentStatus as PaymentStatus,
-    paymentMethod: updated.paymentMethod as PaymentMethod | null,
-    notes: updated.notes,
-    groupId: updated.groupId,
-    // We just set updatedBy to the caller in this same request, so no extra
-    // join is needed to know the name.
-    updatedByName: status === "available" ? null : user.name,
-    updatedAt: updated.updatedAt.toISOString(),
-  };
-
-  return NextResponse.json(dto);
+  return NextResponse.json(toNumberDTO(updated));
 }

@@ -39,6 +39,8 @@ const createRaffleSchema = z.object({
   themeTextColor: hexColorSchema,
   accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
   groups: z.array(groupSchema).max(MAX_GROUPS).optional(),
+  holdDays: z.number().int().min(1).max(365).nullable().optional(),
+  autoRelease: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -201,6 +203,9 @@ export async function POST(req: NextRequest) {
         themeBackground: input.themeBackground ?? null,
         themeNumberColor: input.themeNumberColor ?? null,
         themeTextColor: input.themeTextColor ?? null,
+        holdDays: input.holdDays ?? null,
+        // Releasing on its own only makes sense with a deadline.
+        autoRelease: input.holdDays ? (input.autoRelease ?? false) : false,
       },
     });
 

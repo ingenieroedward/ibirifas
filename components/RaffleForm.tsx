@@ -12,6 +12,7 @@ import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { Spinner } from "@/components/Spinner";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
+const DEFAULT_HOLD_DAYS = 3;
 const MAX_ACCOUNTS = 5;
 
 /** A payment-account row being edited in the form, before submit. */
@@ -70,6 +71,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
+
+  // Sold-but-unpaid numbers can expire after some days (and optionally go back on sale by themselves).
+  const [holdOn, setHoldOn] = useState(Boolean(raffle?.holdDays));
+  const [holdDays, setHoldDays] = useState(String(raffle?.holdDays ?? DEFAULT_HOLD_DAYS));
+  const [autoRelease, setAutoRelease] = useState(raffle?.autoRelease ?? false);
 
   // Selling in lettered sets (A, B, C…) is chosen when the raffle is created.
   const [useSets, setUseSets] = useState(false);
@@ -199,6 +205,12 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       setError("Cada cuenta de pago necesita un nombre (ej. Nequi) y un número.");
       return;
     }
+    const holdValue = Number(holdDays);
+    if (holdOn && !(Number.isInteger(holdValue) && holdValue >= 1 && holdValue <= 365)) {
+      setError("Los días para pagar deben ser un número entre 1 y 365.");
+      return;
+    }
+    const holdPayload = { holdDays: holdOn ? holdValue : null, autoRelease: holdOn && autoRelease };
     const accountsPayload: RaffleAccountInput[] = nonEmptyAccounts.map((a) => ({
       label: a.label.trim(),
       number: a.number.trim(),
@@ -222,6 +234,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           numberPrice: Math.round(price),
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
           accounts: accountsPayload,
+          ...holdPayload,
           ...themePayload,
         });
         router.push(`/rifas/${raffle.id}`);
@@ -234,6 +247,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           totalNumbers: total,
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
           accounts: accountsPayload,
+          ...holdPayload,
           ...(groupsPayload ? { groups: groupsPayload } : {}),
           ...themePayload,
         });
@@ -290,6 +304,60 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
+
+      <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            id="holdOn"
+            type="checkbox"
+            checked={holdOn}
+            onChange={(e) => setHoldOn(e.target.checked)}
+            disabled={submitting}
+            className="mt-1 h-5 w-5 accent-[#f5c542]"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-text">Los apartados sin pagar vencen</span>
+            <span className="mt-0.5 block text-xs text-text-muted">
+              Un número vendido que sigue sin pagarse pasado el plazo se marca como vencido y avisamos al equipo.
+            </span>
+          </span>
+        </label>
+
+        {holdOn && (
+          <div className="space-y-3">
+            <Field label="Días para pagar" htmlFor="holdDays">
+              <input
+                id="holdDays"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={365}
+                step={1}
+                value={holdDays}
+                onChange={(e) => setHoldDays(e.target.value)}
+                disabled={submitting}
+                className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+              />
+            </Field>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                id="autoRelease"
+                type="checkbox"
+                checked={autoRelease}
+                onChange={(e) => setAutoRelease(e.target.checked)}
+                disabled={submitting}
+                className="mt-1 h-5 w-5 accent-[#f5c542]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-text">Liberarlos automáticamente</span>
+                <span className="mt-0.5 block text-xs text-text-muted">
+                  Vuelven a estar disponibles solos (los conjuntos, completos). Si no, solo se avisa una vez al día y tú decides.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+      </div>
 
 
       <Field

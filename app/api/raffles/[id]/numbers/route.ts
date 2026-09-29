@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
-import { toNumberDTO } from "@/lib/numberDto";
+import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 
 /**
  * Numbers changed after `since` (an ISO timestamp taken from the newest
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const changed = await prisma.raffleNumber.findMany({
     where: { raffleId: id, updatedAt: { gt: since } },
     orderBy: { value: "asc" },
-    include: { updatedBy: { select: { name: true } } },
+    include: numberInclude,
   });
 
   // The raffle's own state rides along, so a board also learns it was closed or reopened.

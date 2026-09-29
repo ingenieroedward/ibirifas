@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { daysLeft, daysText, daysWaiting, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/whatsapp";
@@ -16,6 +17,10 @@ interface ParticipantsListProps {
   raffle: WhatsAppRaffle;
   /** The winning number of a closed raffle; whoever holds it is flagged. */
   winnerValue?: number | null;
+  /** Days a sold number may wait for its payment before it is overdue; null = no deadline. */
+  holdDays?: number | null;
+  /** Overdue numbers go back on sale by themselves. */
+  autoRelease?: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -82,11 +87,29 @@ function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   return list;
 }
 
-export function ParticipantsList({ numbers, groups, priceOf, raffle, winnerValue, onSelect, onPayAll }: ParticipantsListProps) {
+export function ParticipantsList({
+  numbers,
+  groups,
+  priceOf,
+  raffle,
+  winnerValue,
+  holdDays = null,
+  autoRelease = false,
+  onSelect,
+  onPayAll,
+}: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
-  const participants = useMemo(() => groupByBuyer(numbers), [numbers]);
+  // "Now" is read once per render pass of the data, not per card, so every card agrees.
+  const [now] = useState(() => Date.now());
+  const participants = useMemo(() => {
+    const list = groupByBuyer(numbers);
+    if (!holdDays) return list;
+    // Whoever's payment is overdue goes to the top, longest wait first.
+    const overdueDays = (p: Participant) => Math.max(0, ...p.numbers.filter((n) => isOverdue(n, holdDays, now)).map((n) => daysWaiting(n, now)));
+    return list.sort((a, b) => overdueDays(b) - overdueDays(a));
+  }, [numbers, holdDays, now]);
 
   const totals = useMemo(() => {
     let pending = 0;
@@ -132,6 +155,12 @@ export function ParticipantsList({ numbers, groups, priceOf, raffle, winnerValue
 
   return (
     <div className="space-y-4">
+      {holdDays !== null && (
+        <p className="text-xs text-text-muted">
+          Los apartados vencen a los {daysText(holdDays)} sin pago
+          {autoRelease ? " y se liberan solos." : ": te avisamos una vez al día y tú decides."}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-gold-600/40 bg-bg-elevated p-4">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
@@ -190,6 +219,8 @@ export function ParticipantsList({ numbers, groups, priceOf, raffle, winnerValue
               groups={groups}
               priceOf={priceOf}
               raffle={raffle}
+              holdDays={holdDays}
+              now={now}
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
               onPayAll={onPayAll}
@@ -221,6 +252,8 @@ function ParticipantCard({
   groups,
   priceOf,
   raffle,
+  holdDays,
+  now,
   isWinner,
   onSelect,
   onPayAll,
@@ -229,6 +262,8 @@ function ParticipantCard({
   groups: RaffleGroupDTO[];
   priceOf: (subset: RaffleNumberDTO[]) => number;
   raffle: WhatsAppRaffle;
+  holdDays: number | null;
+  now: number;
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -236,6 +271,13 @@ function ParticipantCard({
   const owes = priceOf(p.numbers.filter((n) => n.status !== "paid"));
   const holdings = holdingsOf(p.numbers, groups);
   const pendingItems = holdings.filter((h) => !h.paid).length;
+
+  // The deadline for unpaid sales: how long the worst one has waited, or how long is left before the first expires.
+  const unpaid = p.numbers.filter((n) => n.status === "occupied");
+  const overdue = holdDays ? unpaid.filter((n) => isOverdue(n, holdDays, now)) : [];
+  const isLate = overdue.length > 0;
+  const lateDays = Math.max(0, ...overdue.map((n) => daysWaiting(n, now)));
+  const soonest = holdDays && !isLate ? Math.min(...unpaid.map((n) => daysLeft(n, holdDays, now) ?? Infinity)) : Infinity;
   const paidItems = holdings.length - pendingItems;
 
   // WhatsApp messages: one about what's still owed, one confirming what's paid.
@@ -313,6 +355,20 @@ function ParticipantCard({
           </span>
         )}
       </div>
+
+      {holdDays !== null && unpaid.length > 0 && (
+        <p
+          className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+            isLate ? "border border-red-500/40 bg-red-500/10 text-red-400" : "text-text-muted"
+          }`}
+        >
+          {isLate
+            ? `Vencido · ${daysText(lateDays)} sin pagar`
+            : soonest === 0
+              ? "Vence hoy"
+              : `Vence en ${daysText(soonest)}`}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {holdings.map((h) => {
