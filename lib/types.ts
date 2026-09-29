@@ -238,6 +238,12 @@ export interface UpdateNumberInput {
   photoDataUrl?: string | null;
   paymentMethod?: PaymentMethod | null; // only meaningful when status is "paid"
   notes?: string | null;
+  /**
+   * Set by a screen that is selling a number it saw as available: if someone else took it in the
+   * meantime (a visitor reserving from the public link, another seller) the save is refused with
+   * a 409 instead of silently overwriting their sale.
+   */
+  expectAvailable?: boolean;
 }
 
 // Several numbers for one buyer in one request (all-or-nothing on the server).

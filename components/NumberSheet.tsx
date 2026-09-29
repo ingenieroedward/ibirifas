@@ -92,6 +92,8 @@ function SheetContent({
         buyerName: trimmedName,
         buyerPhone: buyerPhone.trim() || null,
         photoDataUrl,
+        // Selling from the "available" form: refuse if someone took it first.
+        expectAvailable: number.status === "available",
       });
       onClose();
     } catch {

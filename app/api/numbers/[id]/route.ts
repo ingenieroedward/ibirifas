@@ -26,6 +26,7 @@ const updateNumberSchema = z.object({
   buyerName: trimmedString(120),
   buyerPhone: trimmedString(120),
   notes: trimmedString(120),
+  expectAvailable: z.boolean().optional(),
   paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]).nullable().optional(),
   photoDataUrl: z
     .string()
@@ -34,6 +35,8 @@ const updateNumberSchema = z.object({
     .nullable()
     .optional(),
 });
+
+class TakenError extends Error {}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser(req);
@@ -153,7 +156,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (input.photoDataUrl !== undefined) data.photoDataUrl = input.photoDataUrl;
   }
 
-  const updated = await prisma.raffleNumber.update({ where: { id }, data, include: numberInclude });
+  // A screen that saw the number as available must not overwrite a sale that landed first. The check
+  // and the write run in one transaction (the database has a single connection, so nothing slips in
+  // between).
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      if (input.expectAvailable) {
+        const current = await tx.raffleNumber.findUnique({ where: { id }, select: { status: true } });
+        if (current?.status !== "available") throw new TakenError();
+      }
+      return tx.raffleNumber.update({ where: { id }, data, include: numberInclude });
+    });
+  } catch (err) {
+    if (err instanceof TakenError) {
+      return NextResponse.json(
+        { error: "Ese número ya lo tomó otra persona. Actualiza el tablero para ver quién." },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
   publishRaffleChange(existing.raffleId);
 
   // Tell the rest of the team, but only for real changes of state — re-saving a
