@@ -31,6 +31,7 @@ model AdminUser {
   plan          String         @default("free")
 
   refreshTokens RefreshToken[]
+  pushSubscriptions PushSubscription[]
   raffles       Raffle[]       @relation("RaffleOwner")
   updates       RaffleNumber[] @relation("UpdatedBy")
 
@@ -45,6 +46,24 @@ model RefreshToken {
   expiresAt  DateTime
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// One row per browser/device that turned on notifications. `endpoint` is the
+// push service URL the browser handed us (unique per device), and p256dh/auth
+// are that device's encryption keys — together they are all web-push needs to
+// deliver an encrypted message. A row is dropped when the push service reports
+// the device gone (404/410) or the user turns notifications off.
+model PushSubscription {
+  id        String    @id @default(cuid())
+  userId    String
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String    @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }

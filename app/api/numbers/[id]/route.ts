@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
+import { describeEvent, notifyTeam, type SaleEvent } from "@/lib/push";
 import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const existing = await prisma.raffleNumber.findUnique({
     where: { id },
-    include: { raffle: { select: { ownerId: true } } },
+    include: { raffle: { select: { ownerId: true, name: true, numberPrice: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
@@ -121,6 +122,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updated = await prisma.raffleNumber.update({ where: { id }, data });
+
+  // Tell the rest of the team, but only for real changes of state — re-saving a
+  // buyer's name on an already-sold number isn't news.
+  const previous = existing.status as NumberStatus;
+  let kind: SaleEvent["kind"] | null = null;
+  if (previous === "available" && status === "occupied") kind = "sold";
+  else if (previous === "available" && status === "paid") kind = "soldAndPaid";
+  else if (previous === "occupied" && status === "paid") kind = "paid";
+  else if (previous !== "available" && status === "available") kind = "released";
+
+  if (kind) {
+    void notifyTeam(tenantId, user.id, {
+      title: existing.raffle.name,
+      body: describeEvent({
+        kind,
+        actorName: user.name,
+        // On release the buyer is gone from `updated`, so read it from before.
+        buyerName: kind === "released" ? existing.buyerName : updated.buyerName,
+        values: [updated.value],
+        numberPrice: existing.raffle.numberPrice,
+        paymentMethod: updated.paymentMethod as PaymentMethod | null,
+      }),
+      url: `/rifas/${existing.raffleId}`,
+    });
+  }
 
   const dto: RaffleNumberDTO = {
     id: updated.id,

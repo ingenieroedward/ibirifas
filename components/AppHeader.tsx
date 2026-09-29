@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CrownIcon } from "@/components/icons/Crown";
+import { NotificationsButton } from "@/components/NotificationsButton";
 
 interface HeaderLink {
   href: string;
@@ -16,6 +17,8 @@ interface AppHeaderProps {
   backLabel?: string;
   /** Extra pill-style nav links, e.g. "Mi equipo" or "Crear rifa". */
   links?: HeaderLink[];
+  /** Show the notifications bell (only meaningful for users who belong to a raffle team). */
+  notifications?: boolean;
 }
 
 /** Shared top bar for the non-grid screens (picker, empty state, forms, user management). */
@@ -27,6 +30,7 @@ export function AppHeader({
   backHref,
   backLabel = "Atrás",
   links = [],
+  notifications = false,
 }: AppHeaderProps) {
   return (
     <header className="px-4 pt-safe sm:px-6 lg:px-8">
@@ -51,6 +55,7 @@ export function AppHeader({
             <span className="max-w-[8rem] truncate text-sm font-medium text-text-muted">
               {userName}
             </span>
+            {notifications && <NotificationsButton />}
             <button
               type="button"
               onClick={onLogout}

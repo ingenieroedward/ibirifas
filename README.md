@@ -85,6 +85,8 @@ de tipo **Docker Compose** en Dokploy.
      iniciales. Si no los defines, el primer arranque genera códigos
      aleatorios y los imprime una sola vez en los logs del contenedor —
      revísalos ahí antes de que se pierdan.
+   - Opcional, para las notificaciones push: `VAPID_PUBLIC_KEY`,
+     `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` (ver "Notificaciones push" abajo).
 3. Configura el dominio de la app en Dokploy apuntando al puerto **interno**
    3000 del servicio `app` (el `docker-compose.yml` del repo no publica
    ningún puerto del host a propósito — Dokploy enruta por su propio proxy
@@ -112,6 +114,39 @@ cp .env.example .env   # o exporta ACCESS_TOKEN_SECRET/REFRESH_TOKEN_PEPPER
 docker compose up --build
 # app disponible en http://localhost:3000 (o el puerto que pongas en APP_PORT)
 ```
+
+## Notificaciones push
+
+Cuando alguien del equipo **vende, cobra o libera** un número, el resto del
+equipo (el organizador y sus vendedores, salvo quien hizo la acción) recibe un
+aviso en su celular aunque no tenga la app abierta. Cada persona las activa
+desde la campana del encabezado, en cada dispositivo donde las quiera.
+
+Para activarlas en el servidor hacen falta dos llaves (VAPID) que identifican
+a tu servidor ante Google, Apple y Mozilla:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Define en Dokploy `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT`
+(un `mailto:` con un correo real tuyo). Sin las llaves la app funciona igual y
+la campana simplemente no aparece. **No cambies las llaves después**: cada
+suscripción queda atada a la llave con la que se creó, y habría que volver a
+activar las notificaciones en todos los dispositivos.
+
+Requisitos y límites:
+
+- El sitio debe abrirse por **HTTPS** (el dominio de Dokploy ya lo es;
+  `localhost` también funciona para desarrollo).
+- **iPhone/iPad (iOS 16.4+)**: las notificaciones solo funcionan con la app
+  instalada en la pantalla de inicio (Compartir → *Añadir a pantalla de
+  inicio*) y abierta desde su ícono. En Safari normal no existen.
+- El servidor solo acepta direcciones de los servicios de push reales (Google,
+  Mozilla, Apple, Windows), para que nadie pueda usarlo para hacer peticiones
+  a direcciones internas.
+- El aviso se envía después de guardar la venta y nunca la retrasa ni la
+  hace fallar: si el servicio de push está caído, la venta se guarda igual.
 
 ## Notas conocidas
 

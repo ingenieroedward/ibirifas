@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
+import { describeEvent, notifyTeam } from "@/lib/push";
 import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from "@/lib/types";
 
 const MAX_IDS = 100;
@@ -79,6 +80,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Los números deben ser de la misma rifa" }, { status: 400 });
   }
 
+  // Which numbers actually changed hands, for the notification (paying a number
+  // that was already paid is a no-op and shouldn't announce anything).
+  let newlyPaidValues: number[] = [];
+
   try {
     await prisma.$transaction(async (tx) => {
       if (input.action === "sell") {
@@ -109,6 +114,11 @@ export async function POST(req: NextRequest) {
       if (withBuyer !== ids.length) {
         throw new ConflictError("Alguno de los números ya no tiene comprador. Actualiza el tablero e inténtalo de nuevo.");
       }
+      const toPay = await tx.raffleNumber.findMany({
+        where: { id: { in: ids }, status: "occupied" },
+        select: { value: true },
+      });
+      newlyPaidValues = toPay.map((n) => n.value);
       await tx.raffleNumber.updateMany({
         where: { id: { in: ids }, status: "occupied" },
         data: {
@@ -131,6 +141,41 @@ export async function POST(req: NextRequest) {
     orderBy: { value: "asc" },
     include: { updatedBy: { select: { name: true } } },
   });
+
+  const raffle = await prisma.raffle.findUnique({
+    where: { id: found[0]!.raffleId },
+    select: { name: true, numberPrice: true },
+  });
+  if (raffle) {
+    const buyers = [...new Set(updated.map((n) => n.buyerName).filter((name): name is string => Boolean(name)))];
+    const buyerName = buyers.length === 0 ? null : buyers.length <= 2 ? buyers.join(" y ") : "varios compradores";
+    if (input.action === "sell") {
+      void notifyTeam(tenantId, user.id, {
+        title: raffle.name,
+        body: describeEvent({
+          kind: "sold",
+          actorName: user.name,
+          buyerName: input.buyerName,
+          values: updated.map((n) => n.value),
+          numberPrice: raffle.numberPrice,
+        }),
+        url: `/rifas/${found[0]!.raffleId}`,
+      });
+    } else if (newlyPaidValues.length > 0) {
+      void notifyTeam(tenantId, user.id, {
+        title: raffle.name,
+        body: describeEvent({
+          kind: "paid",
+          actorName: user.name,
+          buyerName,
+          values: newlyPaidValues,
+          numberPrice: raffle.numberPrice,
+          paymentMethod: input.paymentMethod,
+        }),
+        url: `/rifas/${found[0]!.raffleId}`,
+      });
+    }
+  }
 
   const dtos: RaffleNumberDTO[] = updated.map((n) => ({
     id: n.id,

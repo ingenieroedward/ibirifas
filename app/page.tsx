@@ -106,7 +106,7 @@ export default function HomePage() {
   if (error) {
     return (
       <div className="flex min-h-dvh flex-1 flex-col">
-        <AppHeader userName={user.name} onLogout={handleLogout} title="Tus rifas" />
+        <AppHeader userName={user.name} onLogout={handleLogout} title="Tus rifas" notifications />
         <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <p className="max-w-xs text-text-muted">{error}</p>
           <button
@@ -126,7 +126,7 @@ export default function HomePage() {
   if (raffles.length === 0) {
     return (
       <div className="flex min-h-dvh flex-1 flex-col">
-        <AppHeader userName={user.name} onLogout={handleLogout} title="Tus rifas" />
+        <AppHeader userName={user.name} onLogout={handleLogout} title="Tus rifas" notifications />
         <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <p className="max-w-xs text-text-muted">
             {isOrganizer
@@ -152,6 +152,7 @@ export default function HomePage() {
         userName={user.name}
         onLogout={handleLogout}
         title="Tus rifas"
+        notifications
         subtitle="Elige una rifa para gestionar sus números."
         links={
           isOrganizer

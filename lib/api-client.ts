@@ -193,6 +193,30 @@ export async function updateNumbersBulk(input: BulkNumberInput): Promise<RaffleN
   });
 }
 
+/** The key the browser needs to subscribe, or null when the server has push turned off. */
+export async function getPushPublicKey(): Promise<string | null> {
+  const { publicKey } = await request<{ publicKey: string | null }>("/api/push/key");
+  return publicKey;
+}
+
+export async function savePushSubscription(subscription: PushSubscriptionJSON): Promise<void> {
+  await request<{ ok: true }>("/api/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify(subscription),
+  });
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  await request<{ ok: true }>("/api/push/unsubscribe", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
+export async function sendTestPush(): Promise<void> {
+  await request<{ sent: number }>("/api/push/test", { method: "POST" });
+}
+
 export async function getUsers(): Promise<ManagedUserDTO[]> {
   return request<ManagedUserDTO[]>("/api/users");
 }

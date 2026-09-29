@@ -12,6 +12,11 @@ services:
       SEED_SUPERADMIN_CODE: ${SEED_SUPERADMIN_CODE:-}
       SEED_ORGANIZER_CODE: ${SEED_ORGANIZER_CODE:-}
       SEED_SELLER_CODE: ${SEED_SELLER_CODE:-}
+      # Push notifications. Optional: without the two keys the app runs
+      # normally and the bell button simply doesn't appear.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     volumes:
       - ibirifas_data:/app/data
     expose:

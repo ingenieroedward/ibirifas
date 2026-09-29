@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatCurrency, formatDrawDate } from "@/lib/format";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
+import { NotificationsButton } from "@/components/NotificationsButton";
 import { Spinner } from "@/components/Spinner";
 
 interface DashboardHeaderProps {
@@ -43,6 +44,7 @@ export function DashboardHeader({
             <span className="max-w-[9rem] truncate text-sm font-medium text-text-muted">
               {userName}
             </span>
+            <NotificationsButton />
             <button
               type="button"
               onClick={onLogout}
