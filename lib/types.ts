@@ -152,6 +152,7 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserInput {
+  name?: string;
   active?: boolean;
   code?: string; // reset to a new 6-digit code
   plan?: string; // SUPERADMIN only, only meaningful when target role is ORGANIZER

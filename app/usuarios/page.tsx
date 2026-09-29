@@ -8,6 +8,7 @@ import { ApiError, getUsers, updateUser } from "@/lib/api-client";
 import type { ManagedUserDTO } from "@/lib/types";
 import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
+import { EditUserSheet } from "@/components/EditUserSheet";
 import { Spinner } from "@/components/Spinner";
 import { formatDate } from "@/lib/format";
 
@@ -20,6 +21,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<ManagedUserDTO | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -88,6 +90,15 @@ export default function UsersPage() {
     setUsers((current) => (current ? [created, ...current] : [created]));
     setSheetOpen(false);
   }, []);
+
+  const handleSaved = useCallback(
+    (updated: ManagedUserDTO) => {
+      setUsers((current) => current?.map((u) => (u.id === updated.id ? updated : u)) ?? current);
+      setEditing(null);
+      show("Cambios guardados", "success");
+    },
+    [show],
+  );
 
   const handleToggleActive = useCallback(
     async (target: ManagedUserDTO) => {
@@ -176,11 +187,21 @@ export default function UsersPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-text">{u.name}</p>
-                    <p className="truncate text-xs text-text-muted">
+                    <p className="text-xs text-text-muted">
                       Desde {formatDate(u.createdAt)} · Plan {u.plan}
                     </p>
                   </div>
-                  <ActiveToggle active={u.active} onToggle={() => handleToggleActive(u)} />
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(u)}
+                      aria-label={`Editar ${u.name}`}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
+                    >
+                      <EditIcon className="h-4 w-4" />
+                    </button>
+                    <ActiveToggle active={u.active} onToggle={() => handleToggleActive(u)} />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -197,6 +218,16 @@ export default function UsersPage() {
         +
       </button>
 
+      {editing && (
+        <EditUserSheet
+          key={editing.id}
+          user={editing}
+          targetRoleLabel={targetRoleLabel}
+          onClose={() => setEditing(null)}
+          onSaved={handleSaved}
+        />
+      )}
+
       <CreateUserSheet
         open={sheetOpen}
         targetRoleLabel={targetRoleLabel}
@@ -204,6 +235,20 @@ export default function UsersPage() {
         onCreated={handleCreated}
       />
     </div>
+  );
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
