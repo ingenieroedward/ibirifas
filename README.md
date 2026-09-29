@@ -403,6 +403,32 @@ Límites a tener en cuenta:
   envía `X-Accel-Buffering: no` para los que sí (nginx).
 - Cada rifa admite hasta 300 conexiones en vivo a la vez.
 
+## Concurrencia (muchas personas a la vez)
+
+La base es SQLite, que acepta **un solo escritor a la vez**. Cada compra o
+reserva es una escritura muy corta (milisegundos), así que basta con hacerlas
+en fila: `lib/prisma.ts` fija el pool a **una sola conexión** (con esperas
+largas), y las peticiones simultáneas simplemente se encolan dentro de la app.
+Sin esto, con el pool por defecto de Prisma las conexiones se disputaban el
+archivo y en una prueba 25 de 30 reservas simultáneas fallaban con "Socket
+timeout" tras 30 s.
+
+Quién se queda con un número lo decide el orden en que la base procesa las
+escrituras: **el primero que llega gana**; a los demás el servidor les responde
+409 ("ya lo reservó otra persona") y no se aparta nada de su pedido (todo o
+nada, un conjunto siempre completo). Una pantalla del equipo que ofrece vender un
+número que ya se tomó también recibe 409 (`expectAvailable`) en lugar de pisar la
+venta anterior.
+
+Medido en local (`test-concurrency`, 4 núcleos): 200 personas pidiendo el mismo
+número → 1 gana y 199 reciben 409 en ~1 s; 200 personas sobre 100 números →
+exactamente 100 ventas y 100 rechazos, sin duplicados ni errores; 500 personas
+mirando la página + 30 ventas del equipo + 300 compradores a la vez → todo
+atendido, sin errores 5xx; 1000 peticiones simultáneas sobre 1000 números → sin
+errores en ~6 s. Límites a tener en cuenta: una sola instancia de la app (igual
+que el tiempo real) y el límite de 6 reservas por hora por IP, que personas en
+la misma red (un evento, el wifi de un local, algunos operadores móviles) comparten.
+
 ## Notas conocidas
 
 - `npm audit` reporta una vulnerabilidad en una dependencia transitiva del
