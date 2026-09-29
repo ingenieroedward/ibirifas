@@ -6,6 +6,7 @@ import { ApiError, login } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CrownIcon } from "@/components/icons/Crown";
 import { CodeInput } from "@/components/CodeInput";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { normalizeOrgCode } from "@/lib/orgCode";
 import { Spinner } from "@/components/Spinner";
 
@@ -163,7 +164,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-8 max-w-xs text-center text-xs text-text-muted">
+        <div className="mt-4 w-full">
+          <InstallAppButton />
+        </div>
+
+        <p className="mt-6 max-w-xs text-center text-xs text-text-muted">
           Usa el código de organización y el de 6 dígitos que te compartió tu organizador. El celular
           recuerda la organización. ¿Eres el administrador de la plataforma? Déjalo vacío.
         </p>
