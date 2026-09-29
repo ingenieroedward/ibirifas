@@ -183,3 +183,22 @@ textarea {
   background: var(--color-line);
   border-radius: 999px;
 }
+
+/* iOS Safari gives date inputs a fixed intrinsic width that ignores `w-full` and pokes out of its
+   container. Take the native chrome off so the field sizes like any other input, and keep the
+   value left-aligned like the text fields around it. The picker still opens on tap. */
+input[type="date"] {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.5em;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.7;
+}

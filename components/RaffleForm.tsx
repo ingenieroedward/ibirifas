@@ -602,7 +602,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           value={drawDate}
           onChange={(e) => setDrawDate(e.target.value)}
           disabled={submitting}
-          className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+          className="h-12 w-full min-w-0 max-w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
 
@@ -831,7 +831,7 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <label htmlFor={htmlFor} className="text-sm font-medium text-text-muted">
         {label} {required && <span className="text-gold-400">*</span>}
       </label>
