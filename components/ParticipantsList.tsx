@@ -8,6 +8,8 @@ interface ParticipantsListProps {
   numbers: RaffleNumberDTO[];
   numberPrice: number;
   onSelect: (number: RaffleNumberDTO) => void;
+  /** Collect every unpaid number of one buyer in a single step. */
+  onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
 }
 
 type Filter = "all" | "pending" | "paid";
@@ -61,7 +63,7 @@ function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   return list;
 }
 
-export function ParticipantsList({ numbers, numberPrice, onSelect }: ParticipantsListProps) {
+export function ParticipantsList({ numbers, numberPrice, onSelect, onPayAll }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -159,7 +161,13 @@ export function ParticipantsList({ numbers, numberPrice, onSelect }: Participant
       ) : (
         <ul className="space-y-3">
           {visible.map((p) => (
-            <ParticipantCard key={p.key} participant={p} numberPrice={numberPrice} onSelect={onSelect} />
+            <ParticipantCard
+              key={p.key}
+              participant={p}
+              numberPrice={numberPrice}
+              onSelect={onSelect}
+              onPayAll={onPayAll}
+            />
           ))}
         </ul>
       )}
@@ -171,10 +179,12 @@ function ParticipantCard({
   participant: p,
   numberPrice,
   onSelect,
+  onPayAll,
 }: {
   participant: Participant;
   numberPrice: number;
   onSelect: (number: RaffleNumberDTO) => void;
+  onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
 }) {
   const owes = p.pendingCount * numberPrice;
 
@@ -222,6 +232,22 @@ function ParticipantCard({
           );
         })}
       </div>
+
+      {p.pendingCount > 0 && (
+        <button
+          type="button"
+          onClick={() =>
+            onPayAll(
+              p.name,
+              p.numbers.filter((n) => n.status !== "paid"),
+            )
+          }
+          className="mt-3 flex h-11 w-full items-center justify-center rounded-xl border border-green-500/40 bg-green-500/10 text-sm font-semibold text-green-400 transition active:scale-[0.98]"
+        >
+          {p.pendingCount === 1 ? "Marcar como pagado" : `Cobrar los ${p.pendingCount} pendientes`} ·{" "}
+          {formatCurrency(owes)}
+        </button>
+      )}
 
       <p className="mt-3 text-xs text-text-muted">
         {p.numbers.length} {p.numbers.length === 1 ? "número" : "números"}

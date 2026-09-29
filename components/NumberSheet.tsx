@@ -1,14 +1,17 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PaymentMethod, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
-import { fileToCompressedDataUrl } from "@/lib/image";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
+import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
 
 interface NumberSheetProps {
   number: RaffleNumberDTO | null;
   numberPrice: number;
+  /** Names already used in this raffle, offered as suggestions so one buyer isn't typed two ways. */
+  knownBuyers?: string[];
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
 }
@@ -19,16 +22,7 @@ const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
   paid: "Pagado",
 };
 
-const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  cash: "Efectivo",
-  nequi: "Nequi",
-  transfer: "Transferencia",
-  other: "Otro",
-};
-
-const PAYMENT_METHODS: PaymentMethod[] = ["cash", "nequi", "transfer", "other"];
-
-export function NumberSheet({ number, numberPrice, onClose, onSave }: NumberSheetProps) {
+export function NumberSheet({ number, numberPrice, knownBuyers = [], onClose, onSave }: NumberSheetProps) {
   if (!number) return null;
 
   return (
@@ -44,6 +38,7 @@ export function NumberSheet({ number, numberPrice, onClose, onSave }: NumberShee
         key={number.id}
         number={number}
         numberPrice={numberPrice}
+        knownBuyers={knownBuyers}
         onClose={onClose}
         onSave={onSave}
       />
@@ -54,11 +49,13 @@ export function NumberSheet({ number, numberPrice, onClose, onSave }: NumberShee
 function SheetContent({
   number,
   numberPrice,
+  knownBuyers,
   onClose,
   onSave,
 }: {
   number: RaffleNumberDTO;
   numberPrice: number;
+  knownBuyers: string[];
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
 }) {
@@ -73,25 +70,8 @@ function SheetContent({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     (number.paymentMethod as PaymentMethod | null) ?? "cash",
   );
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAvailable = number.status === "available";
-
-  const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setProcessingPhoto(true);
-    setFormError(null);
-    try {
-      const dataUrl = await fileToCompressedDataUrl(file, { maxSize: 1000, quality: 0.72 });
-      setPhotoDataUrl(dataUrl);
-    } catch {
-      setFormError("No se pudo procesar la foto. Inténtalo de nuevo.");
-    } finally {
-      setProcessingPhoto(false);
-    }
-  };
 
   const handleSell = async () => {
     const trimmedName = buyerName.trim();
@@ -200,12 +180,18 @@ function SheetContent({
               <input
                 id="buyerName"
                 type="text"
+                list="known-buyers-single"
                 value={buyerName}
                 onChange={(e) => setBuyerName(e.target.value)}
                 placeholder="Ej. María Pérez"
-                autoComplete="name"
+                autoComplete="off"
                 className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400"
               />
+              <datalist id="known-buyers-single">
+                {knownBuyers.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
             </div>
 
             <div className="space-y-1.5">
@@ -224,46 +210,15 @@ function SheetContent({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <span className="text-sm font-medium text-text-muted">Foto del comprobante</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-              {photoDataUrl ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative block h-40 w-full overflow-hidden rounded-2xl border border-line"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photoDataUrl} alt="Comprobante" className="h-full w-full object-cover" />
-                  <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
-                    Cambiar
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={processingPhoto}
-                  className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2 text-text-muted transition active:scale-[0.98] disabled:opacity-60"
-                >
-                  {processingPhoto ? (
-                    <Spinner size={24} />
-                  ) : (
-                    <>
-                      <CameraIcon className="h-7 w-7 text-gold-400" />
-                      <span className="text-sm font-medium">Tomar foto</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
+            <PhotoPicker
+              value={photoDataUrl}
+              onChange={(url) => {
+                setPhotoDataUrl(url);
+                setFormError(null);
+              }}
+              onError={setFormError}
+              onBusyChange={setProcessingPhoto}
+            />
 
             {formError && <p className="text-sm font-medium text-red-400">{formError}</p>}
 
@@ -428,16 +383,3 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function CameraIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="13.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}

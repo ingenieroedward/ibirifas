@@ -123,6 +123,17 @@ export interface UpdateNumberInput {
   notes?: string | null;
 }
 
+// Several numbers for one buyer in one request (all-or-nothing on the server).
+export type BulkNumberInput =
+  | {
+      action: "sell";
+      ids: string[];
+      buyerName: string;
+      buyerPhone?: string | null;
+      photoDataUrl?: string | null;
+    }
+  | { action: "pay"; ids: string[]; paymentMethod: PaymentMethod };
+
 // A user managed from the "Usuarios" screen: the target role is always the
 // caller's direct report (SUPERADMIN -> ORGANIZER, ORGANIZER -> SELLER), so
 // it's never client-supplied on create.

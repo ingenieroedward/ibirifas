@@ -9,6 +9,10 @@ interface NumberCellProps {
   /** Custom grid theme colors, when the raffle has set any — undefined/null falls back to the default gold look. */
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  /** Only set while picking several numbers: whether this one is picked. Undefined outside selection mode. */
+  selected?: boolean;
+  /** In selection mode, numbers that can't be picked (already taken) are dimmed. */
+  dimmed?: boolean;
 }
 
 const STATUS_CLASSES: Record<RaffleNumberDTO["status"], string> = {
@@ -19,7 +23,7 @@ const STATUS_CLASSES: Record<RaffleNumberDTO["status"], string> = {
   paid: "bg-gradient-to-b from-green-400 to-green-600 text-[#052012] shadow-green",
 };
 
-export function NumberCell({ number, onTap, themeNumberColor, themeTextColor }: NumberCellProps) {
+export function NumberCell({ number, onTap, themeNumberColor, themeTextColor, selected, dimmed }: NumberCellProps) {
   const hasPhoto = Boolean(number.photoDataUrl);
 
   // Only "available" tiles carry the organizer's custom color — occupied/paid
@@ -38,11 +42,20 @@ export function NumberCell({ number, onTap, themeNumberColor, themeTextColor }: 
     <button
       type="button"
       onClick={() => onTap(number)}
-      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}`}
+      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}${selected ? ", seleccionado" : ""}`}
+      aria-pressed={selected === undefined ? undefined : selected}
       style={style}
-      className={`relative flex aspect-square select-none items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 sm:text-lg ${useCustomTheme ? "" : STATUS_CLASSES[number.status]}`}
+      className={`relative flex aspect-square select-none items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 sm:text-lg ${useCustomTheme ? "" : STATUS_CLASSES[number.status]} ${dimmed ? "opacity-30" : ""} ${selected ? "scale-95 ring-4 ring-white ring-offset-2 ring-offset-bg" : ""}`}
     >
       {formatNumberValue(number.value)}
+      {selected && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-black text-[#241a02] shadow-sm"
+        >
+          ✓
+        </span>
+      )}
       {number.status !== "available" && hasPhoto && (
         <span
           aria-hidden="true"

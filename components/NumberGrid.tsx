@@ -8,9 +8,11 @@ interface NumberGridProps {
   /** Custom grid theme colors, when the raffle has set any — omit to use the default gold look. */
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  /** When set, the grid is in "pick several" mode: these ids are the picked ones. */
+  selectedIds?: Set<string>;
 }
 
-export function NumberGrid({ numbers, onSelect, themeNumberColor, themeTextColor }: NumberGridProps) {
+export function NumberGrid({ numbers, onSelect, themeNumberColor, themeTextColor, selectedIds }: NumberGridProps) {
   const sorted = useMemo(
     () => [...numbers].sort((a, b) => a.value - b.value),
     [numbers],
@@ -25,6 +27,8 @@ export function NumberGrid({ numbers, onSelect, themeNumberColor, themeTextColor
           onTap={onSelect}
           themeNumberColor={themeNumberColor}
           themeTextColor={themeTextColor}
+          selected={selectedIds ? selectedIds.has(number.id) : undefined}
+          dimmed={selectedIds ? number.status !== "available" : undefined}
         />
       ))}
     </div>

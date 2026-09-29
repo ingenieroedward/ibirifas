@@ -1,4 +1,5 @@
 import type {
+  BulkNumberInput,
   CreateRaffleInput,
   CreateUserInput,
   ManagedUserDTO,
@@ -181,6 +182,13 @@ export async function updateNumber(
 ): Promise<RaffleNumberDTO> {
   return request<RaffleNumberDTO>(`/api/numbers/${id}`, {
     method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateNumbersBulk(input: BulkNumberInput): Promise<RaffleNumberDTO[]> {
+  return request<RaffleNumberDTO[]>("/api/numbers/bulk", {
+    method: "POST",
     body: JSON.stringify(input),
   });
 }

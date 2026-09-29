@@ -1,16 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
-import { ApiError, getRaffleById, getRaffles, updateNumber } from "@/lib/api-client";
+import {
+  ApiError,
+  getRaffleById,
+  getRaffles,
+  updateNumber,
+  updateNumbersBulk,
+} from "@/lib/api-client";
 import { downloadBlob, generateRaffleShareImage } from "@/lib/shareImage";
-import type { RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
+import { formatCurrency } from "@/lib/format";
+import type { PaymentMethod, RaffleDTO, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { NumberGrid } from "@/components/NumberGrid";
 import { NumberSheet } from "@/components/NumberSheet";
 import { ParticipantsList } from "@/components/ParticipantsList";
+import { PayManySheet } from "@/components/PayManySheet";
+import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
 
 /** `undefined` in a PATCH input means "leave unchanged"; `null` means "clear". */
@@ -33,6 +42,11 @@ export default function RaffleDashboardPage() {
   const [raffleCount, setRaffleCount] = useState(1);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const [view, setView] = useState<"board" | "participants">("board");
+  // "Pick several" mode: the numbers one buyer wants, sold in a single step.
+  const [selecting, setSelecting] = useState(false);
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+  const [sellingMany, setSellingMany] = useState(false);
+  const [payTarget, setPayTarget] = useState<{ buyerName: string; numbers: RaffleNumberDTO[] } | null>(null);
 
   // Middleware already redirects unauthenticated requests server-side; this
   // is the client-side fallback for when the session expires in-app.
@@ -114,6 +128,113 @@ export default function RaffleDashboardPage() {
 
   const selected = raffle?.numbers.find((n) => n.id === selectedId) ?? null;
 
+  const knownBuyers = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const n of raffle?.numbers ?? []) {
+      const name = n.buyerName?.trim();
+      if (name && !byKey.has(name.toLowerCase())) byKey.set(name.toLowerCase(), name);
+    }
+    return [...byKey.values()].sort((a, b) => a.localeCompare(b, "es"));
+  }, [raffle]);
+
+  const pickedNumbers = useMemo(
+    () =>
+      (raffle?.numbers ?? [])
+        .filter((n) => pickedIds.has(n.id))
+        .sort((a, b) => a.value - b.value),
+    [raffle, pickedIds],
+  );
+
+  const exitSelection = useCallback(() => {
+    setSelecting(false);
+    setPickedIds(new Set());
+    setSellingMany(false);
+  }, []);
+
+  const handleGridSelect = useCallback(
+    (n: RaffleNumberDTO) => {
+      if (!selecting) {
+        setSelectedId(n.id);
+        return;
+      }
+      if (n.status !== "available") return;
+      setPickedIds((current) => {
+        const next = new Set(current);
+        if (next.has(n.id)) next.delete(n.id);
+        else next.add(n.id);
+        return next;
+      });
+    },
+    [selecting],
+  );
+
+  const mergeNumbers = useCallback((updated: RaffleNumberDTO[]) => {
+    const byId = new Map(updated.map((n) => [n.id, n]));
+    setRaffle((current) =>
+      current ? { ...current, numbers: current.numbers.map((n) => byId.get(n.id) ?? n) } : current,
+    );
+  }, []);
+
+  // After a 409 (someone else got there first): pull fresh data without the
+  // full-page spinner, and drop picks that are no longer available.
+  const refreshAfterConflict = useCallback(async () => {
+    try {
+      const fresh = await getRaffleById(raffleId);
+      setRaffle(fresh);
+      const stillFree = new Set(fresh.numbers.filter((n) => n.status === "available").map((n) => n.id));
+      setPickedIds((current) => new Set([...current].filter((id) => stillFree.has(id))));
+    } catch {
+      // The toast already explains the conflict; a failed refresh just leaves stale data.
+    }
+  }, [raffleId]);
+
+  const handleSellMany = useCallback(
+    async (input: { buyerName: string; buyerPhone: string | null; photoDataUrl: string | null }) => {
+      const ids = [...pickedIds];
+      try {
+        const updated = await updateNumbersBulk({ action: "sell", ids, ...input });
+        mergeNumbers(updated);
+        show(
+          `${updated.length} ${updated.length === 1 ? "número vendido" : "números vendidos"} a ${input.buyerName}`,
+          "success",
+        );
+        exitSelection();
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.", "error");
+        if (err instanceof ApiError && err.status === 409) {
+          setSellingMany(false);
+          await refreshAfterConflict();
+        }
+        throw err;
+      }
+    },
+    [pickedIds, mergeNumbers, show, exitSelection, refreshAfterConflict],
+  );
+
+  const handlePayMany = useCallback(
+    async (method: PaymentMethod) => {
+      if (!payTarget) return;
+      try {
+        const updated = await updateNumbersBulk({
+          action: "pay",
+          ids: payTarget.numbers.map((n) => n.id),
+          paymentMethod: method,
+        });
+        mergeNumbers(updated);
+        show(`${payTarget.buyerName} quedó al día`, "success");
+        setPayTarget(null);
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.", "error");
+        if (err instanceof ApiError && err.status === 409) {
+          setPayTarget(null);
+          await refreshAfterConflict();
+        }
+        throw err;
+      }
+    },
+    [payTarget, mergeNumbers, show, refreshAfterConflict],
+  );
+
   const handleSave = useCallback(
     async (id: string, input: UpdateNumberInput) => {
       const previous = raffle;
@@ -160,7 +281,7 @@ export default function RaffleDashboardPage() {
 
   return (
     <div
-      className="flex min-h-dvh flex-1 flex-col pb-10"
+      className={`flex min-h-dvh flex-1 flex-col ${selecting ? "pb-32" : "pb-10"}`}
       style={raffle?.themeBackground ? { backgroundColor: raffle.themeBackground } : undefined}
     >
       {raffle && (
@@ -202,23 +323,51 @@ export default function RaffleDashboardPage() {
                 <ViewTab active={view === "board"} onClick={() => setView("board")}>
                   Tablero
                 </ViewTab>
-                <ViewTab active={view === "participants"} onClick={() => setView("participants")}>
+                <ViewTab
+                  active={view === "participants"}
+                  onClick={() => {
+                    exitSelection();
+                    setView("participants");
+                  }}
+                >
                   Participantes
                 </ViewTab>
               </div>
 
               {view === "board" ? (
-                <NumberGrid
-                  numbers={raffle.numbers}
-                  onSelect={(n) => setSelectedId(n.id)}
-                  themeNumberColor={raffle.themeNumberColor}
-                  themeTextColor={raffle.themeTextColor}
-                />
+                <>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm text-text-muted">
+                      {selecting
+                        ? "Toca los números que se lleva el comprador."
+                        : "¿Alguien se lleva varios? Selecciónalos juntos."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+                      className={`h-10 shrink-0 rounded-full px-4 text-xs font-semibold transition active:scale-95 ${
+                        selecting
+                          ? "border border-line text-text-muted"
+                          : "border border-gold-600/50 text-gold-400"
+                      }`}
+                    >
+                      {selecting ? "Cancelar" : "Seleccionar varios"}
+                    </button>
+                  </div>
+                  <NumberGrid
+                    numbers={raffle.numbers}
+                    onSelect={handleGridSelect}
+                    themeNumberColor={raffle.themeNumberColor}
+                    themeTextColor={raffle.themeTextColor}
+                    selectedIds={selecting ? pickedIds : undefined}
+                  />
+                </>
               ) : (
                 <ParticipantsList
                   numbers={raffle.numbers}
                   numberPrice={raffle.numberPrice}
                   onSelect={(n) => setSelectedId(n.id)}
+                  onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
                 />
               )}
             </>
@@ -226,12 +375,56 @@ export default function RaffleDashboardPage() {
         </div>
       </main>
 
+      {selecting && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pb-safe backdrop-blur">
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-3 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-heading)] text-base font-bold text-text">
+                {pickedIds.size} {pickedIds.size === 1 ? "seleccionado" : "seleccionados"}
+              </p>
+              <p className="text-xs text-text-muted">
+                {formatCurrency(pickedIds.size * (raffle?.numberPrice ?? 0))}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSellingMany(true)}
+              disabled={pickedIds.size === 0}
+              className="h-12 shrink-0 rounded-2xl bg-gradient-to-b from-gold-300 to-gold-500 px-6 text-sm font-bold text-[#241a02] shadow-gold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
       <NumberSheet
         number={selected}
         numberPrice={raffle?.numberPrice ?? 0}
+        knownBuyers={knownBuyers}
         onClose={() => setSelectedId(null)}
         onSave={handleSave}
       />
+
+      {sellingMany && raffle && (
+        <SellManySheet
+          numbers={pickedNumbers}
+          numberPrice={raffle.numberPrice}
+          knownBuyers={knownBuyers}
+          onClose={() => setSellingMany(false)}
+          onConfirm={handleSellMany}
+        />
+      )}
+
+      {payTarget && raffle && (
+        <PayManySheet
+          buyerName={payTarget.buyerName}
+          numbers={payTarget.numbers}
+          numberPrice={raffle.numberPrice}
+          onClose={() => setPayTarget(null)}
+          onConfirm={handlePayMany}
+        />
+      )}
     </div>
   );
 }
