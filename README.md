@@ -293,6 +293,56 @@ varias instancias conviene moverlo a Redis). Los tokens de acceso duran 15
 minutos; el cliente (`lib/api-client.ts`) los renueva automáticamente contra
 `/api/auth/refresh` cuando expiran, y cierra sesión si el refresh también falla.
 
+### Pruebas de ataque y endurecimiento
+
+`test-security` (suite de ataques contra el servidor real: 56 comprobaciones) y
+`test-csp` cubren lo siguiente; lo que falló en la primera pasada quedó corregido:
+
+- **Aislamiento entre organizaciones y roles**: un organizador o vendedor no
+  puede leer, editar, borrar ni vender en rifas, números ni usuarios de otra
+  organización (siempre 404/403, sin filtrar que existen); un vendedor no puede
+  gestionar rifas, usuarios ni ajustes; enviar `role`/`plan`/`ownerId` al crear o
+  editar usuarios no escala privilegios. Suspender a un organizador ahora corta
+  también las sesiones que ya tenían abiertas sus vendedores.
+- **Sesiones**: tokens con `alg=none`, firmados con otra clave, expirados,
+  alterados o de otro algoritmo (ahora solo HS256) son rechazados; un refresh
+  token usado o de una sesión cerrada no sirve; cookies `HttpOnly`, `Secure`,
+  `SameSite=Lax`.
+- **Fuerza bruta**: el límite por IP (8 intentos / 5 min en el login, 6
+  reservas / hora, 10 consultas de comprobante por teléfono / hora) usa la IP
+  que agrega el proxy (la última de `X-Forwarded-For`), no el primer valor, que
+  cualquiera podía inventar para saltarse los límites. **`TRUSTED_PROXY_HOPS`**
+  (por defecto 1: Traefik de Dokploy) indica cuántos proxies hay delante; ponlo
+  en 2 si además hay Cloudflare u otro. Además cada organización tiene un tope
+  de 60 intentos fallidos cada 15 min desde cualquier IP (30 para el
+  superadministrador): un ataque repartido entre muchas IPs deja de poder probar
+  los 1.000.000 de códigos.
+- **CSRF**: una escritura que el navegador declara de otro sitio (`Origin`
+  distinto del host o `Sec-Fetch-Site: cross-site`) no se autentica con la cookie.
+- **Cuerpos enormes**: `lib/body.ts` corta con 413 cualquier cuerpo sobre el
+  límite de cada endpoint (16 KB los pequeños, 512 KB crear/editar rifas, 2,2 MB
+  el comprobante público, 4,5 MB una foto del equipo), antes o durante la lectura.
+- **Entradas hostiles**: inyección SQL (Prisma parametriza todo), prototype
+  pollution, números y textos extremos, path traversal en el token público: 4xx,
+  nunca 500 ni archivos. Los comprobantes solo pueden ser JPEG, PNG o WebP
+  (nada de SVG) tanto desde la web pública como desde el equipo.
+- **XSS**: nombres con `<script>`/`<img onerror>` se muestran como texto en la
+  app y en la página pública.
+- **Cabeceras** (`next.config.ts`): CSP (solo recursos propios, sin plugins, sin
+  `<base>` ajeno, no incrustable), `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy: no-referrer` (el token del enlace público no sale en el
+  Referer), HSTS, `Permissions-Policy`, sin `X-Powered-By`, y la API responde
+  `Cache-Control: no-store`.
+- **Abuso de recursos**: la imagen de vista previa de la rifa (se dibuja en
+  cada petición) tiene su propio límite de 30 por minuto por IP; una suscripción
+  push hacia una dirección interna (SSRF) se rechaza.
+
+Riesgos que se aceptan o quedan por vigilar: un atacante decidido puede hacer
+esperar el login de una organización (a cambio de frenar el adivinar códigos);
+los límites viven en memoria (una sola instancia); un refresh token robado sirve
+hasta que caduca (30 días) o se cierra sesión; el enlace público es un secreto
+compartido, quien lo tenga puede ver la rifa y reservar dentro de los límites.
+
 ## Desplegar con Dokploy (Docker Compose)
 
 El repo incluye `Dockerfile` y `docker-compose.yml` listos para un despliegue

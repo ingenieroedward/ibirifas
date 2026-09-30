@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { newPublicToken } from "@/lib/publicRaffle";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const bodySchema = z.object({ action: z.enum(["enable", "disable", "regenerate"]) });
 
@@ -22,12 +23,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
   const parsed = bodySchema.safeParse(rawBody);
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
 

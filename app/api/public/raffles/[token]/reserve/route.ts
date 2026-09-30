@@ -14,6 +14,7 @@ import {
   reservationsOpen,
 } from "@/lib/reservations";
 import type { ReserveResultDTO } from "@/lib/types";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{22}$/;
 
@@ -41,12 +42,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const { token } = await params;
   if (!TOKEN_SHAPE.test(token)) return NextResponse.json({ error: "Este enlace ya no está disponible." }, { status: 404 });
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!rawBody.ok) return rawBody.response;
+  const raw: unknown = rawBody.value;
   const parsed = reserveSchema.safeParse(raw);
   if (!parsed.success) return NextResponse.json({ error: "Revisa tu nombre, tu teléfono y lo que elegiste." }, { status: 400 });
   const input = parsed.data;

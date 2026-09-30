@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const unsubscribeSchema = z.object({ endpoint: z.string().url().max(2048) });
 
@@ -11,12 +12,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = unsubscribeSchema.safeParse(rawBody);
   if (!parsed.success) {

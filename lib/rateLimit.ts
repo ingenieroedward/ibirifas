@@ -116,11 +116,84 @@ export function checkReceiptLookupLimit(ip: string): boolean {
   return true;
 }
 
+/**
+ * The caller's IP as seen by the reverse proxy in front of the app (Traefik on Dokploy).
+ *
+ * A proxy APPENDS the address it received the connection from to `X-Forwarded-For`, so whatever comes
+ * before that is written by the client and can be anything: reading the first entry would let an
+ * attacker dodge every rate limit by sending a different fake value each time. The address to trust is
+ * the one added by the last trusted proxy, counted from the right. `TRUSTED_PROXY_HOPS` says how many
+ * proxies are in front of the app (default 1; use 2 when something like Cloudflare sits before Traefik).
+ */
+export function clientIpFromHeaders(headers: Headers): string {
+  const hops = Math.max(1, Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? "1", 10) || 1);
+  const entries = (headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (entries.length > 0) return entries[Math.max(0, entries.length - hops)]!;
+  return headers.get("x-real-ip") ?? "unknown";
+}
+
 /** Best-effort client IP extraction for App Router requests. */
 export function getClientIp(req: NextRequest): string {
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]!.trim();
+  return clientIpFromHeaders(req.headers);
+}
+
+const ogHits = new Map<string, number[]>();
+const OG_WINDOW_MS = 60 * 1000;
+const OG_MAX_HITS = 30;
+
+/**
+ * The raffle's preview picture is drawn on every request (it changes with each sale), which costs real CPU,
+ * so it gets its own allowance: 30 a minute per IP. Chat apps ask for it once per shared link.
+ */
+export function checkOgRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const recent = (ogHits.get(ip) ?? []).filter((ts) => now - ts < OG_WINDOW_MS);
+  if (recent.length >= OG_MAX_HITS) {
+    ogHits.set(ip, recent);
+    return false;
   }
-  return req.headers.get("x-real-ip") ?? "unknown";
+  recent.push(now);
+  ogHits.set(ip, recent);
+  if (ogHits.size > 10_000) {
+    for (const [key, timestamps] of ogHits) {
+      if (timestamps.every((ts) => now - ts >= OG_WINDOW_MS)) ogHits.delete(key);
+    }
+  }
+  return true;
+}
+
+const orgFailures = new Map<string, number[]>();
+const ORG_WINDOW_MS = 15 * 60 * 1000;
+
+/** Failed logins tolerated per organization in the window; the platform owner (no organization) gets fewer. */
+function orgFailureLimit(orgKey: string): number {
+  return orgKey === "" ? 30 : 60;
+}
+
+/**
+ * The per-IP limit stops one machine, but an attacker with many IPs could still grind through the 1,000,000
+ * possible 6-digit codes of one organization. So failures are also counted per organization: past the limit,
+ * logins for that organization wait out the window (sustained guessing then yields a few tries a minute, which
+ * is centuries of work). The cost is that a determined attacker can also keep the real team waiting.
+ */
+export function isOrgLoginLocked(orgKey: string): boolean {
+  const now = Date.now();
+  const recent = (orgFailures.get(orgKey) ?? []).filter((ts) => now - ts < ORG_WINDOW_MS);
+  orgFailures.set(orgKey, recent);
+  return recent.length >= orgFailureLimit(orgKey);
+}
+
+export function recordOrgLoginFailure(orgKey: string): void {
+  const now = Date.now();
+  const recent = (orgFailures.get(orgKey) ?? []).filter((ts) => now - ts < ORG_WINDOW_MS);
+  recent.push(now);
+  orgFailures.set(orgKey, recent);
+  if (orgFailures.size > 10_000) {
+    for (const [key, timestamps] of orgFailures) {
+      if (timestamps.every((ts) => now - ts >= ORG_WINDOW_MS)) orgFailures.delete(key);
+    }
+  }
 }

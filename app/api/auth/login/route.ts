@@ -9,10 +9,11 @@ import {
   setAuthCookies,
   signAccessToken,
 } from "@/lib/auth";
-import { checkLoginRateLimit, getClientIp } from "@/lib/rateLimit";
+import { checkLoginRateLimit, getClientIp, isOrgLoginLocked, recordOrgLoginFailure } from "@/lib/rateLimit";
 import { isValidOrgCode, normalizeOrgCode } from "@/lib/orgCode";
 import type { MeDTO, Role } from "@/lib/types";
 import type { AdminUser } from "@prisma/client";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 // A valid bcrypt hash of a throwaway string, only used to spend equal time.
 const DUMMY_HASH = "$2b$10$vkDrIDdD6LbjAmMKy2KMleMnOq5l0lR197e./.s1QbzT8mKEqOnEC";
@@ -26,12 +27,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const bodyBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!bodyBody.ok) return bodyBody.response;
+  const body: unknown = bodyBody.value;
 
   const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
   const code = fields.code;
@@ -48,6 +46,13 @@ export async function POST(req: NextRequest) {
   // only compared against that team (a handful of people) instead of everyone.
   // No organization code means the platform owner.
   const orgCode = normalizeOrgCode(rawOrgCode ?? "");
+  // Too many failed guesses against this organization from anywhere: wait it out (see lib/rateLimit.ts).
+  if (isOrgLoginLocked(orgCode)) {
+    return NextResponse.json(
+      { error: "Demasiados intentos para esta organización. Intenta de nuevo en unos minutos." },
+      { status: 429 },
+    );
+  }
   let candidates: AdminUser[] = [];
   if (orgCode === "") {
     candidates = await prisma.adminUser.findMany({ where: { role: "SUPERADMIN", active: true } });
@@ -75,6 +80,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!matchedUser) {
+    recordOrgLoginFailure(orgCode);
     // Same answer whether the organization or the code was wrong.
     return NextResponse.json({ error: "Código inválido" }, { status: 401 });
   }

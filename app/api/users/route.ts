@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/session";
 import { isValidOrgCode, normalizeOrgCode, ORG_CODE_HELP } from "@/lib/orgCode";
 import { codeUsedInTeam, orgCodeTaken, uniqueOrgCodeFromName } from "@/lib/team";
 import type { ManagedUserDTO, Role } from "@/lib/types";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -67,12 +68,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = createUserSchema.safeParse(rawBody);
   if (!parsed.success) {

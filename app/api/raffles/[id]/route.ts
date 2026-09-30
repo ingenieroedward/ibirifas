@@ -10,6 +10,7 @@ import { sweepRaffle } from "@/lib/expiry";
 import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
 import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const MAX_ACCOUNTS = 5;
 
@@ -166,12 +167,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.medium);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = updateRaffleSchema.safeParse(rawBody);
   if (!parsed.success) {

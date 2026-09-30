@@ -5,6 +5,7 @@ import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { MAX_GROUPS } from "@/lib/groups";
 import { settingToDb } from "@/lib/reservations";
 import type { CreateRaffleInput, RaffleSummaryDTO } from "@/lib/types";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 
@@ -155,12 +156,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.medium);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = createRaffleSchema.safeParse(rawBody);
   if (!parsed.success) {

@@ -7,6 +7,7 @@ import { describeEvent, notifyTeam, type SaleEvent } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { NumberStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
+import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
 // decoding, but we just need a sane upper bound to protect the DB/response).
@@ -30,7 +31,7 @@ const updateNumberSchema = z.object({
   paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]).nullable().optional(),
   photoDataUrl: z
     .string()
-    .startsWith("data:image/", { message: "photoDataUrl debe ser una imagen data URL" })
+    .regex(RECEIPT_IMAGE_RE, { message: "photoDataUrl debe ser una imagen JPEG, PNG o WebP en data URL" })
     .max(MAX_PHOTO_DATA_URL_LENGTH, { message: "La foto es demasiado grande" })
     .nullable()
     .optional(),
@@ -71,12 +72,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.photo);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = updateNumberSchema.safeParse(rawBody);
   if (!parsed.success) {
