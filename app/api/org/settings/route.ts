@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import type { OrgSettingsDTO } from "@/lib/types";
+import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const updateSchema = z.object({ publicReservations: z.boolean().optional() });
 
@@ -25,12 +26,9 @@ export async function PATCH(req: NextRequest) {
   const auth = await organizerOnly(req);
   if (auth.error) return auth.error;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBody = await readJsonBody(req, BODY_LIMITS.small);
+  if (!rawBody.ok) return rawBody.response;
+  const raw: unknown = rawBody.value;
   const parsed = updateSchema.safeParse(raw);
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
 

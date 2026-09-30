@@ -6,6 +6,7 @@ import { describeEvent, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
+import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
 
 const MAX_IDS = 100;
 const MAX_PHOTO_DATA_URL_LENGTH = 3 * 1024 * 1024;
@@ -29,7 +30,7 @@ const bulkSchema = z.discriminatedUnion("action", [
     buyerPhone: trimmedOptional(120),
     photoDataUrl: z
       .string()
-      .startsWith("data:image/")
+      .regex(RECEIPT_IMAGE_RE)
       .max(MAX_PHOTO_DATA_URL_LENGTH)
       .nullable()
       .optional(),
@@ -66,12 +67,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
-  }
+  const rawBodyBody = await readJsonBody(req, BODY_LIMITS.photo);
+  if (!rawBodyBody.ok) return rawBodyBody.response;
+  const rawBody: unknown = rawBodyBody.value;
 
   const parsed = bulkSchema.safeParse(rawBody);
   if (!parsed.success) {

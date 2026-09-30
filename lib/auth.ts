@@ -35,7 +35,7 @@ export function signAccessToken(userId: string): string {
 
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, getAccessTokenSecret());
+    const decoded = jwt.verify(token, getAccessTokenSecret(), { algorithms: ["HS256"] });
     if (typeof decoded === "object" && decoded && typeof decoded.sub === "string") {
       return { sub: decoded.sub };
     }
