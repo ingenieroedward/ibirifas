@@ -1,5 +1,6 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
@@ -511,7 +512,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   // as an equal-weight column. Fecha/lotería fold into one slim meta line
   // below it, omitted entirely when neither is set.
   const hasPrize = Boolean(raffle.prizeLabel);
-  const hasMeta = Boolean(raffle.drawDate || raffle.lottery);
+  const drawPlan = drawPlanFromNumbers(raffle);
+  const hasMeta = Boolean(drawPlan.line || raffle.lottery);
   const heroHeight = HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
 
   const accountsCount = raffle.accounts.length;
@@ -746,8 +748,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     ctx.lineTo(gridStartX + gridWidth - 24, metaY);
     ctx.stroke();
 
-    const metaText = raffle.drawDate
-      ? `Sorteo el ${formatDrawDate(raffle.drawDate)}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
+    const metaText = drawPlan.line
+      ? `${drawPlan.line}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
       : `Lotería: ${raffle.lottery}`;
     const metaIconSize = 26;
     const metaIconGap = 10;
@@ -757,7 +759,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     const metaBlockStartX = gridStartX + gridWidth / 2 - metaBlockWidth / 2;
     const metaCenterY = metaY + HERO_META_HEIGHT / 2;
 
-    if (raffle.drawDate) {
+    if (drawPlan.line) {
       drawCalendarIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
     } else {
       drawDiceIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);

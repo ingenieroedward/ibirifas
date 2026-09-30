@@ -8,7 +8,8 @@ import { notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { sweepRaffle } from "@/lib/expiry";
 import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
-import type { RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
+import type { DrawTrigger, RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
+import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
@@ -52,6 +53,8 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     numberPrice: raffle.numberPrice,
     totalNumbers: raffle.totalNumbers,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
+    drawTrigger: raffle.drawTrigger as DrawTrigger,
+    completedAt: raffle.completedAt ? raffle.completedAt.toISOString() : null,
     status: raffle.status as "active" | "closed",
     winnerValue: raffle.winnerValue,
     closedAt: raffle.closedAt ? raffle.closedAt.toISOString() : null,
@@ -94,6 +97,7 @@ const updateRaffleSchema = z.object({
   lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive().optional(),
   drawDate: z.string().datetime().nullable().optional(),
+  drawTrigger: z.enum(["date", "sold", "paid"]).optional(),
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
@@ -186,6 +190,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.drawDate !== undefined) {
     data.drawDate = input.drawDate ? new Date(input.drawDate) : null;
   }
+  if (input.drawTrigger !== undefined) data.drawTrigger = input.drawTrigger;
   if (input.themeBackground !== undefined) data.themeBackground = input.themeBackground;
   if (input.themeNumberColor !== undefined) data.themeNumberColor = input.themeNumberColor;
   if (input.themeTextColor !== undefined) data.themeTextColor = input.themeTextColor;
@@ -241,6 +246,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
   });
+
+  // A changed trigger (or a reopened raffle) may make the raffle count as full right now, or not any more.
+  if (input.drawTrigger !== undefined || (wasClosed && nextStatus === "active")) await syncCompletion(id);
 
   const updated = await prisma.raffle.findUniqueOrThrow({
     where: { id },

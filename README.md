@@ -166,6 +166,23 @@ producción. El superadmin entra **sin** código de organización.
   sueltos, el campo "Cantidad de conjuntos" (por defecto, todos los que caben)
   permite hacer menos conjuntos, o se sacan números de una letra en el modo "Elegir
   yo". Los sueltos se venden de a uno a ese precio.
+- **Sorteo al completarse**: en el formulario, "¿Cuándo se juega?" ofrece tres
+  opciones (`Raffle.drawTrigger`): **en una fecha** (lo de siempre), **cuando se
+  vendan todos los números** o **cuando se paguen todos los números**. Con las dos
+  últimas la fecha es opcional al principio: el tablero, la página pública, el
+  texto copiable, la imagen para compartir, la vista previa del enlace y los
+  recordatorios de WhatsApp dicen "Sorteo cuando se vendan todos los números" y
+  muestran el avance ("7 de 10 vendidos", con barra). En el instante en que se
+  cumple la condición (venta del equipo, reserva desde el enlace, cobro, o un
+  cambio de la condición) se guarda `completedAt` y el equipo recibe una
+  notificación **una sola vez** ("¡completa! Fija la fecha del sorteo"); el
+  organizador ve un aviso verde con el botón "Fijar fecha", que abre una hoja
+  rápida con el calendario (los vendedores ven el aviso sin el botón). Si se
+  libera algún número (a mano o por vencimiento) y deja de estar completa,
+  `completedAt` se borra, y al volver a completarse se avisa otra vez. En la
+  lista de rifas la celda "Sorteo" dice "Al vender todo" / "Al cobrar todo" en
+  lugar de "Por definir". La página pública solo recibe totales (vendidos /
+  pagados), nunca cuáles números están pagados.
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación

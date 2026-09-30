@@ -3,6 +3,7 @@ import { DAY_MS, daysText } from "@/lib/holds";
 import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
+import { syncCompletion } from "@/lib/completion";
 
 /** A warning is repeated at most once per this long, so the team isn't nagged on every sweep. */
 const NOTICE_EVERY_MS = DAY_MS;
@@ -103,6 +104,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
     result.released = released.count;
     if (released.count > 0) {
       publishRaffleChange(raffleId);
+      await syncCompletion(raffleId);
       await notifyTeam(raffle.ownerId, "", {
         title: `${raffle.name} · apartados liberados`,
         body: `Pasaron ${daysText(raffle.holdDays)} sin pago y volvieron a la venta: ${summary}`,

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
+import { syncCompletion } from "@/lib/completion";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
@@ -237,6 +238,7 @@ export async function POST(req: NextRequest) {
   }
 
   publishRaffleChange(found[0]!.raffleId);
+  void syncCompletion(found[0]!.raffleId);
 
   const updated = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
