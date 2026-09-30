@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { MAX_LOOSE_PER_RESERVATION, MAX_SETS_PER_RESERVATION, reservationsOpen } from "@/lib/reservations";
-import type { PublicRaffleDTO } from "@/lib/types";
+import type { DrawTrigger, PublicRaffleDTO } from "@/lib/types";
 
 /** 128 bits of randomness, URL-safe (22 characters). Unguessable, so the link itself is the secret. */
 export function newPublicToken(): string {
@@ -28,6 +28,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       lottery: true,
       numberPrice: true,
       drawDate: true,
+      drawTrigger: true,
       status: true,
       winnerValue: true,
       totalNumbers: true,
@@ -57,6 +58,9 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     lottery: raffle.lottery,
     numberPrice: raffle.numberPrice,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
+    drawTrigger: raffle.drawTrigger as DrawTrigger,
+    soldCount: numbers.filter((n) => n.sold).length,
+    paidCount: raffle.numbers.filter((n) => n.status === "paid").length,
     status: raffle.status as "active" | "closed",
     winnerValue: raffle.status === "closed" ? raffle.winnerValue : null,
     totalNumbers: raffle.totalNumbers,

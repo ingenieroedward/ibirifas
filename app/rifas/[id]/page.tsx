@@ -11,6 +11,7 @@ import {
   getRaffles,
   setPublicLink,
   setRaffleStatus,
+  updateRaffle,
   updateNumber,
   updateNumbersBulk,
 } from "@/lib/api-client";
@@ -39,6 +40,7 @@ import type {
 import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DeleteRaffleSheet } from "@/components/DeleteRaffleSheet";
+import { DrawDateSheet } from "@/components/DrawDateSheet";
 import { ImagePreviewSheet } from "@/components/ImagePreviewSheet";
 import { PublicLinkSheet, publicLinkUrl } from "@/components/PublicLinkSheet";
 import { GroupedBoard } from "@/components/GroupedBoard";
@@ -80,6 +82,7 @@ export default function RaffleDashboardPage() {
   // The lettered set whose sheet is open (raffles sold in sets).
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [publicLinkOpen, setPublicLinkOpen] = useState(false);
+  const [settingDrawDate, setSettingDrawDate] = useState(false);
   const [closingRaffle, setClosingRaffle] = useState(false);
   const [deletingRaffle, setDeletingRaffle] = useState(false);
   // Only used to decide whether the "back to picker" link is worth showing.
@@ -631,6 +634,7 @@ export default function RaffleDashboardPage() {
           onLogout={handleLogout}
           onDownloadImage={handleDownloadImage}
           onCopyText={handleCopyText}
+          onSetDrawDate={() => setSettingDrawDate(true)}
           downloadingImage={downloadingImage}
           canShareImage={canShareImage}
           onOpenPublicLink={() => setPublicLinkOpen(true)}
@@ -869,6 +873,20 @@ export default function RaffleDashboardPage() {
           filename={imagePreview.filename}
           title={imagePreview.title}
           onClose={closeImagePreview}
+        />
+      )}
+
+      {settingDrawDate && raffle && isOrganizer && (
+        <DrawDateSheet
+          raffleName={raffle.name}
+          current={raffle.drawDate}
+          onClose={() => setSettingDrawDate(false)}
+          onSave={async (isoDate) => {
+            const updated = await updateRaffle(raffle.id, { drawDate: isoDate });
+            setRaffle((current) => (current ? { ...current, drawDate: updated.drawDate } : current));
+            setSettingDrawDate(false);
+            show("Fecha del sorteo guardada", "success");
+          }}
         />
       )}
 

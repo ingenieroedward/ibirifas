@@ -93,6 +93,11 @@ model Raffle {
   numberPrice  Int
   totalNumbers Int            @default(100)
   drawDate     DateTime?
+  // When the draw is played: on `drawDate` ("date"), or once every number is sold ("sold") or paid ("paid").
+  // With the last two, drawDate may stay empty until the raffle fills up; `completedAt` marks the moment the
+  // condition became true (the team is told once, and it clears again if numbers are freed).
+  drawTrigger  String         @default("date")
+  completedAt  DateTime?
   status       String         @default("active")
   createdAt    DateTime       @default(now())
   numbers      RaffleNumber[]

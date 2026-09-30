@@ -1,5 +1,7 @@
 export type NumberStatus = "available" | "occupied" | "paid";
 export type PaymentStatus = "pending" | "paid" | "refunded";
+/** When a raffle is played: on its date, or once every number is sold / paid. */
+export type DrawTrigger = "date" | "sold" | "paid";
 export type Role = "SUPERADMIN" | "ORGANIZER" | "SELLER";
 // How a manual payment was collected in person — no gateway involved yet.
 export type PaymentMethod = "cash" | "nequi" | "transfer" | "other";
@@ -59,6 +61,7 @@ export interface RaffleSummaryDTO {
   numberPrice: number;
   totalNumbers: number;
   drawDate: string | null;
+  drawTrigger: DrawTrigger;
   status: "active" | "closed";
   /** The winning number of a closed raffle (null: still open, or closed without a draw). */
   winnerValue: number | null;
@@ -94,6 +97,10 @@ export interface PublicRaffleDTO {
   lottery: string | null;
   numberPrice: number;
   drawDate: string | null;
+  drawTrigger: DrawTrigger;
+  /** Totals only (never which numbers): progress toward a "when full" draw. */
+  soldCount: number;
+  paidCount: number;
   status: "active" | "closed";
   /** Only for a closed raffle. */
   winnerValue: number | null;
@@ -145,6 +152,9 @@ export interface RaffleDTO {
   numberPrice: number;
   totalNumbers: number;
   drawDate: string | null;
+  drawTrigger: DrawTrigger;
+  /** The moment a "when full" raffle filled up (null while it hasn't). */
+  completedAt: string | null;
   status: "active" | "closed";
   /** The winning number once the raffle is closed; null while open or when closed without a draw. */
   winnerValue: number | null;
@@ -196,6 +206,7 @@ export interface CreateRaffleInput {
   numberPrice: number;
   totalNumbers?: number; // defaults to 100
   drawDate?: string | null;
+  drawTrigger?: DrawTrigger;
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
@@ -221,6 +232,7 @@ export interface UpdateRaffleInput {
   lottery?: string | null;
   numberPrice?: number;
   drawDate?: string | null;
+  drawTrigger?: DrawTrigger;
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;

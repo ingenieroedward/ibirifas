@@ -7,7 +7,8 @@ import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { contrastRatio, lighten, luminance } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME, tileTextColor } from "@/lib/theme";
-import type { RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
+import type { DrawTrigger, RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
+import { DRAW_TRIGGER_LABEL } from "@/lib/drawPlan";
 import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { Spinner } from "@/components/Spinner";
 
@@ -96,6 +97,8 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
+  // The draw is played on a date, or once every number is sold / paid (then the date can wait until it fills up).
+  const [drawTrigger, setDrawTrigger] = useState<DrawTrigger>(raffle?.drawTrigger ?? "date");
 
   // Sold-but-unpaid numbers can expire after some days (and optionally go back on sale by themselves).
   const [holdOn, setHoldOn] = useState(Boolean(raffle?.holdDays));
@@ -292,6 +295,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           lottery: lottery.trim() || null,
           numberPrice: Math.round(price),
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
+          drawTrigger,
           accounts: accountsPayload,
           ...holdPayload,
           ...themePayload,
@@ -305,6 +309,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           numberPrice: looseNumberPrice,
           totalNumbers: total,
           drawDate: drawDate ? new Date(drawDate).toISOString() : null,
+          drawTrigger,
           accounts: accountsPayload,
           ...holdPayload,
           ...(groupsPayload ? { groups: groupsPayload } : {}),
@@ -610,7 +615,34 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
 
       {!useSets && individualPriceField}
 
-      <Field label="Fecha del sorteo (opcional)" htmlFor="drawDate">
+      <fieldset className="space-y-2 rounded-2xl border border-line bg-surface-2/60 p-4">
+        <legend className="px-1 text-sm font-semibold text-text">¿Cuándo se juega?</legend>
+        {(Object.keys(DRAW_TRIGGER_LABEL) as DrawTrigger[]).map((value) => (
+          <label key={value} className="flex cursor-pointer items-center gap-3 py-1">
+            <input
+              type="radio"
+              name="drawTrigger"
+              value={value}
+              checked={drawTrigger === value}
+              onChange={() => setDrawTrigger(value)}
+              disabled={submitting}
+              className="h-5 w-5 accent-[#f5c542]"
+            />
+            <span className="text-sm text-text">{DRAW_TRIGGER_LABEL[value]}</span>
+          </label>
+        ))}
+        {drawTrigger !== "date" && (
+          <p className="text-xs text-text-muted">
+            El sorteo se juega cuando {drawTrigger === "sold" ? "no quede ningún número disponible" : "todos los números estén pagados"}. Te
+            avisamos en ese momento para que pongas la fecha; si ya la sabes, puedes ponerla desde ahora.
+          </p>
+        )}
+      </fieldset>
+
+      <Field
+        label={drawTrigger === "date" ? "Fecha del sorteo (opcional)" : "Fecha del sorteo (opcional por ahora)"}
+        htmlFor="drawDate"
+      >
         <input
           id="drawDate"
           type="date"

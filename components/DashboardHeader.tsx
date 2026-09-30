@@ -2,8 +2,9 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
+import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
 import { describeHolder } from "@/components/CloseRaffleSheet";
@@ -59,6 +60,8 @@ interface DashboardHeaderProps {
   canShareImage: boolean;
   /** Copies the raffle and what is still available as a chat message. */
   onCopyText: () => void;
+  /** Opens the sheet that sets the draw date (organizer only). */
+  onSetDrawDate: () => void;
   /** Opens the sheet with the raffle's public link for buyers. */
   onOpenPublicLink: () => void;
   /** Organizer actions on the raffle's life cycle. */
@@ -77,6 +80,7 @@ export function DashboardHeader({
   downloadingImage,
   canShareImage,
   onCopyText,
+  onSetDrawDate,
   onOpenPublicLink,
   onCloseRaffle,
   onReopenRaffle,
@@ -84,6 +88,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const closed = raffle.status === "closed";
+  const plan = drawPlanFromNumbers(raffle);
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
@@ -291,18 +296,50 @@ export function DashboardHeader({
                 )}
               </div>
             </div>
-            {(raffle.drawDate || raffle.lottery) && (
+            {(plan.line || raffle.lottery) && (
               <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
                 <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
                 <span>
-                  {raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo"}
+                  {plan.line ?? "Sorteo"}
                   {raffle.lottery && (
                     <>
-                      {raffle.drawDate && " · "}
+                      {plan.line && " · "}
                       {raffle.lottery}
                     </>
                   )}
                 </span>
+              </div>
+            )}
+            {plan.progress && (
+              <div className="border-t border-line px-4 py-2.5" aria-label="Avance para jugar">
+                <div className="flex items-center justify-between text-xs text-text-muted">
+                  <span>
+                    {plan.progress.done} de {plan.progress.total} {plan.progress.noun}
+                  </span>
+                  <span>{Math.round((plan.progress.done / Math.max(1, plan.progress.total)) * 100)}%</span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={plan.progress.total} aria-valuenow={plan.progress.done}>
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-gold-300 to-gold-500"
+                    style={{ width: `${Math.min(100, (plan.progress.done / Math.max(1, plan.progress.total)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {plan.needsDate && !closed && (
+              <div className="flex items-center justify-between gap-3 border-t border-green-500/30 bg-green-500/10 px-4 py-2.5">
+                <p className="min-w-0 text-sm font-semibold text-green-400">
+                  ¡Rifa completa! {role === "ORGANIZER" ? "Fija la fecha del sorteo." : "Falta que el organizador fije la fecha."}
+                </p>
+                {role === "ORGANIZER" && (
+                  <button
+                    type="button"
+                    onClick={onSetDrawDate}
+                    className="h-9 shrink-0 rounded-full border border-green-500/50 px-3 text-xs font-bold text-green-400 transition active:scale-95"
+                  >
+                    Fijar fecha
+                  </button>
+                )}
               </div>
             )}
             {raffle.accounts.length > 0 && (

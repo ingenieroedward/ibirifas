@@ -1,4 +1,5 @@
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { drawPlanFromNumbers } from "@/lib/drawPlan";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { numbersOfGroup } from "@/lib/groups";
 import type { RaffleDTO } from "@/lib/types";
 
@@ -25,10 +26,11 @@ export function buildAvailabilityText(raffle: RaffleDTO, link?: string | null): 
   const free = raffle.numbers.filter((n) => n.status === "available").sort((a, b) => a.value - b.value);
 
   if (raffle.prizeLabel) lines.push(`Premio: ${raffle.prizeLabel}`);
-  if (raffle.drawDate || raffle.lottery) {
-    const when = raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo";
-    lines.push(`${when}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`);
+  const plan = drawPlanFromNumbers(raffle);
+  if (plan.line || raffle.lottery) {
+    lines.push(`${plan.line ?? "Sorteo"}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`);
   }
+  if (plan.progress) lines.push(`Avance: ${plan.progress.done} de ${plan.progress.total} ${plan.progress.noun}`);
 
   if (hasSets) {
     const freeSets = raffle.groups.filter((g) => numbersOfGroup(raffle.numbers, g.id).every((n) => n.status === "available"));

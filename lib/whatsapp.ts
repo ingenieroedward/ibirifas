@@ -62,6 +62,8 @@ export interface ReminderContext extends MessageContext {
   accounts: RaffleAccountDTO[];
   drawDate: string | null;
   lottery: string | null;
+  /** For a raffle played when it fills up and with no date yet: "cuando se vendan todos los números". */
+  drawCondition?: string | null;
 }
 
 export function buildReminderMessage(c: ReminderContext): string {
@@ -80,8 +82,8 @@ export function buildReminderMessage(c: ReminderContext): string {
     lines.push("", "Cuando pagues, envíame el comprobante por aquí.");
   }
 
-  if (c.drawDate || c.lottery) {
-    const when = c.drawDate ? `el ${formatDrawDate(c.drawDate)}` : "";
+  if (c.drawDate || c.lottery || c.drawCondition) {
+    const when = c.drawDate ? `el ${formatDrawDate(c.drawDate)}` : (c.drawCondition ?? "");
     const lottery = c.lottery ? `con la lotería ${c.lottery}` : "";
     lines.push("", `El sorteo es ${[when, lottery].filter(Boolean).join(" ")}.`);
   }

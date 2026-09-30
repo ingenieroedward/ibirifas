@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { triggerCondition } from "@/lib/drawPlan";
 import { daysLeft, daysText, daysWaiting, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
@@ -26,7 +27,7 @@ interface ParticipantsListProps {
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
 }
 
-type WhatsAppRaffle = Pick<RaffleDTO, "name" | "accounts" | "drawDate" | "lottery">;
+type WhatsAppRaffle = Pick<RaffleDTO, "name" | "accounts" | "drawDate" | "lottery" | "drawTrigger">;
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -334,6 +335,7 @@ function ParticipantCard({
             amount: pendingPart.amount,
             accounts: raffle.accounts,
             drawDate: raffle.drawDate,
+            drawCondition: raffle.drawDate || raffle.drawTrigger === "date" ? null : triggerCondition(raffle.drawTrigger),
             lottery: raffle.lottery,
           }),
         )

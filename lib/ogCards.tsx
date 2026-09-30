@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { luminance } from "@/lib/color";
 import { tileTextColor } from "@/lib/theme";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { drawPlanOf } from "@/lib/drawPlan";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
 import type { PublicRaffleDTO } from "@/lib/types";
 
 /**
@@ -105,7 +106,14 @@ export function RaffleCard({ raffle }: { raffle: PublicRaffleDTO }) {
       : hasSets
         ? `${freeSets} de ${raffle.groups.length} conjuntos disponibles`
         : `${free} ${free === 1 ? "número disponible" : "números disponibles"}`;
-  const drawLine = raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "";
+  const plan = drawPlanOf({
+    drawDate: raffle.drawDate,
+    drawTrigger: raffle.drawTrigger,
+    soldCount: raffle.soldCount,
+    paidCount: raffle.paidCount,
+    totalNumbers: raffle.totalNumbers,
+  });
+  const drawLine = plan.line ?? "";
   const lotteryLine = raffle.lottery ? `${drawLine ? "" : "Sorteo con "}${raffle.lottery}` : "";
 
   return (

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { drawPlanOf } from "@/lib/drawPlan";
+import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { pageThemeStyle, tileTextColor } from "@/lib/theme";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
@@ -58,6 +59,13 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
 
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
+  const plan = drawPlanOf({
+    drawDate: raffle.drawDate,
+    drawTrigger: raffle.drawTrigger,
+    soldCount: raffle.soldCount,
+    paidCount: raffle.paidCount,
+    totalNumbers: raffle.totalNumbers,
+  });
   const canReserve = raffle.reservations.open && !closed;
   const { maxLoose, maxSets } = raffle.reservations;
 
@@ -159,11 +167,27 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 )}
               </div>
             </div>
-            {(raffle.drawDate || raffle.lottery) && (
+            {(plan.line || raffle.lottery) && (
               <p className="border-t border-line px-4 py-2.5 text-center text-sm text-text-muted">
-                {raffle.drawDate ? `Sorteo el ${formatDrawDate(raffle.drawDate)}` : "Sorteo"}
+                {plan.line ?? "Sorteo"}
                 {raffle.lottery && ` · ${raffle.lottery}`}
               </p>
+            )}
+            {plan.progress && (
+              <div className="border-t border-line px-4 py-2.5" aria-label="Avance para jugar">
+                <div className="flex items-center justify-between text-xs text-text-muted">
+                  <span>
+                    {plan.progress.done} de {plan.progress.total} {plan.progress.noun}
+                  </span>
+                  <span>{Math.round((plan.progress.done / Math.max(1, plan.progress.total)) * 100)}%</span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-gold-300 to-gold-500"
+                    style={{ width: `${Math.min(100, (plan.progress.done / Math.max(1, plan.progress.total)) * 100)}%` }}
+                  />
+                </div>
+              </div>
             )}
             {raffle.accounts.length > 0 && (
               <div className="space-y-1 border-t border-line px-4 py-3 text-sm text-text-muted">

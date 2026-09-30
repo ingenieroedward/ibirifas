@@ -70,7 +70,13 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
             Sorteo
           </p>
           <p className="mt-0.5 truncate text-base font-semibold text-text">
-            {raffle.drawDate ? formatDrawDate(raffle.drawDate) : "Por definir"}
+            {raffle.drawDate
+              ? formatDrawDate(raffle.drawDate)
+              : raffle.drawTrigger === "date"
+                ? "Por definir"
+                : raffle.drawTrigger === "sold"
+                  ? "Al vender todo"
+                  : "Al cobrar todo"}
           </p>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { MAX_GROUPS } from "@/lib/groups";
 import { settingToDb } from "@/lib/reservations";
-import type { CreateRaffleInput, RaffleSummaryDTO } from "@/lib/types";
+import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
@@ -36,6 +36,7 @@ const createRaffleSchema = z.object({
   numberPrice: z.number().int().positive(),
   totalNumbers: z.number().int().min(10).max(1000).optional(),
   drawDate: z.string().datetime().nullable().optional(),
+  drawTrigger: z.enum(["date", "sold", "paid"]).optional(),
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
@@ -129,6 +130,7 @@ export async function GET(req: NextRequest) {
       numberPrice: r.numberPrice,
       totalNumbers: r.totalNumbers,
       drawDate: r.drawDate ? r.drawDate.toISOString() : null,
+      drawTrigger: r.drawTrigger as DrawTrigger,
       status: r.status as "active" | "closed",
       winnerValue: r.status === "closed" ? r.winnerValue : null,
       availableCount: counts.available,
@@ -199,6 +201,7 @@ export async function POST(req: NextRequest) {
         numberPrice: input.numberPrice,
         totalNumbers,
         drawDate: input.drawDate ? new Date(input.drawDate) : null,
+        drawTrigger: input.drawTrigger ?? "date",
         status: "active",
         themeBackground: input.themeBackground ?? null,
         themeNumberColor: input.themeNumberColor ?? null,
@@ -253,6 +256,7 @@ export async function POST(req: NextRequest) {
     numberPrice: raffle.numberPrice,
     totalNumbers: raffle.totalNumbers,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
+    drawTrigger: raffle.drawTrigger as DrawTrigger,
     status: raffle.status as "active" | "closed",
     winnerValue: null,
     availableCount: totalNumbers,

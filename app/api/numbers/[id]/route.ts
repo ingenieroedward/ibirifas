@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { describeEvent, notifyTeam, type SaleEvent } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
+import { syncCompletion } from "@/lib/completion";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { NumberStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
@@ -176,6 +177,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     throw err;
   }
   publishRaffleChange(existing.raffleId);
+  void syncCompletion(existing.raffleId);
 
   // Tell the rest of the team, but only for real changes of state — re-saving a
   // buyer's name on an already-sold number isn't news.

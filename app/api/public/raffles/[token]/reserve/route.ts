@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { checkReserveRateLimit, getClientIp } from "@/lib/rateLimit";
 import { publishRaffleChange } from "@/lib/realtime";
+import { syncCompletion } from "@/lib/completion";
 import { newPublicToken } from "@/lib/publicRaffle";
 import {
   MAX_LOOSE_PER_RESERVATION,
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   }
 
   publishRaffleChange(raffle.id);
+  void syncCompletion(raffle.id);
 
   const total = chosenGroups.reduce((sum, g) => sum + g!.price, 0) + values.length * raffle.numberPrice;
   const what = [
