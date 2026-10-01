@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const tenantId = tenantIdFor(user);
-  if (!tenantId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  if (!tenantId || user.role !== "ORGANIZER") {
+    return NextResponse.json({ error: "Solo el organizador maneja los pagos recibidos" }, { status: 403 });
+  }
 
   const payer = req.nextUrl.searchParams.get("payer") ?? "";
   const amount = Number(req.nextUrl.searchParams.get("amount"));

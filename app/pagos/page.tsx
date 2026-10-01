@@ -50,6 +50,8 @@ export default function PaymentsPage() {
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
     if (!authLoading && user?.role === "SUPERADMIN") router.replace("/usuarios");
+    // Only the organizer sees what reaches the account (it may receive other payments too).
+    if (!authLoading && user?.role === "SELLER") router.replace("/");
   }, [authLoading, user, router]);
 
   const load = useCallback(async (f: Filter) => {
@@ -62,7 +64,7 @@ export default function PaymentsPage() {
   }, []);
 
   useEffect(() => {
-    if (!user || user.role === "SUPERADMIN") return;
+    if (!user || user.role !== "ORGANIZER") return;
     let cancelled = false;
     getReceivedPayments(filter)
       .then((d) => {
