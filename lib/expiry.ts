@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { currentPaidStage, deadlineOf, installmentsNeeded } from "@/lib/stages";
+import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 import { formatNumberValue } from "@/lib/format";
 import { syncCompletion } from "@/lib/completion";
 
@@ -48,7 +49,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
   const late = await prisma.raffleNumber.findMany({
     // In a raffle by stages, a number with an installment paid is a paying customer, not a stale hold.
     where: { raffleId, status: "occupied", soldAt: { lt: cutoff }, quotas: { none: {} } },
-    select: { id: true, value: true, buyerName: true, groupId: true, group: { select: { label: true, price: true } } },
+    select: { id: true, ...buyerRowSelect, group: { select: { label: true, price: true } } },
     orderBy: { value: "asc" },
   });
   if (late.length === 0) return result;
@@ -104,11 +105,15 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
         soldAt: null,
         online: false,
         holdToken: null,
+        buyerEmail: null,
+        receiptRejectedAt: null,
+        receiptRejectReason: null,
         updatedById: null,
       },
     });
     result.released += released.count;
     if (released.count > 0) {
+      void emailBuyers(raffleId, late, { kind: "released", why: "expired" }, await mailOrigin());
       publishRaffleChange(raffleId);
       await syncCompletion(raffleId);
       await notifyTeam(raffle.ownerId, "", {
@@ -183,7 +188,7 @@ async function sweepStageDeadline(raffleId: string, now: Date): Promise<number> 
 
   const sold = await prisma.raffleNumber.findMany({
     where: { raffleId, status: { not: "available" } },
-    select: { id: true, value: true, buyerName: true, quotas: { select: { paidAt: true } } },
+    select: { id: true, ...buyerRowSelect },
     orderBy: { value: "asc" },
   });
   const behind = sold.filter((n) => n.quotas.filter((q) => q.paidAt <= deadline).length < needed);
@@ -210,10 +215,14 @@ async function sweepStageDeadline(raffleId: string, now: Date): Promise<number> 
           soldAt: null,
           online: false,
           holdToken: null,
+          buyerEmail: null,
+          receiptRejectedAt: null,
+          receiptRejectReason: null,
           updatedById: null,
         },
       }),
     ]);
+    void emailBuyers(raffleId, unpaid, { kind: "released", why: "stage" }, await mailOrigin());
     publishRaffleChange(raffleId);
     await syncCompletion(raffleId);
     await notifyTeam(raffle.ownerId, "", {

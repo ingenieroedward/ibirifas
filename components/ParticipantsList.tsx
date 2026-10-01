@@ -458,6 +458,11 @@ function ParticipantCard({
           Con comprobante
         </p>
       )}
+      {p.numbers.some((n) => n.status === "occupied" && !n.photoDataUrl && n.receiptRejectedAt) && (
+        <p className="mt-2 mr-1.5 inline-block rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-bold text-red-400">
+          Comprobante rechazado
+        </p>
+      )}
       {receipts.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {receipts.map((url, i) => (

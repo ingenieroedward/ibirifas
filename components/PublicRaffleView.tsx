@@ -20,6 +20,7 @@ import { CrownIcon } from "@/components/icons/Crown";
 import { CopyButton } from "@/components/CopyButton";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { ReserveSheet } from "@/components/ReserveSheet";
+import { myReservations, reservationPath } from "@/lib/myReservations";
 
 const REFRESH_MS = 20_000;
 
@@ -66,6 +67,13 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   const [reserving, setReserving] = useState<{ numbers: number[]; sets: string[]; total: number } | null>(null);
   const [limitNote, setLimitNote] = useState<string | null>(null);
   const [sendingReceipt, setSendingReceipt] = useState(false);
+  // Reservations made from this device (newest first), linking to "Mi reserva". Read after mount: the
+  // server render can't see this browser's storage.
+  const [mine, setMine] = useState<string[]>([]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMine(myReservations(token));
+  }, [token, reserving]);
 
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
@@ -252,15 +260,25 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
             </p>
           )}
-          {canReserve && (
-            <div className="mt-3 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setSendingReceipt(true)}
-                className="rounded-full border border-gold-600/50 px-4 py-2 text-xs font-semibold text-gold-400 transition active:scale-95"
-              >
-                Ya reservé: subir mi comprobante
-              </button>
+          {(canReserve || mine.length > 0) && (
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {mine.length > 0 && (
+                <a
+                  href={reservationPath(token, mine[0]!)}
+                  className="rounded-full border border-gold-600/50 bg-gold-400/10 px-4 py-2 text-xs font-semibold text-gold-400 transition active:scale-95"
+                >
+                  {mine.length === 1 ? "Ver mi reserva" : "Ver mi última reserva"}
+                </a>
+              )}
+              {canReserve && (
+                <button
+                  type="button"
+                  onClick={() => setSendingReceipt(true)}
+                  className="rounded-full border border-gold-600/50 px-4 py-2 text-xs font-semibold text-gold-400 transition active:scale-95"
+                >
+                  Ya reservé: subir mi comprobante
+                </button>
+              )}
             </div>
           )}
         </div>

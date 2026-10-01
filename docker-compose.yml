@@ -18,6 +18,18 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # The public address (https://rifas.tu-dominio.com): links in emails and the allowed origin.
+      APP_URL: ${APP_URL:-}
+      # Proxies in front of the app that add X-Forwarded-For: 1 = only Dokploy/Traefik,
+      # 2 = Cloudflare (orange cloud) + Traefik.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-}
+      # Email to buyers (optional). Without SMTP_HOST no email is sent and the
+      # reservation form doesn't ask for one.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     volumes:
       - ibirifas_data:/app/data
     expose:

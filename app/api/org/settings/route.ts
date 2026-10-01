@@ -4,8 +4,19 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import type { OrgSettingsDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { EMAIL_RE, mailEnabled } from "@/lib/mail";
 
-const updateSchema = z.object({ publicReservations: z.boolean().optional() });
+const updateSchema = z.object({
+  publicReservations: z.boolean().optional(),
+  contactEmail: z.string().trim().max(120).nullable().optional(),
+});
+
+const SELECT = { publicReservations: true, contactEmail: true } as const;
+const toDTO = (row: { publicReservations: boolean; contactEmail: string | null }): OrgSettingsDTO => ({
+  publicReservations: row.publicReservations,
+  contactEmail: row.contactEmail,
+  mailEnabled: mailEnabled(),
+});
 
 /** The organization's own settings: only its organizer reads or changes them. */
 async function organizerOnly(req: NextRequest) {
@@ -18,8 +29,8 @@ async function organizerOnly(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const auth = await organizerOnly(req);
   if (auth.error) return auth.error;
-  const row = await prisma.adminUser.findUniqueOrThrow({ where: { id: auth.user.id }, select: { publicReservations: true } });
-  return NextResponse.json({ publicReservations: row.publicReservations } satisfies OrgSettingsDTO);
+  const row = await prisma.adminUser.findUniqueOrThrow({ where: { id: auth.user.id }, select: SELECT });
+  return NextResponse.json(toDTO(row));
 }
 
 export async function PATCH(req: NextRequest) {
@@ -32,10 +43,17 @@ export async function PATCH(req: NextRequest) {
   const parsed = updateSchema.safeParse(raw);
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
 
+  const contactEmail = parsed.data.contactEmail === undefined ? undefined : parsed.data.contactEmail || null;
+  if (contactEmail && !EMAIL_RE.test(contactEmail)) {
+    return NextResponse.json({ error: "Ese correo no parece válido." }, { status: 400 });
+  }
   const row = await prisma.adminUser.update({
     where: { id: auth.user.id },
-    data: { ...(parsed.data.publicReservations !== undefined ? { publicReservations: parsed.data.publicReservations } : {}) },
-    select: { publicReservations: true },
+    data: {
+      ...(parsed.data.publicReservations !== undefined ? { publicReservations: parsed.data.publicReservations } : {}),
+      ...(contactEmail !== undefined ? { contactEmail } : {}),
+    },
+    select: SELECT,
   });
-  return NextResponse.json({ publicReservations: row.publicReservations } satisfies OrgSettingsDTO);
+  return NextResponse.json(toDTO(row));
 }

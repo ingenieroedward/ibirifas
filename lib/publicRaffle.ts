@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { mailEnabled } from "@/lib/mail";
 import { MAX_LOOSE_PER_RESERVATION, MAX_SETS_PER_RESERVATION, reservationsOpen } from "@/lib/reservations";
 import type { DrawTrigger, FullPayPerk, PublicRaffleDTO } from "@/lib/types";
 
@@ -104,6 +105,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       }),
       holdDays: raffle.holdDays,
       maxLoose: MAX_LOOSE_PER_RESERVATION,
+      email: mailEnabled(),
       maxSets: MAX_SETS_PER_RESERVATION,
     },
   };

@@ -16,12 +16,16 @@ import {
 } from "@/lib/reservations";
 import type { ReserveResultDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { EMAIL_RE } from "@/lib/mail";
+import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{22}$/;
 
 const reserveSchema = z.object({
   name: z.string().trim().min(2).max(60),
   phone: z.string().trim().max(30),
+  // Optional: where we tell them about the reservation (payment confirmed or rejected, released).
+  email: z.string().trim().max(120).optional(),
   numbers: z.array(z.number().int().min(0)).max(MAX_LOOSE_PER_RESERVATION),
   sets: z.array(z.string().regex(/^[A-Z]$/)).max(MAX_SETS_PER_RESERVATION),
 });
@@ -53,6 +57,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const digits = phoneDigits(input.phone);
   if (digits.length < 7 || digits.length > 15) {
     return NextResponse.json({ error: "Escribe un teléfono válido para poder contactarte." }, { status: 400 });
+  }
+  const email = input.email ? input.email : null;
+  if (email && !EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "Revisa tu correo: no parece válido." }, { status: 400 });
   }
   const values = [...new Set(input.numbers)];
   const labels = [...new Set(input.sets)];
@@ -135,6 +143,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           soldAt: new Date(),
           online: true,
           holdToken: receiptKey,
+          buyerEmail: email,
+          receiptRejectedAt: null,
+          receiptRejectReason: null,
         },
       });
       if (count !== ids.length) throw new TakenError();
@@ -159,6 +170,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     body: `${input.name} reservó ${what} · ${formatCurrency(total)}. Tiene ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} para pagar`,
     url: `/rifas/${raffle.id}`,
   });
+
+  if (email) {
+    const rows = await prisma.raffleNumber.findMany({ where: { id: { in: ids } }, select: buyerRowSelect });
+    void emailBuyers(raffle.id, rows, { kind: "reserved" }, await mailOrigin());
+  }
 
   return NextResponse.json({
     total,

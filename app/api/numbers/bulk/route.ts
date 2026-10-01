@@ -8,6 +8,7 @@ import { syncCompletion } from "@/lib/completion";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
+import { buyerRowSelect, emailBuyers, mailOrigin, type BuyerRow } from "@/lib/buyerMail";
 
 const MAX_IDS = 100;
 const MAX_PHOTO_DATA_URL_LENGTH = 3 * 1024 * 1024;
@@ -43,6 +44,8 @@ const bulkSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("unpay"), ids: idsSchema }),
   z.object({ action: z.literal("release"), ids: idsSchema }),
+  // The receipt a buyer sent isn't valid: it is removed (they can send another) and they are told why.
+  z.object({ action: z.literal("rejectReceipt"), ids: idsSchema, reason: trimmedOptional(200) }),
   z.object({
     action: z.literal("edit"),
     ids: idsSchema,
@@ -125,7 +128,7 @@ export async function POST(req: NextRequest) {
   // Which numbers actually changed hands, for the notification (paying a number
   // that was already paid is a no-op and shouldn't announce anything).
   let newlyPaidValues: number[] = [];
-  let releasedBefore: { value: number; buyerName: string | null }[] = [];
+  let releasedBefore: BuyerRow[] = [];
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -145,6 +148,9 @@ export async function POST(req: NextRequest) {
             soldAt: new Date(),
             online: false,
             holdToken: null,
+            buyerEmail: null,
+            receiptRejectedAt: null,
+            receiptRejectReason: null,
           },
         });
         if (count !== ids.length) {
@@ -157,7 +163,7 @@ export async function POST(req: NextRequest) {
         await tx.numberQuota.deleteMany({ where: { numberId: { in: ids } } });
         releasedBefore = await tx.raffleNumber.findMany({
           where: { id: { in: ids }, status: { not: "available" } },
-          select: { value: true, buyerName: true },
+          select: buyerRowSelect,
         });
         await tx.raffleNumber.updateMany({
           where: { id: { in: ids } },
@@ -174,7 +180,24 @@ export async function POST(req: NextRequest) {
             soldAt: null,
             online: false,
             holdToken: null,
+            buyerEmail: null,
+            receiptRejectedAt: null,
+            receiptRejectReason: null,
           },
+        });
+        return;
+      }
+
+      if (input.action === "rejectReceipt") {
+        const toReview = await tx.raffleNumber.count({
+          where: { id: { in: ids }, status: "occupied", photoDataUrl: { not: null } },
+        });
+        if (toReview !== ids.length) {
+          throw new ConflictError("No hay un comprobante pendiente por revisar. Actualiza el tablero.");
+        }
+        await tx.raffleNumber.updateMany({
+          where: { id: { in: ids } },
+          data: { photoDataUrl: null, receiptRejectedAt: new Date(), receiptRejectReason: input.reason ?? null, updatedById: user.id },
         });
         return;
       }
@@ -235,6 +258,8 @@ export async function POST(req: NextRequest) {
           status: "paid",
           paymentStatus: "paid" satisfies PaymentStatus,
           paymentMethod: input.paymentMethod,
+          receiptRejectedAt: null,
+          receiptRejectReason: null,
           updatedById: user.id,
         },
       });
@@ -322,6 +347,19 @@ export async function POST(req: NextRequest) {
         url,
       });
     }
+  }
+
+  // Buyers who reserved online with an email hear what happened.
+  const origin = await mailOrigin();
+  const raffleId = found[0]!.raffleId;
+  if (input.action === "pay" && newlyPaidValues.length > 0) {
+    const rows = await prisma.raffleNumber.findMany({ where: { id: { in: ids }, value: { in: newlyPaidValues } }, select: buyerRowSelect });
+    void emailBuyers(raffleId, rows, { kind: "approved", method: input.paymentMethod }, origin);
+  } else if (input.action === "release" && releasedBefore.length > 0) {
+    void emailBuyers(raffleId, releasedBefore, { kind: "released", why: "manual" }, origin);
+  } else if (input.action === "rejectReceipt") {
+    const rows = await prisma.raffleNumber.findMany({ where: { id: { in: ids } }, select: buyerRowSelect });
+    void emailBuyers(raffleId, rows, { kind: "rejected", reason: input.reason ?? null }, origin);
   }
 
   const dtos = updated.map(toNumberDTO);

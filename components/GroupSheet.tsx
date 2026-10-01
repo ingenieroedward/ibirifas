@@ -7,6 +7,7 @@ import { groupStatus } from "@/lib/groups";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
+import { ReceiptReview } from "@/components/ReceiptReview";
 import { Spinner } from "@/components/Spinner";
 
 interface GroupSheetProps {
@@ -23,6 +24,8 @@ interface GroupSheetProps {
   onUnpay: () => Promise<void>;
   onEdit: (input: { buyerName: string; buyerPhone: string | null }) => Promise<void>;
   onRelease: () => Promise<void>;
+  /** Reject the receipt the buyer sent (it is removed; they are told why). */
+  onRejectReceipt?: (reason: string | null) => Promise<void>;
 }
 
 const STATUS_LABEL = { available: "Disponible", occupied: "Vendido · pendiente de pago", paid: "Vendido y pagado" } as const;
@@ -31,7 +34,7 @@ const STATUS_LABEL = { available: "Disponible", occupied: "Vendido · pendiente 
  * Everything you can do with a lettered set. A set is one unit: it's sold to a
  * single buyer for its own price, and collected or freed as a whole.
  */
-export function GroupSheet({ group, members, knownBuyers, canRelease = true, onClose, onSell, onPay, onUnpay, onEdit, onRelease }: GroupSheetProps) {
+export function GroupSheet({ group, members, knownBuyers, canRelease = true, onClose, onSell, onPay, onUnpay, onEdit, onRelease, onRejectReceipt }: GroupSheetProps) {
   const status = groupStatus(members);
   const first = members[0];
 
@@ -248,6 +251,16 @@ export function GroupSheet({ group, members, knownBuyers, canRelease = true, onC
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={savedPhoto} alt="Comprobante" className="h-full w-full object-cover" />
             </button>
+          )}
+
+          {status === "occupied" && first && onRejectReceipt && (
+            <ReceiptReview
+              hasReceipt={Boolean(savedPhoto)}
+              rejectedAt={first.receiptRejectedAt}
+              rejectReason={first.receiptRejectReason}
+              buyerEmail={first.buyerEmail}
+              onReject={onRejectReceipt}
+            />
           )}
 
           {formError && <p className="text-sm font-medium text-red-400">{formError}</p>}

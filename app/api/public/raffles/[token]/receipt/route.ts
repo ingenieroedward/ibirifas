@@ -6,6 +6,7 @@ import { checkPublicRateLimit, checkReceiptLookupLimit, getClientIp } from "@/li
 import { phoneDigits, samePhone } from "@/lib/reservations";
 import { publishRaffleChange } from "@/lib/realtime";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
+import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
 const KEY_SHAPE = /^[A-Za-z0-9_-]{22}$/;
 
@@ -85,10 +86,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const withoutReceipt = mine.filter((n) => !n.photoDataUrl);
   if (withoutReceipt.length > 0) mine = withoutReceipt;
 
+  // A new receipt replaces a rejected one: it is back to "waiting for review".
   await prisma.raffleNumber.updateMany({
     where: { id: { in: mine.map((n) => n.id) } },
-    data: { photoDataUrl: parsed.data.photoDataUrl },
+    data: { photoDataUrl: parsed.data.photoDataUrl, receiptRejectedAt: null, receiptRejectReason: null },
   });
+  const rows = await prisma.raffleNumber.findMany({ where: { id: { in: mine.map((n) => n.id) } }, select: buyerRowSelect });
+  void emailBuyers(raffle.id, rows, { kind: "receipt" }, await mailOrigin());
   publishRaffleChange(raffle.id);
   void notifyTeam(raffle.ownerId, "", {
     title: `${raffle.name} · comprobante recibido`,

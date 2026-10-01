@@ -611,6 +611,21 @@ export default function RaffleDashboardPage() {
     [payTarget, mergeNumbers, show, refreshAfterConflict, handleQuotas],
   );
 
+  const handleRejectReceipt = useCallback(
+    async (id: string, reason: string | null) => {
+      try {
+        const updated = await updateNumbersBulk({ action: "rejectReceipt", ids: [id], reason });
+        mergeNumbers(updated);
+        show(updated[0]?.buyerEmail ? "Comprobante rechazado: le avisamos por correo" : "Comprobante rechazado", "success");
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo rechazar el comprobante.", "error");
+        if (err instanceof ApiError && err.status === 409) await refreshAfterConflict();
+        throw err;
+      }
+    },
+    [mergeNumbers, show, refreshAfterConflict],
+  );
+
   const replaceStage = useCallback((stage: RaffleStageDTO) => {
     setRaffle((current) =>
       current ? { ...current, stages: current.stages.map((s) => (s.id === stage.id ? stage : s)) } : current,
@@ -973,6 +988,7 @@ export default function RaffleDashboardPage() {
         onSave={handleSave}
         stageSettings={stageSettings}
         onQuotas={(id, action, method) => handleQuotas([id], action, method)}
+        onRejectReceipt={handleRejectReceipt}
       />
 
       {publicLinkOpen && raffle && (
@@ -1039,6 +1055,9 @@ export default function RaffleDashboardPage() {
           onUnpay={() => runGroupAction(openGroup, { action: "unpay" }, `Pago del conjunto ${openGroup.label} deshecho`)}
           onEdit={(input) => runGroupAction(openGroup, { action: "edit", ...input }, "Datos del comprador actualizados")}
           onRelease={() => runGroupAction(openGroup, { action: "release" }, `Conjunto ${openGroup.label} liberado`)}
+          onRejectReceipt={(reason) =>
+            runGroupAction(openGroup, { action: "rejectReceipt", reason }, `Comprobante del conjunto ${openGroup.label} rechazado`)
+          }
         />
       )}
 

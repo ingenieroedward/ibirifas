@@ -9,6 +9,7 @@ import { syncCompletion } from "@/lib/completion";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { NumberStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
+import { emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
 // ~3MB cap on the base64 payload itself (actual binary is smaller after
 // decoding, but we just need a sane upper bound to protect the DB/response).
@@ -124,6 +125,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       soldAt: null,
       online: false,
       holdToken: null,
+      buyerEmail: null,
+      receiptRejectedAt: null,
+      receiptRejectReason: null,
     };
   } else {
     const resultingBuyerName =
@@ -156,6 +160,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.soldAt = new Date();
       data.online = false;
       data.holdToken = null;
+      data.buyerEmail = null;
+    }
+    // Paid: whatever was said about an earlier receipt no longer matters.
+    if (status === "paid") {
+      data.receiptRejectedAt = null;
+      data.receiptRejectReason = null;
     }
 
     if (input.buyerName !== undefined) data.buyerName = input.buyerName;
@@ -198,6 +208,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   else if (previous === "available" && status === "paid") kind = "soldAndPaid";
   else if (previous === "occupied" && status === "paid") kind = "paid";
   else if (previous !== "available" && status === "available") kind = "released";
+
+  // The buyer, when they left an email reserving online: payment confirmed, or reservation freed.
+  if (kind === "paid") {
+    void emailBuyers(existing.raffleId, [{ ...existing, quotas: [] }], { kind: "approved", method: updated.paymentMethod as PaymentMethod | null }, await mailOrigin());
+  } else if (kind === "released") {
+    void emailBuyers(existing.raffleId, [{ ...existing, quotas: [] }], { kind: "released", why: "manual" }, await mailOrigin());
+  }
 
   if (kind) {
     void notifyTeam(tenantId, user.id, {

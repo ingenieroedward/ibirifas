@@ -27,6 +27,9 @@ export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
     soldByName: n.soldBy?.name ?? null,
     soldAt: n.soldAt ? n.soldAt.toISOString() : null,
     online: n.online,
+    buyerEmail: n.buyerEmail,
+    receiptRejectedAt: n.receiptRejectedAt ? n.receiptRejectedAt.toISOString() : null,
+    receiptRejectReason: n.receiptRejectReason,
     quotas: n.quotas.map((q) => ({
       quota: q.quota,
       amount: q.amount,

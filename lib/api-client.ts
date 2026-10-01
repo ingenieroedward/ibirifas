@@ -319,6 +319,11 @@ export async function getOrgSettings(): Promise<OrgSettingsDTO> {
   return request<OrgSettingsDTO>("/api/org/settings");
 }
 
+/** Sends a test email to the organizer's contact address. */
+export async function sendTestEmail(): Promise<void> {
+  await request<{ ok: true }>("/api/org/test-email", { method: "POST" });
+}
+
 export async function updateOrgSettings(input: Partial<OrgSettingsDTO>): Promise<OrgSettingsDTO> {
   return request<OrgSettingsDTO>("/api/org/settings", { method: "PATCH", body: JSON.stringify(input) });
 }
