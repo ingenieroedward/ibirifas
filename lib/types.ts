@@ -48,7 +48,7 @@ export type QuotaAction = "next" | "due" | "all" | "undo";
 
 export type Role = "SUPERADMIN" | "ORGANIZER" | "SELLER";
 // How a manual payment was collected in person — no gateway involved yet.
-export type PaymentMethod = "cash" | "nequi" | "transfer" | "other";
+export type PaymentMethod = "cash" | "nequi" | "breb" | "transfer" | "other";
 
 /** A raffle's reservations from the public link: follow the organization, or force on/off. */
 export type ReservationSetting = "inherit" | "on" | "off";
@@ -61,6 +61,10 @@ export interface OrgSettingsDTO {
   contactEmail: string | null;
   /** Read-only: the server has email set up (SMTP). */
   mailEnabled?: boolean;
+  /** Read-only: this organization's account is connected to pagoradar (bank payment notices). */
+  paymentsEnabled?: boolean;
+  /** A bank payment that matches exactly one reservation is approved on its own. */
+  autoApprovePayments?: boolean;
 }
 
 export interface AdminUserDTO {
@@ -457,4 +461,53 @@ export interface UpdateUserInput {
 
 export interface ApiErrorBody {
   error: string;
+}
+
+// ---------- Payments reported by the bank (pagoradar)
+
+export type ReceivedPaymentStatus = "auto" | "approved" | "review" | "unmatched" | "ignored";
+
+/** An open reservation a payment could belong to (or, for manual assignment, any open reservation). */
+export interface PaymentCandidateDTO {
+  key: string;
+  raffleId: string;
+  raffleName: string;
+  numberIds: string[];
+  items: string;
+  buyerName: string | null;
+  payerName: string | null;
+  online: boolean;
+  hasReceipt: boolean;
+  amount: number;
+  soldAt: string | null;
+  /** How the bank's holder name compares with what the buyer typed (or their own name). */
+  nameMatch: "strong" | "weak" | "none";
+}
+
+export interface ReceivedPaymentDTO {
+  id: string;
+  bank: string;
+  bankLabel: string;
+  method: string | null;
+  amount: number;
+  payerName: string;
+  payerBank: string | null;
+  reference: string | null;
+  paidAt: string;
+  status: ReceivedPaymentStatus;
+  raffleId: string | null;
+  matchLabel: string | null;
+  note: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  /** Only for payments waiting for the team. */
+  candidates: PaymentCandidateDTO[];
+}
+
+export interface ReceivedPaymentsDTO {
+  /** The server is connected to pagoradar for this organization. */
+  enabled: boolean;
+  autoApprove: boolean;
+  pending: number;
+  payments: ReceivedPaymentDTO[];
 }

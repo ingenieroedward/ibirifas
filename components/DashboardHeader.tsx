@@ -11,6 +11,7 @@ import { AccountsList } from "@/components/AccountsList";
 import { describeHolder } from "@/components/CloseRaffleSheet";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
+import { PaymentsLink } from "@/components/PaymentsLink";
 import { Spinner } from "@/components/Spinner";
 
 // Whether the folding part of the header is hidden. Remembered on the device (localStorage),
@@ -142,6 +143,7 @@ export function DashboardHeader({
             >
               {userName}
             </Link>
+            <PaymentsLink />
             <NotificationsButton />
             <button
               type="button"

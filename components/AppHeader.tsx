@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
+import { PaymentsLink } from "@/components/PaymentsLink";
 
 interface HeaderLink {
   href: string;
@@ -59,6 +60,7 @@ export function AppHeader({
             >
               {userName}
             </Link>
+            {notifications && <PaymentsLink />}
             {notifications && <NotificationsButton />}
             <button
               type="button"

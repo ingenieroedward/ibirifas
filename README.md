@@ -350,8 +350,49 @@ en "Mi reserva") el comprador escribe el **titular de la cuenta desde la que
 pagó** (viene lleno con su nombre). Se guarda en el número (`payerName`), lo ve
 el equipo en la hoja del número o conjunto ("Titular que pagó") y sale en el
 Excel; se borra al liberar el número. Con el valor, es lo que permite cruzar la
-transferencia con el aviso del banco (el lector automático de pagos irá en un
-servicio aparte, no dentro de la app).
+transferencia con el aviso del banco.
+
+## Pagos automáticos (pagoradar)
+
+[pagoradar](https://github.com/ingenieroedward/pagoradar) es un servicio aparte que
+lee los avisos de pago que el banco manda a tu Gmail (Nequi Negocios, Nequi,
+Bancolombia), comprueba que sean auténticos (firma DKIM del banco y dirigidos a ti)
+y le avisa a Ibirifas con un webhook firmado. La app **nunca** toca tu correo.
+
+Con cada pago que llega, Ibirifas busca entre las reservas pendientes de la
+organización (rifas abiertas, no por etapas):
+
+- **mismo valor**, pagado **después** de reservar (30 min de margen), y el
+  **titular** que avisa el banco coincide con el que escribió el comprador al subir
+  el comprobante (o con su propio nombre). Los bancos dan el nombre completo
+  ("ANA MARIA PEREZ GOMEZ") y la gente escribe parte ("Ana Pérez"): coincide si al
+  menos dos palabras coinciden y están todas las del nombre más corto.
+- Si coincide **una sola** reserva en línea → se **aprueba sola** (números pagados
+  con método *Bre-B*, correo "Pago confirmado" al comprador, aviso al equipo) y queda
+  en **Pagos recibidos → Aprobados** con **Deshacer**.
+- Si coinciden varias, el nombre coincide solo en parte, es una venta del equipo o la
+  aprobación automática está apagada → **Por revisar**, con las reservas posibles y
+  un botón "Aprobar con esta reserva" en cada una (u "Otra reserva" para buscar).
+- Si ninguna reserva tiene ese valor → **Sin reserva** (asignar a mano o ignorar).
+
+El aviso del banco suele llegar **antes** que el comprobante: cuando el comprador lo
+sube (con el titular), se vuelve a intentar el cruce. Un pago que alguien deshizo no
+se vuelve a aprobar solo. El botón con el ícono de banco (arriba, junto a la campana)
+lleva a **Pagos recibidos** y muestra cuántos esperan. En **Mi equipo** el
+organizador apaga o enciende "Aprobar solos los pagos Bre-B". Cada número pagado así
+guarda el id del pago (`paymentRef`).
+
+Configuración en Dokploy (además de pagoradar, ver su README):
+
+| Variable | Qué es |
+|---|---|
+| `PAGORADAR_WEBHOOK_SECRET` | El `secret` del webhook en la fuente de pagoradar |
+| `PAGORADAR_ORG` | El **código de organización** dueña de la cuenta (ej. `demo`) |
+| `PAGORADAR_URL` | `https://pagoradar.tu-dominio.com` (para ponerse al día) |
+| `PAGORADAR_API_KEY` | La `apiKey` de la fuente (para ponerse al día) |
+
+El webhook es `POST https://<tu-dominio>/api/pagoradar/webhook`. Cada 10 minutos (y
+al arrancar) la app pide a pagoradar los pagos que no le llegaron por webhook.
 
 ## Organizaciones y acceso
 
