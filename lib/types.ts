@@ -2,6 +2,50 @@ export type NumberStatus = "available" | "occupied" | "paid";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 /** When a raffle is played: on its date, or once every number is sold / paid. */
 export type DrawTrigger = "date" | "sold" | "paid";
+/** What paying every installment of a raffle by stages up front earns. */
+export type FullPayPerk = "none" | "discount" | "draw";
+
+/** One draw of a raffle by stages (see prisma/schema.prisma RaffleStage). */
+export interface RaffleStageDTO {
+  id: string;
+  position: number;
+  label: string;
+  prize: string;
+  /** The installment for this stage; 0 for the bonus draw. */
+  price: number;
+  /** The extra draw for numbers paid in full up front. */
+  bonus: boolean;
+  lottery: string | null;
+  drawDate: string | null;
+  winnerValue: number | null;
+  /** "won": the number was up to date; "house": it wasn't (or nobody had it) and the prize stays with the organizer. */
+  outcome: "won" | "house" | null;
+  winnerName: string | null;
+  drawnAt: string | null;
+}
+
+/** An installment paid on a number. */
+export interface QuotaDTO {
+  quota: number;
+  amount: number;
+  method: PaymentMethod;
+  paidAt: string;
+}
+
+/** A stage as sent when creating or editing a raffle by stages. */
+export interface RaffleStageInput {
+  /** Present when editing an existing stage. */
+  id?: string;
+  label?: string;
+  prize: string;
+  price?: number;
+  lottery?: string | null;
+  drawDate?: string | null;
+}
+
+/** Collect the next installment, what the stage being collected needs (catching up), everything, or undo the last one. */
+export type QuotaAction = "next" | "due" | "all" | "undo";
+
 export type Role = "SUPERADMIN" | "ORGANIZER" | "SELLER";
 // How a manual payment was collected in person — no gateway involved yet.
 export type PaymentMethod = "cash" | "nequi" | "transfer" | "other";
@@ -49,6 +93,8 @@ export interface RaffleNumberDTO {
   soldAt: string | null;
   /** Reserved by a visitor of the public link rather than sold by the team. */
   online: boolean;
+  /** Installments paid (raffles by stages only; empty otherwise), in order. */
+  quotas: QuotaDTO[];
   updatedAt: string;
 }
 
@@ -111,6 +157,11 @@ export interface PublicRaffleDTO {
   accounts: RaffleAccountDTO[];
   /** Lettered sets in order; `sold` once someone has the whole set. */
   groups: { label: string; price: number; sold: boolean }[];
+  /** A raffle by stages: its draws (no buyer names), the installment deadline and the up-front perk. */
+  stages: Omit<RaffleStageDTO, "id" | "winnerName" | "drawnAt">[];
+  stageDeadlineDays: number;
+  fullPayPerk: FullPayPerk;
+  fullPayDiscount: number | null;
   /** Every number: `sold` is true for anything taken (pending or paid); `group` is the set's letter. */
   numbers: { value: number; sold: boolean; group: string | null }[];
   /** Whether visitors can reserve from this page, and how many days they get to pay. */
@@ -173,6 +224,11 @@ export interface RaffleDTO {
   accounts: RaffleAccountDTO[];
   /** Lettered sets in order (A, B, C…); empty for a raffle sold number by number. */
   groups: RaffleGroupDTO[];
+  /** The draws of a raffle by stages, in order of play; empty for an ordinary raffle. */
+  stages: RaffleStageDTO[];
+  stageDeadlineDays: number;
+  fullPayPerk: FullPayPerk;
+  fullPayDiscount: number | null;
   /** Grid theme overrides — null means "use the app's default gold/black look". */
   themeBackground?: string | null;
   themeNumberColor?: string | null;
@@ -216,6 +272,13 @@ export interface CreateRaffleInput {
   publicReservations?: ReservationSetting;
   /** Sell in lettered sets; numbers not listed here remain loose and use `numberPrice`. */
   groups?: RaffleGroupInput[];
+  /** A raffle by stages (can't be combined with sets): one installment per stage; `numberPrice` becomes their sum. */
+  stages?: RaffleStageInput[];
+  stageDeadlineDays?: number;
+  fullPayPerk?: FullPayPerk;
+  fullPayDiscount?: number | null;
+  /** With fullPayPerk "draw": the bonus draw. */
+  bonusStage?: RaffleStageInput | null;
 }
 
 // Editing an existing raffle. `totalNumbers` is intentionally absent — changing
@@ -241,6 +304,12 @@ export interface UpdateRaffleInput {
   holdDays?: number | null;
   autoRelease?: boolean;
   publicReservations?: ReservationSetting;
+  /** Raffles by stages: prize/label/lottery/date of stages not yet drawn (installment prices are fixed). */
+  stages?: RaffleStageInput[];
+  stageDeadlineDays?: number;
+  fullPayPerk?: FullPayPerk;
+  fullPayDiscount?: number | null;
+  bonusStage?: RaffleStageInput | null;
 }
 
 export interface UpdateNumberInput {

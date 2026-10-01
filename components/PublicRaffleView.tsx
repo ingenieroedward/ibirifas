@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
 import { drawPlanOf } from "@/lib/drawPlan";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import {
+  amountDueNow,
+  currentStage,
+  installmentPrices,
+  lastPayDay,
+  paidStages,
+  sortedStages,
+  stagesPrizeSummary,
+  totalPrice,
+} from "@/lib/stages";
 import { pageThemeStyle, tileTextColor } from "@/lib/theme";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
@@ -59,13 +69,22 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
 
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
-  const plan = drawPlanOf({
+  const byStages = raffle.stages.length > 0;
+  const nextStage = byStages ? currentStage(raffle.stages) : null;
+  const basePlan = drawPlanOf({
     drawDate: raffle.drawDate,
     drawTrigger: raffle.drawTrigger,
     soldCount: raffle.soldCount,
     paidCount: raffle.paidCount,
     totalNumbers: raffle.totalNumbers,
   });
+  // A raffle by stages talks about its next draw.
+  const plan = nextStage
+    ? { ...basePlan, line: `Próximo: ${nextStage.label}${nextStage.drawDate ? ` el ${formatDrawDate(nextStage.drawDate)}` : ""}` }
+    : basePlan;
+  const lotteryText = nextStage?.lottery || raffle.lottery;
+  // What a number taken today must pay to play the next draw (its first installments).
+  const perNumberNow = byStages ? amountDueNow([], raffle.stages) : raffle.numberPrice;
   const canReserve = raffle.reservations.open && !closed;
   const { maxLoose, maxSets } = raffle.reservations;
 
@@ -139,7 +158,9 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           {closed && (
             <div role="status" className="mt-4 rounded-2xl border border-gold-600/50 bg-gold-400/10 p-4 text-center">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Rifa cerrada</p>
-              {raffle.winnerValue !== null && (
+              {byStages ? (
+                <p className="mt-1 text-sm text-text-muted">Se jugaron todos los sorteos: mira los resultados abajo.</p>
+              ) : raffle.winnerValue !== null && (
                 <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-extrabold text-text">
                   Ganó el <span className="text-3xl text-gold-400">{formatNumberValue(raffle.winnerValue)}</span>
                 </p>
@@ -152,7 +173,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               <div className="flex-1 px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Premio</p>
                 <p className="mt-0.5 break-words font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                  {raffle.prizeLabel || "Por definir"}
+                  {raffle.prizeLabel || stagesPrizeSummary(raffle.stages) || "Por definir"}
                 </p>
               </div>
               <div className="flex-1 px-4 py-3">
@@ -165,12 +186,22 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 {hasSets && loose.length > 0 && (
                   <p className="text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
                 )}
+                {byStages && (
+                  <p className="text-xs text-text-muted">
+                    {(() => {
+                      const prices = installmentPrices(raffle.stages);
+                      return new Set(prices).size === 1
+                        ? `${prices.length} cuotas de ${formatCurrency(prices[0]!)}`
+                        : `Cuotas: ${prices.map(formatCurrency).join(" + ")}`;
+                    })()}
+                  </p>
+                )}
               </div>
             </div>
-            {(plan.line || raffle.lottery) && (
+            {(plan.line || lotteryText) && (
               <p className="border-t border-line px-4 py-2.5 text-center text-sm text-text-muted">
                 {plan.line ?? "Sorteo"}
-                {raffle.lottery && ` · ${raffle.lottery}`}
+                {lotteryText && ` · ${lotteryText}`}
               </p>
             )}
             {plan.progress && (
@@ -237,6 +268,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
 
       <main className="mt-5 flex-1 px-4 sm:px-6">
         <div className="mx-auto w-full max-w-3xl space-y-6">
+          {byStages && <PublicStages raffle={raffle} />}
           {hasSets && (
             <section aria-label="Conjuntos">
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -368,7 +400,10 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 <p className="font-[family-name:var(--font-heading)] text-base font-bold text-text">
                   {pickedCount} {pickedCount === 1 ? "elegido" : "elegidos"}
                 </p>
-                <p className="text-xs text-text-muted">{formatCurrency(pickedTotal)}</p>
+                <p className="text-xs text-text-muted">
+                  {formatCurrency(pickedTotal)}
+                  {byStages && numbersPicked.length > 0 && ` · para el próximo sorteo: ${formatCurrency(numbersPicked.length * perNumberNow)}`}
+                </p>
               </div>
               <button
                 type="button"
@@ -402,5 +437,64 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
         />
       )}
     </div>
+  );
+}
+
+/** The draws of a raffle by stages for buyers: prizes, dates, results (numbers only) and the payment rules. */
+function PublicStages({ raffle }: { raffle: PublicRaffleDTO }) {
+  const stages = sortedStages(raffle.stages);
+  const first = paidStages(stages)[0];
+  const firstDay = first ? lastPayDay(first, raffle.stageDeadlineDays) : null;
+  const total = totalPrice(stages);
+  const bonus = stages.find((st) => st.bonus);
+  const days = raffle.stageDeadlineDays;
+  return (
+    <section aria-label="Sorteos" className="space-y-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+      <div>
+        <h2 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">Sorteos</h2>
+        <p className="text-xs text-text-muted">Juegas con el mismo número en todos.</p>
+      </div>
+      <ol className="space-y-2">
+        {stages.map((st) => (
+          <li key={st.position} className="flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text">
+                {st.bonus ? "🎁 " : ""}
+                {st.label} · <span className="text-gold-400">{st.prize}</span>
+              </p>
+              <p className="text-xs text-text-muted">
+                {st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}
+                {st.lottery || raffle.lottery ? ` · ${st.lottery || raffle.lottery}` : ""}
+                {!st.bonus && !st.outcome && lastPayDay(st, days) ? ` · paga hasta el ${lastPayDay(st, days)}` : ""}
+              </p>
+            </div>
+            {st.winnerValue !== null && (
+              <span className="shrink-0 text-right">
+                <span className="block font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
+                  {formatNumberValue(st.winnerValue)}
+                </span>
+                <span className="block text-[11px] text-text-muted">{st.outcome === "won" ? "Ganador" : "Quedó en la casa"}</span>
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      <ul className="space-y-1 text-xs text-text-muted">
+        <li>
+          Cada cuota debe estar paga {days === 0 ? "a más tardar el día del sorteo" : `${days} ${days === 1 ? "día" : "días"} antes de su sorteo`}. Si sale
+          un número que no está al día, el premio queda en la casa.
+        </li>
+        {raffle.fullPayPerk === "discount" && raffle.fullPayDiscount ? (
+          <li className="font-medium text-gold-400">
+            Pagando todo de una{firstDay ? ` hasta el ${firstDay}` : ""}: {formatCurrency(total - raffle.fullPayDiscount)} en vez de{" "}
+            {formatCurrency(total)}.
+          </li>
+        ) : raffle.fullPayPerk === "draw" && bonus ? (
+          <li className="font-medium text-gold-400">
+            Pagando todo de una{firstDay ? ` hasta el ${firstDay}` : ""} juegas también {bonus.label}: {bonus.prize}.
+          </li>
+        ) : null}
+      </ul>
+    </section>
   );
 }

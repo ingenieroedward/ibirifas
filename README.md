@@ -183,6 +183,45 @@ producción. El superadmin entra **sin** código de organización.
   lista de rifas la celda "Sorteo" dice "Al vender todo" / "Al cobrar todo" en
   lugar de "Por definir". La página pública solo recibe totales (vendidos /
   pagados), nunca cuáles números están pagados.
+- **Rifa por etapas** (varios sorteos, pago por cuotas): al crear la rifa se
+  activa "Rifa por etapas" (no se combina con conjuntos). Cada etapa
+  (`RaffleStage`, de 2 a 6) es un sorteo con su premio, fecha y lotería, y cuesta
+  una cuota; el valor del número es la suma de las cuotas. Ejemplo: 100 números a
+  $150.000 en 3 cuotas de $50.000; etapa 1 por $500.000, etapa 2 por $500.000 y la
+  final por $7.000.000. Reglas:
+  - El comprador juega **con el mismo número en todas las etapas**, y un número
+    puede ganar varias.
+  - Una cuota cuenta para una etapa si se pagó a más tardar el día que queda
+    `Raffle.stageDeadlineDays` días antes del sorteo (3 por defecto,
+    configurable). Si sale un número que **no está al día**, o que nadie tiene, el
+    premio **queda en la casa** (`outcome = "house"`).
+  - **Entrar tarde**: quien compra con etapas ya jugadas paga las cuotas
+    anteriores para ponerse al día ("Ponerse al día" cobra lo necesario para la
+    próxima etapa); al final siempre paga el total.
+  - **Pagar todo de una** (`Raffle.fullPayPerk`): sin beneficio, con **descuento**
+    (`fullPayDiscount`, se aplica si paga todo junto antes de la fecha límite de la
+    primera etapa) o con un **sorteo extra gratis** (una etapa `bonus` de precio
+    0, que juegan solo los números pagados completos antes de esa fecha límite).
+  - Las cuotas pagadas se guardan en `NumberQuota` (cuota, valor, método, fecha y
+    quién cobró). En la hoja del número: "Cobrar cuota N", "Ponerse al día",
+    "Cobrar todo" (con el descuento si aplica) y "Deshacer la última cuota"; el
+    número pasa a "Pagado" cuando completa las cuotas. "Marcar como pagado" y el
+    cobro masivo normal no se usan en estas rifas (`POST /api/numbers/quotas`).
+  - El tablero muestra el panel **Etapas** (premio, fecha, hasta cuándo pagar,
+    cuántos vendidos están al día) y cada número vendido lleva "1/3". El
+    organizador usa "Registrar resultado", que antes de guardar dice si el número
+    gana o si el premio queda en la casa; se puede deshacer el último resultado.
+    Al registrar la última etapa la rifa se cierra sola.
+  - Pasada la fecha límite de la etapa en cobro, con "Liberar los números
+    atrasados" los números que no pagaron esa cuota vuelven a la venta (sus cuotas
+    se pierden); si no, se avisa al equipo una vez al día. Quien pagó tarde
+    conserva el número y juega desde la siguiente etapa.
+  - Participantes, el reporte de vendedores, los recordatorios y comprobantes de
+    WhatsApp, el texto para copiar, la imagen, la página pública (con resultados,
+    sin nombres) y la vista previa del enlace entienden las etapas. El formulario
+    hace las cuentas: lo que entra si se venden todos contra los premios en dinero.
+  - Al editar se pueden cambiar premio, nombre, fecha y lotería de las etapas que
+    no se han jugado, los días de plazo y el beneficio; las cuotas no.
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación

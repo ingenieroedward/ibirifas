@@ -8,7 +8,9 @@ import { notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { sweepRaffle } from "@/lib/expiry";
 import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
-import type { DrawTrigger, RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
+import type { DrawTrigger, FullPayPerk, RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
+import { stagesInclude, toStageDTO } from "@/lib/stageDto";
+import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
@@ -22,6 +24,7 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
     };
     accounts: true;
     groups: true;
+    stages: true;
     owner: { select: { publicReservations: true } };
   };
 }>;
@@ -71,6 +74,10 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     numbers,
     accounts,
     groups,
+    stages: raffle.stages.slice().sort((a, b) => a.position - b.position).map(toStageDTO),
+    stageDeadlineDays: raffle.stageDeadlineDays,
+    fullPayPerk: (["none", "discount", "draw"].includes(raffle.fullPayPerk) ? raffle.fullPayPerk : "none") as FullPayPerk,
+    fullPayDiscount: raffle.fullPayDiscount,
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,
     themeTextColor: raffle.themeTextColor,
@@ -102,6 +109,11 @@ const updateRaffleSchema = z.object({
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
   accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
+  stages: z.array(stageInputSchema).max(MAX_STAGES + 1).optional(),
+  stageDeadlineDays: z.number().int().min(0).max(30).optional(),
+  fullPayPerk: z.enum(["none", "discount", "draw"]).optional(),
+  fullPayDiscount: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  bonusStage: stageInputSchema.nullable().optional(),
   holdDays: z.number().int().min(1).max(365).nullable().optional(),
   autoRelease: z.boolean().optional(),
   publicReservations: z.enum(["inherit", "on", "off"]).optional(),
@@ -125,6 +137,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         },
         accounts: true,
         groups: true,
+        stages: stagesInclude,
         owner: { select: { publicReservations: true } },
       },
     });
@@ -140,7 +153,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // Opening a raffle also applies its deadline for unpaid holds, so what is shown is never stale.
-  if (raffle.status === "active" && raffle.holdDays) {
+  if (raffle.status === "active" && (raffle.holdDays || raffle.stages.length > 0)) {
     const swept = await sweepRaffle(id);
     if (swept.released > 0) raffle = (await load()) ?? raffle;
   }
@@ -225,8 +238,83 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const justClosed = !wasClosed && nextStatus === "closed";
 
+  // A raffle by stages: stages not yet played can get a new prize, name, lottery or date (installment prices
+  // stay fixed once the raffle exists, since people may have paid them); the perk for paying up front can change.
+  const existingStages = await prisma.raffleStage.findMany({ where: { raffleId: id }, orderBy: { position: "asc" } });
+  const byStages = existingStages.length > 0;
+  if (!byStages && (input.stages || input.fullPayPerk || input.bonusStage)) {
+    return NextResponse.json({ error: "Esta rifa no es por etapas." }, { status: 400 });
+  }
+  if (byStages) {
+    // The price is the sum of the installments and each stage is played on its own date.
+    delete data.numberPrice;
+    delete data.drawTrigger;
+  }
+  const paidTotal = existingStages.filter((s) => !s.bonus).reduce((sum, s) => sum + s.price, 0);
+  if (input.stageDeadlineDays !== undefined) data.stageDeadlineDays = input.stageDeadlineDays;
+  const nextPerk = input.fullPayPerk ?? existing.fullPayPerk;
+  if (input.fullPayPerk !== undefined) data.fullPayPerk = input.fullPayPerk;
+  if (nextPerk === "discount") {
+    const discount = input.fullPayDiscount !== undefined ? input.fullPayDiscount : existing.fullPayDiscount;
+    if (!(discount && discount > 0 && discount < paidTotal)) {
+      return NextResponse.json({ error: "El descuento por pagar todo debe ser mayor a cero y menor que el total." }, { status: 400 });
+    }
+    data.fullPayDiscount = discount;
+  } else if (input.fullPayPerk !== undefined) {
+    data.fullPayDiscount = null;
+  }
+  const existingBonus = existingStages.find((s) => s.bonus) ?? null;
+  if (nextPerk === "draw" && !existingBonus && !input.bonusStage?.prize) {
+    return NextResponse.json({ error: "Escribe el premio del sorteo extra por pagar todo." }, { status: 400 });
+  }
+  if (existingBonus?.outcome && input.fullPayPerk !== undefined && input.fullPayPerk !== "draw") {
+    return NextResponse.json({ error: "El sorteo extra ya se jugó; no se puede quitar." }, { status: 409 });
+  }
+  for (const change of input.stages ?? []) {
+    const stage = existingStages.find((s) => s.id === change.id);
+    if (!stage) return NextResponse.json({ error: "Etapa no encontrada" }, { status: 404 });
+    if (stage.outcome) return NextResponse.json({ error: `${stage.label} ya se jugó: no se puede cambiar.` }, { status: 409 });
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.raffle.update({ where: { id }, data });
+
+    if (byStages) {
+      for (const change of input.stages ?? []) {
+        await tx.raffleStage.update({
+          where: { id: change.id },
+          data: {
+            ...(change.label ? { label: change.label } : {}),
+            prize: change.prize,
+            ...(change.lottery !== undefined ? { lottery: change.lottery || null } : {}),
+            ...(change.drawDate !== undefined ? { drawDate: change.drawDate ? new Date(change.drawDate) : null } : {}),
+          },
+        });
+      }
+      // The bonus draw follows the perk: created when it is switched on, removed (if not yet played) when off.
+      if (nextPerk === "draw") {
+        const bonusData = input.bonusStage
+          ? {
+              prize: input.bonusStage.prize,
+              label: input.bonusStage.label || "Sorteo extra",
+              lottery: input.bonusStage.lottery || null,
+              drawDate: input.bonusStage.drawDate ? new Date(input.bonusStage.drawDate) : null,
+            }
+          : null;
+        if (existingBonus && bonusData && !existingBonus.outcome) {
+          await tx.raffleStage.update({ where: { id: existingBonus.id }, data: bonusData });
+        } else if (!existingBonus && bonusData) {
+          const last = existingStages[existingStages.length - 1]!;
+          await tx.raffleStage.create({ data: { raffleId: id, position: last.position + 1, price: 0, bonus: true, ...bonusData } });
+        }
+      } else if (existingBonus && !existingBonus.outcome) {
+        await tx.raffleStage.delete({ where: { id: existingBonus.id } });
+      }
+      // The raffle's own date is the last paid stage's, so lists and previews show when it ends.
+      const fresh = await tx.raffleStage.findMany({ where: { raffleId: id, bonus: false }, orderBy: { position: "desc" } });
+      const last = fresh.find((s) => s.drawDate);
+      await tx.raffle.update({ where: { id }, data: { drawDate: last?.drawDate ?? null } });
+    }
 
     // `accounts` follows the same "undefined vs provided" convention as the
     // other optional fields: absent means "leave untouched", present means
@@ -259,6 +347,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
       accounts: true,
       groups: true,
+      stages: stagesInclude,
       owner: { select: { publicReservations: true } },
     },
   });

@@ -5,6 +5,7 @@ import type { NumberStatus, PaymentMethod, PaymentStatus, RaffleNumberDTO } from
 export const numberInclude = {
   updatedBy: { select: { name: true } },
   soldBy: { select: { name: true } },
+  quotas: { select: { quota: true, amount: true, method: true, paidAt: true }, orderBy: { quota: "asc" } },
 } satisfies Prisma.RaffleNumberInclude;
 
 type NumberWithAuthors = Prisma.RaffleNumberGetPayload<{ include: typeof numberInclude }>;
@@ -26,6 +27,12 @@ export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
     soldByName: n.soldBy?.name ?? null,
     soldAt: n.soldAt ? n.soldAt.toISOString() : null,
     online: n.online,
+    quotas: n.quotas.map((q) => ({
+      quota: q.quota,
+      amount: q.amount,
+      method: q.method as PaymentMethod,
+      paidAt: q.paidAt.toISOString(),
+    })),
     updatedAt: n.updatedAt.toISOString(),
   };
 }

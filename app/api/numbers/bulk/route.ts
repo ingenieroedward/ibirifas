@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   const found = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
-    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true, status: true } } },
+    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true, status: true, _count: { select: { stages: true } } } } },
   });
 
   const tenantId = tenantIdFor(user);
@@ -96,6 +96,14 @@ export async function POST(req: NextRequest) {
   // A closed raffle no longer changes hands; collecting payments and fixing buyer details still works.
   if (found[0]!.raffle.status === "closed" && (input.action === "sell" || input.action === "release")) {
     return NextResponse.json({ error: "La rifa está cerrada: ya no se venden ni se liberan números." }, { status: 409 });
+  }
+
+  // In a raffle by stages money comes in installments (/api/numbers/quotas), never as a plain "paid".
+  if (found[0]!.raffle._count.stages > 0 && (input.action === "pay" || input.action === "unpay")) {
+    return NextResponse.json(
+      { error: "En una rifa por etapas se cobra por cuotas: usa «Cobrar cuota» o «Cobrar todo»." },
+      { status: 400 },
+    );
   }
 
   // A set is all or nothing.
@@ -146,6 +154,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (input.action === "release") {
+        await tx.numberQuota.deleteMany({ where: { numberId: { in: ids } } });
         releasedBefore = await tx.raffleNumber.findMany({
           where: { id: { in: ids }, status: { not: "available" } },
           select: { value: true, buyerName: true },

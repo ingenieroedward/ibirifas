@@ -7,6 +7,15 @@ import { daysLeft, daysText, daysWaiting, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/whatsapp";
+import {
+  amountRemaining,
+  collectedOn,
+  currentPaidStage,
+  installmentPrices,
+  quotaBadge,
+  standingOf,
+  type StageSettings,
+} from "@/lib/stages";
 
 interface ParticipantsListProps {
   numbers: RaffleNumberDTO[];
@@ -25,6 +34,8 @@ interface ParticipantsListProps {
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
+  /** A raffle by stages: amounts come from the installments, and each number shows how many are paid. */
+  stageSettings?: StageSettings | null;
 }
 
 type WhatsAppRaffle = Pick<RaffleDTO, "name" | "accounts" | "drawDate" | "lottery" | "drawTrigger">;
@@ -98,6 +109,7 @@ export function ParticipantsList({
   autoRelease = false,
   onSelect,
   onPayAll,
+  stageSettings = null,
 }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -122,11 +134,16 @@ export function ParticipantsList({
     for (const p of participants) {
       pending += p.pendingCount;
       paid += p.paidCount;
-      pendingAmount += priceOf(p.numbers.filter((n) => n.status !== "paid"));
-      paidAmount += priceOf(p.numbers.filter((n) => n.status === "paid"));
+      if (stageSettings) {
+        pendingAmount += p.numbers.reduce((sum, n) => sum + amountRemaining(n.quotas, stageSettings.stages), 0);
+        paidAmount += p.numbers.reduce((sum, n) => sum + collectedOn(n.quotas), 0);
+      } else {
+        pendingAmount += priceOf(p.numbers.filter((n) => n.status !== "paid"));
+        paidAmount += priceOf(p.numbers.filter((n) => n.status === "paid"));
+      }
     }
     return { pending, paid, pendingAmount, paidAmount };
-  }, [participants, priceOf]);
+  }, [participants, priceOf, stageSettings]);
 
   const debtors = participants.filter((p) => p.pendingCount > 0).length;
 
@@ -228,6 +245,7 @@ export function ParticipantsList({
               onSelect={onSelect}
               onPayAll={onPayAll}
               onViewReceipt={setReceiptOpen}
+              stageSettings={stageSettings}
             />
           ))}
         </ul>
@@ -282,6 +300,7 @@ function ParticipantCard({
   onSelect,
   onPayAll,
   onViewReceipt,
+  stageSettings,
 }: {
   participant: Participant;
   groups: RaffleGroupDTO[];
@@ -293,11 +312,27 @@ function ParticipantCard({
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
   onViewReceipt: (photoDataUrl: string) => void;
+  stageSettings: StageSettings | null;
 }) {
   // Every distinct receipt this buyer sent (a set carries one copy on each of its numbers), viewable from here
   // without opening each number or set.
   const receipts = [...new Set(p.numbers.map((n) => n.photoDataUrl).filter((u): u is string => Boolean(u)))];
-  const owes = priceOf(p.numbers.filter((n) => n.status !== "paid"));
+  // A raffle by stages: what is owed overall, what must be paid now to play the next draw, and what was paid.
+  const stageMoney = stageSettings
+    ? (() => {
+        const owed = p.numbers.filter((n) => n.status !== "paid");
+        const prices = installmentPrices(stageSettings.stages);
+        const due = owed.reduce((sum, n) => sum + standingOf(n.quotas, stageSettings).due, 0);
+        const next = owed.reduce((sum, n) => sum + (prices[n.quotas.length] ?? 0), 0);
+        return {
+          remaining: owed.reduce((sum, n) => sum + amountRemaining(n.quotas, stageSettings.stages), 0),
+          due,
+          next,
+          collected: p.numbers.reduce((sum, n) => sum + collectedOn(n.quotas), 0),
+        };
+      })()
+    : null;
+  const owes = stageMoney ? stageMoney.remaining : priceOf(p.numbers.filter((n) => n.status !== "paid"));
   const holdings = holdingsOf(p.numbers, groups);
   const pendingItems = holdings.filter((h) => !h.paid).length;
 
@@ -321,6 +356,21 @@ function ParticipantCard({
   };
   const pendingPart = partOf(false);
   const paidPart = partOf(true);
+  if (stageMoney) {
+    // Installments: the reminder asks for what's due now (or the next installment); the receipt counts every
+    // number with something paid and the total paid so far.
+    pendingPart.amount = stageMoney.due > 0 ? stageMoney.due : stageMoney.next;
+    const withPayments = p.numbers.filter((n) => n.quotas.length > 0);
+    paidPart.looseValues = withPayments.map((n) => n.value);
+    paidPart.count = withPayments.length;
+    paidPart.amount = stageMoney.collected;
+  }
+  const collectingStage = stageSettings ? currentPaidStage(stageSettings.stages) : null;
+  const collectingDay = stageSettings && p.numbers[0] ? standingOf(p.numbers[0].quotas, stageSettings).lastDay : null;
+  const stageNote =
+    stageSettings && collectingStage
+      ? `Para jugar *${collectingStage.label}* (premio ${collectingStage.prize}) debes estar al día${collectingDay ? ` antes de terminar el ${collectingDay}` : ""}.`
+      : null;
   const methods = new Set(p.numbers.filter((n) => n.status === "paid").map((n) => n.paymentMethod));
   const onlyMethod = methods.size === 1 ? [...methods][0] : null;
   const reminderUrl =
@@ -337,6 +387,7 @@ function ParticipantCard({
             drawDate: raffle.drawDate,
             drawCondition: raffle.drawDate || raffle.drawTrigger === "date" ? null : triggerCondition(raffle.drawTrigger),
             lottery: raffle.lottery,
+            stageNote,
           }),
         )
       : null;
@@ -351,6 +402,7 @@ function ParticipantCard({
             looseValues: paidPart.looseValues,
             amount: paidPart.amount,
             paymentMethodLabel: onlyMethod ? PAYMENT_METHOD_LABEL[onlyMethod] : null,
+            progress: stageSettings ? stageProgress(p.numbers, stageSettings) : null,
           }),
         )
       : null;
@@ -375,7 +427,17 @@ function ParticipantCard({
             </a>
           )}
         </div>
-        {p.pendingCount > 0 ? (
+        {stageMoney && p.pendingCount > 0 ? (
+          stageMoney.due > 0 ? (
+            <span className="shrink-0 rounded-full border border-gold-600/50 bg-gold-400/10 px-3 py-1 text-right text-xs font-bold text-gold-400">
+              Debe ahora {formatCurrency(stageMoney.due)}
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 text-right text-xs font-bold text-green-400">
+              Al día · faltan {formatCurrency(stageMoney.remaining)}
+            </span>
+          )
+        ) : p.pendingCount > 0 ? (
           <span className="shrink-0 rounded-full border border-gold-600/50 bg-gold-400/10 px-3 py-1 text-xs font-bold text-gold-400">
             Debe {formatCurrency(owes)}
           </span>
@@ -447,6 +509,9 @@ function ParticipantCard({
               }`}
             >
               {h.kind === "set" ? `Conjunto ${h.group.label}` : formatNumberValue(h.number.value)}
+              {stageSettings && h.kind === "number" && !paid && (
+                <span className="ml-1.5 text-[11px] font-semibold opacity-80">{quotaBadge(h.number.quotas, stageSettings)}</span>
+              )}
             </button>
           );
         })}
@@ -466,14 +531,20 @@ function ParticipantCard({
                     p.numbers.filter((n) => n.status !== "paid"),
                   )
                 }
-                aria-label={`${pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · ${formatCurrency(owes)}`}
+                aria-label={
+                  stageMoney
+                    ? `Cobrar cuotas · ${formatCurrency(stageMoney.due > 0 ? stageMoney.due : stageMoney.next)}`
+                    : `${pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · ${formatCurrency(owes)}`
+                }
                 className="flex h-11 min-w-0 flex-[1.3] items-center justify-center rounded-xl border border-green-500/40 bg-green-500/10 px-3 text-sm font-semibold text-green-400 transition active:scale-[0.98]"
               >
                 <span aria-hidden="true" className="truncate sm:hidden">
-                  {pendingItems === 1 ? "Cobrar" : "Cobrar todo"}
+                  {stageMoney ? "Cobrar cuota" : pendingItems === 1 ? "Cobrar" : "Cobrar todo"}
                 </span>
                 <span aria-hidden="true" className="hidden truncate sm:inline">
-                  {pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · {formatCurrency(owes)}
+                  {stageMoney
+                    ? `Cobrar cuota · ${formatCurrency(stageMoney.due > 0 ? stageMoney.due : stageMoney.next)}`
+                    : `${pendingItems === 1 ? "Marcar como pagado" : `Cobrar los ${pendingItems} pendientes`} · ${formatCurrency(owes)}`}
                 </span>
               </button>
               {reminderUrl && (
@@ -512,6 +583,17 @@ function ParticipantCard({
       </p>
     </li>
   );
+}
+
+/** "Llevas 2 de 3 cuotas." (or per number when they differ), for the receipt of a raffle by stages. */
+function stageProgress(numbers: RaffleNumberDTO[], settings: StageSettings): string {
+  const total = installmentPrices(settings.stages).length;
+  const counts = new Set(numbers.map((n) => n.quotas.length));
+  if (counts.size === 1) {
+    const paid = numbers[0]!.quotas.length;
+    return paid === total ? "¡Ya pagaste todas las cuotas!" : `Llevas ${paid} de ${total} cuotas.`;
+  }
+  return `Cuotas pagadas: ${numbers.map((n) => `${formatNumberValue(n.value)} (${n.quotas.length}/${total})`).join(", ")}.`;
 }
 
 function FilterChip({

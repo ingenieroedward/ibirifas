@@ -19,6 +19,8 @@ interface NumberCellProps {
   dimmed?: boolean;
   /** This is the winning number of a closed raffle. */
   winner?: boolean;
+  /** A raffle by stages: how many installments a number has ("1/3" on a sold, not fully paid number). */
+  installments?: number;
 }
 
 const LONG_PRESS_MS = 450;
@@ -42,6 +44,7 @@ export function NumberCell({
   selected,
   dimmed,
   winner,
+  installments,
 }: NumberCellProps) {
   const hasPhoto = Boolean(number.photoDataUrl);
 
@@ -57,6 +60,8 @@ export function NumberCell({
     }
   };
   useEffect(() => cancelHold, []);
+
+  const showQuotas = Boolean(installments) && number.status === "occupied";
 
   // Taken numbers just open their sheet; there's nothing to pick.
   const canLongPress = Boolean(onLongPress) && number.status === "available";
@@ -105,7 +110,7 @@ export function NumberCell({
         }
         onTap(number);
       }}
-      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}${selected ? ", seleccionado" : ""}${winner ? ", ganador" : ""}`}
+      aria-label={`Número ${formatNumberValue(number.value)}, ${STATUS_LABEL[number.status]}${showQuotas ? `, ${number.quotas.length} de ${installments} cuotas` : ""}${selected ? ", seleccionado" : ""}${winner ? ", ganador" : ""}`}
       aria-pressed={selected === undefined ? undefined : selected}
       style={style}
       className={`relative flex aspect-square select-none [-webkit-touch-callout:none] items-center justify-center rounded-2xl font-[family-name:var(--font-heading)] text-base font-bold transition active:scale-90 sm:text-lg ${useCustomTheme ? "" : STATUS_CLASSES[number.status]} ${dimmed ? "opacity-30" : ""} ${selected ? "scale-95 ring-4 ring-white ring-offset-2 ring-offset-bg" : ""} ${winner ? "ring-4 ring-gold-300 ring-offset-2 ring-offset-bg" : ""}`}
@@ -117,6 +122,16 @@ export function NumberCell({
           className="absolute -left-1.5 -top-2 rounded-full bg-gold-300 px-1.5 text-[9px] font-black uppercase leading-4 text-[#241a02] shadow-sm"
         >
           Ganó
+        </span>
+      )}
+      {showQuotas && (
+        <span
+          aria-hidden="true"
+          className={`absolute inset-x-0 bottom-1 text-center text-[9px] font-bold leading-none sm:text-[10px] ${
+            number.quotas.length > 0 ? "text-green-400" : "text-text-muted"
+          }`}
+        >
+          {number.quotas.length}/{installments}
         </span>
       )}
       {selected && (

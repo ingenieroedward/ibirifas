@@ -7,13 +7,17 @@ import { useToast } from "@/components/Toast";
 import {
   ApiError,
   deleteRaffle,
+  drawStage,
   getRaffleById,
   getRaffles,
+  payQuotas,
   setPublicLink,
   setRaffleStatus,
   updateRaffle,
   updateNumber,
   updateNumbersBulk,
+  undoStage,
+  type NumbersSince,
 } from "@/lib/api-client";
 import {
   canShareImageFiles,
@@ -27,14 +31,17 @@ import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
 import { buildAvailabilityText } from "@/lib/shareText";
 import { isOverdue } from "@/lib/holds";
 import { useRaffleLive } from "@/lib/useRaffleLive";
+import { amountRemaining, discountNow, installmentPrices, stageSettingsOf, standingOf, type StageSettings } from "@/lib/stages";
 import type {
   BulkActionBody,
   BulkNumberInput,
   PaymentMethod,
   PublicLinkAction,
+  QuotaAction,
   RaffleDTO,
   RaffleGroupDTO,
   RaffleNumberDTO,
+  RaffleStageDTO,
   UpdateNumberInput,
 } from "@/lib/types";
 import { CloseRaffleSheet } from "@/components/CloseRaffleSheet";
@@ -52,6 +59,7 @@ import { PayManySheet } from "@/components/PayManySheet";
 import { SellersReport } from "@/components/SellersReport";
 import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
+import { StagesPanel } from "@/components/StagesPanel";
 
 /** For useSyncExternalStore values that never change while the page is open (browser capabilities). */
 const subscribeNever = () => () => {};
@@ -61,6 +69,20 @@ function newestUpdate(numbers: RaffleNumberDTO[]): string | null {
   let newest: string | null = null;
   for (const n of numbers) if (!newest || n.updatedAt > newest) newest = n.updatedAt;
   return newest;
+}
+
+/** What collecting a buyer's installments would cost: what's due now, the next installment of each, everything. */
+function stagePayAmounts(numbers: RaffleNumberDTO[], settings: StageSettings) {
+  const prices = installmentPrices(settings.stages);
+  let due = 0;
+  let next = 0;
+  let all = 0;
+  for (const n of numbers) {
+    due += standingOf(n.quotas, settings).due;
+    next += prices[n.quotas.length] ?? 0;
+    all += amountRemaining(n.quotas, settings.stages) - discountNow(n.quotas, settings);
+  }
+  return { due, next, all };
 }
 
 /** `undefined` in a PATCH input means "leave unchanged"; `null` means "clear". */
@@ -267,6 +289,12 @@ export default function RaffleDashboardPage() {
   );
 
   const pricer = useMemo(() => (raffle ? makePricer(raffle) : () => 0), [raffle]);
+  // A raffle by stages: paid in installments, one draw per stage.
+  const stageSettings = useMemo(() => (raffle ? stageSettingsOf(raffle) : null), [raffle]);
+  const stageWinners = useMemo(
+    () => new Set((raffle?.stages ?? []).filter((s) => s.outcome === "won").map((s) => s.winnerValue!)),
+    [raffle],
+  );
   const openGroup = raffle?.groups.find((g) => g.id === openGroupId) ?? null;
   const openGroupMembers = useMemo(
     () => (raffle && openGroupId ? numbersOfGroup(raffle.numbers, openGroupId) : []),
@@ -352,10 +380,11 @@ export default function RaffleDashboardPage() {
 
   // The raffle was closed or reopened by someone else (or in another tab).
   const handleRaffleState = useCallback(
-    (state: { status: "active" | "closed"; winnerValue: number | null }) => {
+    (state: NumbersSince["raffle"]) => {
       const current = raffleRef.current;
-      if (!current || (current.status === state.status && current.winnerValue === state.winnerValue)) return;
-      setRaffle({ ...current, status: state.status, winnerValue: state.winnerValue });
+      const stagesChanged = JSON.stringify(current?.stages ?? []) !== JSON.stringify(state.stages ?? []);
+      if (!current || (current.status === state.status && current.winnerValue === state.winnerValue && !stagesChanged)) return;
+      setRaffle({ ...current, status: state.status, winnerValue: state.winnerValue, stages: state.stages ?? current.stages });
       if (current.status !== state.status) {
         show(state.status === "closed" ? "La rifa se cerró" : "La rifa se reabrió", "info");
         if (state.status === "closed") {
@@ -527,9 +556,40 @@ export default function RaffleDashboardPage() {
     [pickedIds, mergeNumbers, show, exitSelection, refreshAfterConflict],
   );
 
+  /** Installments of a raffle by stages, for one number or all of a buyer's. */
+  const handleQuotas = useCallback(
+    async (ids: string[], action: QuotaAction, method: PaymentMethod) => {
+      try {
+        const updated = await payQuotas(ids, action, method);
+        mergeNumbers(updated);
+        show(
+          action === "undo"
+            ? "Cuota deshecha"
+            : updated.every((n) => n.status === "paid")
+              ? updated.length === 1
+                ? `${formatNumberValue(updated[0]!.value)} pagado completo`
+                : "Números pagados completos"
+              : "Cuota cobrada",
+          "success",
+        );
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.", "error");
+        if (err instanceof ApiError && err.status === 409) await refreshAfterConflict();
+        throw err;
+      }
+    },
+    [mergeNumbers, show, refreshAfterConflict],
+  );
+
   const handlePayMany = useCallback(
-    async (method: PaymentMethod) => {
+    async (method: PaymentMethod, action?: Exclude<QuotaAction, "undo">) => {
       if (!payTarget) return;
+      if (action) {
+        // A raffle by stages: installments instead of "paid".
+        await handleQuotas(payTarget.numbers.map((n) => n.id), action, method);
+        setPayTarget(null);
+        return;
+      }
       try {
         const updated = await updateNumbersBulk({
           action: "pay",
@@ -548,7 +608,52 @@ export default function RaffleDashboardPage() {
         throw err;
       }
     },
-    [payTarget, mergeNumbers, show, refreshAfterConflict],
+    [payTarget, mergeNumbers, show, refreshAfterConflict, handleQuotas],
+  );
+
+  const replaceStage = useCallback((stage: RaffleStageDTO) => {
+    setRaffle((current) =>
+      current ? { ...current, stages: current.stages.map((s) => (s.id === stage.id ? stage : s)) } : current,
+    );
+  }, []);
+
+  const handleDrawStage = useCallback(
+    async (stage: RaffleStageDTO, winnerValue: number) => {
+      try {
+        const result = await drawStage(raffleId, stage.id, winnerValue);
+        replaceStage(result.stage);
+        if (result.closed) {
+          // The last draw closes the raffle: reload to pick up its final state.
+          const fresh = await getRaffleById(raffleId);
+          applyFullLoad(fresh);
+        }
+        show(
+          result.stage.outcome === "won"
+            ? `${stage.label}: ganó ${result.stage.winnerName ?? "su comprador"}`
+            : `${stage.label}: el premio queda en la casa`,
+          "success",
+        );
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo registrar el resultado.", "error");
+        throw err;
+      }
+    },
+    [raffleId, replaceStage, applyFullLoad, show],
+  );
+
+  const handleUndoStage = useCallback(
+    async (stage: RaffleStageDTO) => {
+      try {
+        const result = await undoStage(raffleId, stage.id);
+        replaceStage(result.stage);
+        if (raffleRef.current?.status === "closed") applyFullLoad(await getRaffleById(raffleId));
+        show(`Resultado de ${stage.label} deshecho`, "success");
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo deshacer el resultado.", "error");
+        throw err;
+      }
+    },
+    [raffleId, replaceStage, applyFullLoad, show],
   );
 
   /** One action on a whole set (sell, collect, undo, edit, free): all its numbers in a single atomic request. */
@@ -733,6 +838,15 @@ export default function RaffleDashboardPage() {
 
               {view === "board" ? (
                 <>
+                  {stageSettings && (
+                    <StagesPanel
+                      raffle={raffle}
+                      settings={stageSettings}
+                      isOrganizer={isOrganizer}
+                      onDraw={handleDrawStage}
+                      onUndo={handleUndoStage}
+                    />
+                  )}
                   {hasGroups && (
                     <section aria-label="Conjuntos" className="mb-6">
                       <p className="mb-3 text-sm text-text-muted">
@@ -780,6 +894,8 @@ export default function RaffleDashboardPage() {
                         onLongPress={selecting || raffleClosed ? undefined : handleLongPress}
                         selectedIds={selecting ? pickedIds : undefined}
                         winnerValue={raffle.winnerValue}
+                        stageWinners={stageWinners}
+                        installments={stageSettings ? installmentPrices(stageSettings.stages).length : undefined}
                       />
                     </section>
                   )}
@@ -805,6 +921,7 @@ export default function RaffleDashboardPage() {
                       autoRelease={raffle.autoRelease}
                       onSelect={openNumber}
                       onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
+                      stageSettings={stageSettings}
                     />
                   ) : (
                     <SellersReport
@@ -814,6 +931,7 @@ export default function RaffleDashboardPage() {
                       priceOf={pricer}
                       viewerId={user?.id ?? ""}
                       canSeeAll={isOrganizer}
+                      stageSettings={stageSettings}
                     />
                   )}
                 </>
@@ -853,6 +971,8 @@ export default function RaffleDashboardPage() {
         canRelease={!raffleClosed}
         onClose={() => setSelectedId(null)}
         onSave={handleSave}
+        stageSettings={stageSettings}
+        onQuotas={(id, action, method) => handleQuotas([id], action, method)}
       />
 
       {publicLinkOpen && raffle && (
@@ -940,6 +1060,7 @@ export default function RaffleDashboardPage() {
           total={pricer(payTarget.numbers)}
           onClose={() => setPayTarget(null)}
           onConfirm={handlePayMany}
+          stageAmounts={stageSettings ? stagePayAmounts(payTarget.numbers, stageSettings) : null}
         />
       )}
     </div>

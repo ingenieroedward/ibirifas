@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { PaymentMethod, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
+import type { PaymentMethod, QuotaAction, RaffleNumberDTO, UpdateNumberInput } from "@/lib/types";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
+import { amountRemaining, type StageSettings } from "@/lib/stages";
 import { PhotoPicker } from "@/components/PhotoPicker";
+import { QuotaPanel } from "@/components/QuotaPanel";
 import { Spinner } from "@/components/Spinner";
 
 interface NumberSheetProps {
@@ -16,6 +18,9 @@ interface NumberSheetProps {
   canRelease?: boolean;
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
+  /** A raffle by stages: the number is paid in installments instead of "Marcar como pagado". */
+  stageSettings?: StageSettings | null;
+  onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
 }
 
 const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
@@ -24,7 +29,16 @@ const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
   paid: "Pagado",
 };
 
-export function NumberSheet({ number, numberPrice, knownBuyers = [], canRelease = true, onClose, onSave }: NumberSheetProps) {
+export function NumberSheet({
+  number,
+  numberPrice,
+  knownBuyers = [],
+  canRelease = true,
+  onClose,
+  onSave,
+  stageSettings = null,
+  onQuotas,
+}: NumberSheetProps) {
   if (!number) return null;
 
   return (
@@ -44,6 +58,8 @@ export function NumberSheet({ number, numberPrice, knownBuyers = [], canRelease 
         canRelease={canRelease}
         onClose={onClose}
         onSave={onSave}
+        stageSettings={stageSettings}
+        onQuotas={onQuotas}
       />
     </div>
   );
@@ -56,6 +72,8 @@ function SheetContent({
   canRelease,
   onClose,
   onSave,
+  stageSettings,
+  onQuotas,
 }: {
   number: RaffleNumberDTO;
   numberPrice: number;
@@ -63,6 +81,8 @@ function SheetContent({
   canRelease: boolean;
   onClose: () => void;
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
+  stageSettings: StageSettings | null;
+  onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
 }) {
   const [buyerName, setBuyerName] = useState(number.buyerName ?? "");
   const [buyerPhone, setBuyerPhone] = useState(number.buyerPhone ?? "");
@@ -266,7 +286,11 @@ function SheetContent({
               <InfoRow
                 label="Pago"
                 value={
-                  number.status === "paid"
+                  stageSettings
+                    ? number.status === "paid"
+                      ? "Pagado completo"
+                      : `Debe ${formatCurrency(amountRemaining(number.quotas, stageSettings.stages))}`
+                    : number.status === "paid"
                     ? number.paymentMethod
                       ? `Pagado · ${PAYMENT_METHOD_LABEL[number.paymentMethod]}`
                       : "Pagado"
@@ -288,8 +312,17 @@ function SheetContent({
 
             {formError && <p className="text-sm font-medium text-red-400">{formError}</p>}
 
+            {stageSettings && onQuotas && (
+              <QuotaPanel
+                number={number}
+                settings={stageSettings}
+                canCollect
+                onQuotas={(action, method) => onQuotas(number.id, action, method)}
+              />
+            )}
+
             <div className="space-y-2.5">
-              {number.status === "occupied" && (
+              {number.status === "occupied" && !stageSettings && (
                 <>
                   <div className="space-y-1.5">
                     <span className="text-sm font-medium text-text-muted">Método de pago</span>

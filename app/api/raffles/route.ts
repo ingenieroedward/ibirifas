@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { MAX_GROUPS } from "@/lib/groups";
 import { settingToDb } from "@/lib/reservations";
+import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
@@ -45,6 +46,11 @@ const createRaffleSchema = z.object({
   holdDays: z.number().int().min(1).max(365).nullable().optional(),
   autoRelease: z.boolean().optional(),
   publicReservations: z.enum(["inherit", "on", "off"]).optional(),
+  stages: z.array(stageInputSchema).min(2).max(MAX_STAGES).optional(),
+  stageDeadlineDays: z.number().int().min(0).max(30).optional(),
+  fullPayPerk: z.enum(["none", "discount", "draw"]).optional(),
+  fullPayDiscount: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  bonusStage: stageInputSchema.nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -171,6 +177,28 @@ export async function POST(req: NextRequest) {
   const totalNumbers = input.totalNumbers ?? DEFAULT_TOTAL_NUMBERS;
   const groups = input.groups ?? [];
 
+  // A raffle by stages: every stage needs its installment, sets can't be combined with it, and the number's
+  // price is the sum of the installments.
+  const stages = input.stages ?? [];
+  const byStages = stages.length > 0;
+  if (byStages) {
+    if (groups.length > 0) {
+      return NextResponse.json({ error: "Una rifa por etapas no puede venderse por conjuntos." }, { status: 400 });
+    }
+    if (stages.some((s) => !s.price)) {
+      return NextResponse.json({ error: "Cada etapa necesita el valor de su cuota." }, { status: 400 });
+    }
+  }
+  const stagesTotal = stages.reduce((sum, s) => sum + (s.price ?? 0), 0);
+  const perk = byStages ? (input.fullPayPerk ?? "none") : "none";
+  if (perk === "discount" && !(input.fullPayDiscount && input.fullPayDiscount > 0 && input.fullPayDiscount < stagesTotal)) {
+    return NextResponse.json({ error: "El descuento por pagar todo debe ser mayor a cero y menor que el total." }, { status: 400 });
+  }
+  if (perk === "draw" && !input.bonusStage?.prize) {
+    return NextResponse.json({ error: "Escribe el premio del sorteo extra por pagar todo." }, { status: 400 });
+  }
+  const lastStageDate = [...stages].reverse().find((s) => s.drawDate)?.drawDate ?? null;
+
   // Sets: each letter once, only numbers that exist, no number in two sets.
   const groupOf = new Map<number, string>();
   for (const [index, group] of groups.entries()) {
@@ -198,20 +226,53 @@ export async function POST(req: NextRequest) {
         name: input.name,
         prizeLabel: input.prizeLabel ?? null,
         lottery: input.lottery ?? null,
-        numberPrice: input.numberPrice,
+        numberPrice: byStages ? stagesTotal : input.numberPrice,
         totalNumbers,
-        drawDate: input.drawDate ? new Date(input.drawDate) : null,
-        drawTrigger: input.drawTrigger ?? "date",
+        drawDate: byStages ? (lastStageDate ? new Date(lastStageDate) : null) : input.drawDate ? new Date(input.drawDate) : null,
+        drawTrigger: byStages ? "date" : (input.drawTrigger ?? "date"),
+        stageDeadlineDays: input.stageDeadlineDays ?? 3,
+        fullPayPerk: perk,
+        fullPayDiscount: perk === "discount" ? input.fullPayDiscount! : null,
         status: "active",
         themeBackground: input.themeBackground ?? null,
         themeNumberColor: input.themeNumberColor ?? null,
         themeTextColor: input.themeTextColor ?? null,
         holdDays: input.holdDays ?? null,
         // Releasing on its own only makes sense with a deadline.
-        autoRelease: input.holdDays ? (input.autoRelease ?? false) : false,
+        autoRelease: input.holdDays || byStages ? (input.autoRelease ?? false) : false,
         publicReservations: settingToDb(input.publicReservations ?? "inherit"),
       },
     });
+
+    if (byStages) {
+      await tx.raffleStage.createMany({
+        data: [
+          ...stages.map((s, i) => ({
+            raffleId: created.id,
+            position: i + 1,
+            label: s.label || `Etapa ${i + 1}`,
+            prize: s.prize,
+            price: s.price!,
+            lottery: s.lottery || null,
+            drawDate: s.drawDate ? new Date(s.drawDate) : null,
+          })),
+          ...(perk === "draw" && input.bonusStage
+            ? [
+                {
+                  raffleId: created.id,
+                  position: stages.length + 1,
+                  label: input.bonusStage.label || "Sorteo extra",
+                  prize: input.bonusStage.prize,
+                  price: 0,
+                  bonus: true,
+                  lottery: input.bonusStage.lottery || null,
+                  drawDate: input.bonusStage.drawDate ? new Date(input.bonusStage.drawDate) : null,
+                },
+              ]
+            : []),
+        ],
+      });
+    }
 
     const groupIdByLabel = new Map<string, string>();
     for (const [position, group] of groups.entries()) {
