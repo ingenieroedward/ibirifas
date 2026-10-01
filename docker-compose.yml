@@ -33,6 +33,9 @@ services:
       # Cloudflare Turnstile on public reservations (optional anti-bot check).
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      # Daily consistent copy of the database inside the volume (/app/data/backups), last N days.
+      BACKUP_KEEP: ${BACKUP_KEEP:-}
+      BACKUP_SNAPSHOTS: ${BACKUP_SNAPSHOTS:-}
     volumes:
       - ibirifas_data:/app/data
     expose:
