@@ -7,6 +7,7 @@ import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { rememberReservation, reservationPath } from "@/lib/myReservations";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import type { PublicRaffleDTO, ReserveResultDTO } from "@/lib/types";
 
 interface ReserveSheetProps {
@@ -42,6 +43,10 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
   const [phone, setPhone] = useState(contact.phone);
   const [email, setEmail] = useState(contact.email);
   const askEmail = raffle.reservations.email;
+  const turnstileKey = raffle.reservations.turnstileSiteKey;
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReserveResultDTO | null>(null);
@@ -64,17 +69,24 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
     if (phone.replace(/\D/g, "").length < 7) return setError("Escribe un teléfono válido para poder contactarte.");
     const mail = askEmail ? email.trim() : "";
     if (mail && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(mail)) return setError("Revisa tu correo: no parece válido.");
+    if (!acceptPrivacy) return setError("Para reservar debes aceptar el aviso de privacidad.");
+    if (turnstileKey && !turnstileToken) return setError("Espera a que termine la verificación de abajo.");
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/public/raffles/${token}/reserve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), ...(mail ? { email: mail } : {}), numbers, sets }),
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), ...(mail ? { email: mail } : {}), ...(turnstileToken ? { turnstileToken } : {}), acceptPrivacy, numbers, sets }),
       });
       const body = (await res.json().catch(() => ({}))) as Partial<ReserveResultDTO> & { error?: string };
       if (!res.ok) {
         setError(body.error ?? "No se pudo reservar. Inténtalo de nuevo.");
+        // A token is good for one try.
+        if (turnstileKey) {
+          setTurnstileToken(null);
+          setTurnstileReset((n) => n + 1);
+        }
         // Someone got there first: go back to the page, which refreshes what is still free.
         if (res.status === 409) setTimeout(() => onClose(true), 2500);
         return;
@@ -284,6 +296,32 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
           />
           <p className="text-xs text-text-muted">Te avisamos ahí cuando confirmen o rechacen tu pago.</p>
         </div>
+      )}
+
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          id="acceptPrivacy"
+          type="checkbox"
+          checked={acceptPrivacy}
+          onChange={(e) => setAcceptPrivacy(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-gold-400)]"
+        />
+        <span className="text-xs text-text-muted">
+          Acepto el{" "}
+          <a href={`/p/${token}/privacidad`} target="_blank" rel="noopener noreferrer" className="font-semibold text-gold-400 underline">
+            aviso de privacidad
+          </a>{" "}
+          y autorizo el uso de mis datos para gestionar mi reserva.
+        </span>
+      </label>
+
+      {turnstileKey && (
+        <TurnstileWidget
+          key={turnstileReset}
+          siteKey={turnstileKey}
+          onToken={setTurnstileToken}
+          onError={setError}
+        />
       )}
 
       <p className="text-xs text-text-muted">

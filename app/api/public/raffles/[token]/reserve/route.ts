@@ -17,6 +17,7 @@ import {
 import type { ReserveResultDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { EMAIL_RE } from "@/lib/mail";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{22}$/;
@@ -26,6 +27,10 @@ const reserveSchema = z.object({
   phone: z.string().trim().max(30),
   // Optional: where we tell them about the reservation (payment confirmed or rejected, released).
   email: z.string().trim().max(120).optional(),
+  // Cloudflare Turnstile token, when the server has it switched on.
+  turnstileToken: z.string().max(2048).optional(),
+  // The visitor accepted the raffle's privacy notice (/p/<token>/privacidad); required.
+  acceptPrivacy: z.boolean().optional(),
   numbers: z.array(z.number().int().min(0)).max(MAX_LOOSE_PER_RESERVATION),
   sets: z.array(z.string().regex(/^[A-Z]$/)).max(MAX_SETS_PER_RESERVATION),
 });
@@ -57,6 +62,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const digits = phoneDigits(input.phone);
   if (digits.length < 7 || digits.length > 15) {
     return NextResponse.json({ error: "Escribe un teléfono válido para poder contactarte." }, { status: 400 });
+  }
+  if (input.acceptPrivacy !== true) {
+    return NextResponse.json({ error: "Para reservar debes aceptar el aviso de privacidad." }, { status: 400 });
+  }
+  if (!(await verifyTurnstile(input.turnstileToken, getClientIp(req)))) {
+    return NextResponse.json({ error: "No pudimos comprobar que no eres un robot. Inténtalo de nuevo." }, { status: 403 });
   }
   const email = input.email ? input.email : null;
   if (email && !EMAIL_RE.test(email)) {
@@ -146,6 +157,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           buyerEmail: email,
           receiptRejectedAt: null,
           receiptRejectReason: null,
+          privacyConsentAt: new Date(),
         },
       });
       if (count !== ids.length) throw new TakenError();

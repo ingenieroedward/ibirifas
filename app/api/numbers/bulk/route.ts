@@ -151,6 +151,7 @@ export async function POST(req: NextRequest) {
             buyerEmail: null,
             receiptRejectedAt: null,
             receiptRejectReason: null,
+            privacyConsentAt: null,
           },
         });
         if (count !== ids.length) {
@@ -183,6 +184,7 @@ export async function POST(req: NextRequest) {
             buyerEmail: null,
             receiptRejectedAt: null,
             receiptRejectReason: null,
+            privacyConsentAt: null,
           },
         });
         return;

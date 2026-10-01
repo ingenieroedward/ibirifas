@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import type { PublicLinkAction } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { getVisitStats } from "@/lib/api-client";
+import type { PublicLinkAction, VisitStatsDTO } from "@/lib/types";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Spinner } from "@/components/Spinner";
 
@@ -15,6 +16,10 @@ interface PublicLinkSheetProps {
   reservationsOpen: boolean;
   onClose: () => void;
   onChange: (action: PublicLinkAction) => Promise<void>;
+  /** For the visit counter. */
+  raffleId: string;
+  /** Numbers currently held by online reservations. */
+  onlineCount: number;
 }
 
 export function publicLinkUrl(token: string): string {
@@ -22,12 +27,33 @@ export function publicLinkUrl(token: string): string {
 }
 
 /** The raffle's public, read-only page: for buyers to check what's still available without an account. */
-export function PublicLinkSheet({ raffleName, token, canManage, reservationsOpen, onClose, onChange }: PublicLinkSheetProps) {
+export function PublicLinkSheet({
+  raffleName,
+  token,
+  canManage,
+  reservationsOpen,
+  onClose,
+  onChange,
+  raffleId,
+  onlineCount,
+}: PublicLinkSheetProps) {
   const [busy, setBusy] = useState<PublicLinkAction | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [confirmingRenew, setConfirmingRenew] = useState(false);
 
   const url = token ? publicLinkUrl(token) : null;
+  const [visits, setVisits] = useState<VisitStatsDTO | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getVisitStats(raffleId)
+      .then((v) => {
+        if (!cancelled) setVisits(v);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [raffleId]);
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const run = async (action: PublicLinkAction) => {
@@ -64,6 +90,7 @@ export function PublicLinkSheet({ raffleName, token, canManage, reservationsOpen
 
   return (
     <BottomSheet title="Enlace para compradores" subtitle={raffleName} onClose={busy ? () => {} : onClose}>
+      {visits && (visits.total > 0 || url) && <VisitsCard visits={visits} onlineCount={onlineCount} />}
       {url ? (
         <>
           <div className="space-y-1.5">
@@ -201,5 +228,41 @@ export function PublicLinkSheet({ raffleName, token, canManage, reservationsOpen
         </div>
       )}
     </BottomSheet>
+  );
+}
+
+/** Who is arriving through the link: people today, this week and overall, and the last two weeks. */
+function VisitsCard({ visits, onlineCount }: { visits: VisitStatsDTO; onlineCount: number }) {
+  const max = Math.max(1, ...visits.last14.map((d) => d.visitors));
+  return (
+    <section aria-label="Visitas al enlace" className="space-y-3 rounded-2xl border border-line bg-surface-2 p-4">
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[
+          ["Hoy", visits.today],
+          ["7 días", visits.last7],
+          ["En total", visits.total],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="font-[family-name:var(--font-heading)] text-2xl font-extrabold text-gold-400">{value}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">{label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex h-10 items-end gap-1" aria-hidden="true">
+        {visits.last14.map((d, i) => (
+          <div
+            key={d.day}
+            title={`${d.day}: ${d.visitors}`}
+            className={`flex-1 rounded-t ${i === visits.last14.length - 1 ? "bg-gold-400" : "bg-gold-400/40"}`}
+            style={{ height: `${d.visitors === 0 ? 4 : Math.max(12, (d.visitors / max) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-text-muted">
+        Personas que abrieron el enlace (cada una cuenta una vez al día) · {visits.views}{" "}
+        {visits.views === 1 ? "apertura" : "aperturas"} en total
+        {onlineCount > 0 ? ` · ${onlineCount} ${onlineCount === 1 ? "número reservado" : "números reservados"} en línea` : ""}.
+      </p>
+    </section>
   );
 }

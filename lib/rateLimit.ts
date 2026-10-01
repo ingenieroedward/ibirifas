@@ -69,9 +69,14 @@ export function checkPublicRateLimit(ip: string): boolean {
 
 const reserveHits = new Map<string, number[]>();
 const RESERVE_WINDOW_MS = 60 * 60 * 1000;
-const RESERVE_MAX_HITS = 6;
+const RESERVE_MAX_HITS = 20;
 
-/** Reservations from the public link cost real numbers, so they get a much tighter allowance: 6 an hour per IP. */
+/**
+ * Reservations from the public link cost real numbers, so they get a tighter allowance: 20 an hour per IP.
+ * Not lower: phone carriers put many customers behind one shared IP, and a busy raffle shared in a group
+ * gets several buyers from the same network. Each reservation is also capped (10 numbers, 3 sets) and a
+ * phone can't hold more than 20 unpaid numbers; Turnstile, when on, stops scripted reservations.
+ */
 export function checkReserveRateLimit(ip: string): boolean {
   const now = Date.now();
   const recent = (reserveHits.get(ip) ?? []).filter((ts) => now - ts < RESERVE_WINDOW_MS);

@@ -349,6 +349,13 @@ varias instancias conviene moverlo a Redis). Los tokens de acceso duran 15
 minutos; el cliente (`lib/api-client.ts`) los renueva automáticamente contra
 `/api/auth/refresh` cuando expiran, y cierra sesión si el refresh también falla.
 
+**Cambiar mi código**: cualquiera (también el administrador de la plataforma)
+cambia su propio código en **Mi cuenta** (`/cuenta`, tocando su nombre arriba a
+la derecha). Pide el código actual (los intentos fallidos cuentan para el mismo
+límite por IP del login), rechaza códigos obvios (111111, 123456, 987654…) y los
+que ya usa alguien del mismo equipo, y cierra las sesiones de los demás
+dispositivos dejando abierta la actual.
+
 ### Pruebas de ataque y endurecimiento
 
 `test-security` (suite de ataques contra el servidor real: 56 comprobaciones) y
@@ -422,6 +429,8 @@ de tipo **Docker Compose** en Dokploy.
      solo está Dokploy; `2` con Cloudflare en modo proxy, la nube naranja).
    - Opcional, para los correos a compradores: `SMTP_HOST`, `SMTP_PORT`,
      `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM` (ver "Correos a compradores" abajo).
+   - Opcional, contra reservas automáticas: `TURNSTILE_SITE_KEY` y
+     `TURNSTILE_SECRET_KEY` (ver "Protección de las reservas en línea").
    - Solo las variables listadas en `docker-compose.yml` llegan al contenedor:
      si agregas una nueva en Dokploy, también debe estar ahí.
 3. Configura el dominio de la app en Dokploy apuntando al puerto **interno**
@@ -535,6 +544,41 @@ contacto** (las respuestas de los compradores llegan ahí) y puede enviarse un
 comprador en la hoja del número, y en Participantes aparece "Comprobante
 rechazado" mientras espera uno nuevo.
 
+Los correos usan los **colores de la rifa** (los mismos del enlace público): el
+encabezado con su fondo y su color, el botón y los resaltados en el color de los
+números (ajustado para que se lea), y un fondo suave del mismo tono.
+
+## Protección de las reservas en línea
+
+- **Límite por IP**: 20 reservas por hora (antes 6). No es más bajo porque los
+  operadores móviles ponen a muchos clientes detrás de la misma IP. Además cada
+  reserva tiene tope (10 números, 3 conjuntos) y un teléfono no puede tener más
+  de 20 números sin pagar.
+- **Cloudflare Turnstile** (opcional, recomendado): la verificación "no soy un
+  robot" de Cloudflare, casi siempre invisible. En Cloudflare → *Turnstile* →
+  *Add widget*, con el dominio de la app y modo *Managed*; copia la **Site Key** y
+  la **Secret Key** a `TURNSTILE_SITE_KEY` y `TURNSTILE_SECRET_KEY` en Dokploy y
+  redespliega. Con las dos llaves, reservar exige el token del widget, que el
+  servidor comprueba con Cloudflare (si Cloudflare no responde, la reserva se
+  rechaza: falla cerrado). Sin ellas no cambia nada.
+- **Aviso de privacidad** (Ley 1581 de 2012): cada rifa tiene su aviso en
+  `/p/<token>/privacidad` (enlazado al pie del enlace público), con el
+  organizador como responsable de los datos y su correo de contacto. Para
+  reservar hay que marcar "Acepto el aviso de privacidad"; la fecha de la
+  aceptación se guarda con la reserva (`RaffleNumber.privacyConsentAt`) y se
+  borra junto con los datos del comprador si la reserva se libera.
+
+## Visitas al enlace
+
+El organizador y los vendedores ven en **Enlace para compradores** cuántas
+personas abrieron el enlace hoy, en los últimos 7 días y en total, cuántas veces
+se abrió, una barra de los últimos 14 días y cuántos números hay reservados en
+línea. Se cuenta cada vez que alguien abre la página (no las actualizaciones
+automáticas), sin contar los robots de vista previa (WhatsApp, Facebook,
+Telegram…). Cada visitante es un resumen irreversible de IP + navegador + día
+(`RaffleVisit`): la misma persona cuenta una vez al día y no se puede seguir de un
+día a otro. Las visitas de más de 120 días se borran solas.
+
 ## Actualización en tiempo real
 
 Cuando alguien del equipo vende, cobra o libera un número, los demás lo ven
@@ -589,7 +633,7 @@ exactamente 100 ventas y 100 rechazos, sin duplicados ni errores; 500 personas
 mirando la página + 30 ventas del equipo + 300 compradores a la vez → todo
 atendido, sin errores 5xx; 1000 peticiones simultáneas sobre 1000 números → sin
 errores en ~6 s. Límites a tener en cuenta: una sola instancia de la app (igual
-que el tiempo real) y el límite de 6 reservas por hora por IP, que personas en
+que el tiempo real) y el límite de 20 reservas por hora por IP, que personas en
 la misma red (un evento, el wifi de un local, algunos operadores móviles) comparten.
 
 ## Notas conocidas

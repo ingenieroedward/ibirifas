@@ -142,6 +142,7 @@ model Raffle {
   // A raffle "by stages" (etapas): the same number plays several draws in a row, each with its own prize,
   // paid in one installment (cuota) per stage. Empty = an ordinary raffle with a single draw.
   stages            RaffleStage[]
+  visits            RaffleVisit[]
   // Installments for a stage must be paid this many days before its draw; later ones don't count for it.
   stageDeadlineDays Int        @default(3)
   // What paying every installment up front earns: "none", "discount" (fullPayDiscount pesos off) or "draw"
@@ -274,6 +275,8 @@ model RaffleNumber {
   // The team rejected the receipt the buyer sent (it was removed so they can send another): when and why.
   receiptRejectedAt   DateTime?
   receiptRejectReason String?
+  // When the online buyer accepted the privacy notice (their authorization to process their data).
+  privacyConsentAt    DateTime?
   // Installments paid, for a raffle by stages.
   quotas        NumberQuota[]
 
@@ -287,4 +290,19 @@ model RaffleNumber {
   @@index([groupId])
   @@index([soldById])
   @@index([holdToken])
+}
+
+// Visits to a raffle's public link: one row per visitor per day (Colombia time). The visitor is a
+// one-way hash of IP + browser + day, so nobody can be followed from one day to the next.
+model RaffleVisit {
+  id        String   @id @default(cuid())
+  raffleId  String
+  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  day       String
+  visitor   String
+  views     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([raffleId, day, visitor])
+  @@index([raffleId, day])
 }

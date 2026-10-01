@@ -999,6 +999,8 @@ export default function RaffleDashboardPage() {
           reservationsOpen={raffle.reservationsOpen}
           onClose={() => setPublicLinkOpen(false)}
           onChange={handlePublicLinkChange}
+          raffleId={raffle.id}
+          onlineCount={raffle.numbers.filter((n) => n.online && n.status !== "available").length}
         />
       )}
 
