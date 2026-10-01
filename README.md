@@ -448,6 +448,42 @@ borres el volumen. Para migrar a Postgres/MySQL más adelante: cambia
 `provider` en `prisma/schema.prisma`, ajusta `DATABASE_URL` y regenera las
 migraciones; el resto de la app no cambia.
 
+### Respaldos (Cloudflare R2 desde Dokploy)
+
+**Copia diaria dentro de la app.** Una vez al día la app escribe una copia
+consistente de la base de datos (`VACUUM INTO`) en el mismo volumen:
+`/app/data/backups/ibirifas-AAAA-MM-DD.db`, y guarda las últimas 7
+(`BACKUP_KEEP` para cambiarlo, `BACKUP_SNAPSHOTS=off` para apagarlo). Copiar el
+archivo `prod.db` en vivo desde afuera puede pillarlo a mitad de una escritura;
+estas copias siempre están completas. El respaldo del volumen las sube a R2.
+
+**1. R2 en Cloudflare**
+- R2 → *Create bucket* (ej. `ibirifas-backups`).
+- R2 → *Manage API tokens* → *Create API token* con permiso *Object Read &
+  Write* sobre ese bucket. Guarda el *Access Key ID*, el *Secret Access Key* y el
+  endpoint S3 `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (sin el nombre del
+  bucket al final).
+- Opcional: en el bucket, una regla de ciclo de vida que borre objetos de más de
+  60 días.
+
+**2. Destino general en Dokploy** (Settings → S3 Destinations → Add):
+proveedor Cloudflare, Access Key, Secret Key, bucket, región `auto` y el endpoint
+de arriba. Toca *Test connection* antes de guardar. Si falla con *Access Denied*
+aunque las llaves estén bien, suele ser porque el token solo ve un bucket y la
+prueba intenta listarlos: crea el token con acceso a todos los buckets (o *Admin
+Read & Write*) y vuelve a probar.
+
+**3. Respaldo de esta app** (la app Docker Compose → *Volume Backups* → Create):
+el volumen de datos (`ibirifas_data`; Dokploy puede mostrarlo con el nombre del
+proyecto delante), el destino R2, un prefijo como `ibirifas/`, horario diario (ej.
+`0 8 * * *` = 3 a. m. en Colombia si el servidor está en UTC) y cuántos conservar.
+Ejecútalo una vez a mano y revisa que el archivo aparezca en el bucket.
+
+**Restaurar**: descarga el respaldo de R2 y saca la copia del día que quieras
+(`backups/ibirifas-AAAA-MM-DD.db`). Detén la app en Dokploy, reemplaza
+`/app/data/prod.db` del volumen por esa copia (con el nombre `prod.db`) y vuelve a
+iniciarla; las migraciones pendientes se aplican solas al arrancar.
+
 ### Probarlo en local con Docker
 
 `docker-compose.override.yml` publica el puerto 3000 al host — Compose lo
