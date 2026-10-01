@@ -521,6 +521,12 @@ tablas `Raffle`, `RaffleNumber`, etc. con tus rifas. Otra opción en el servidor
 restaurar a un volumen con **otro nombre** (ej. `ibirifas_restore_test`), revisarlo
 y borrarlo.
 
+### Cambiar de dominio
+
+Ver [docs/CAMBIO-DE-DOMINIO.md](docs/CAMBIO-DE-DOMINIO.md): el orden de los pasos
+(Cloudflare, Dokploy y `APP_URL`, redirección del dominio viejo, Resend, Turnstile,
+notificaciones, UptimeRobot y el lector de pagos).
+
 ### Probarlo en local con Docker
 
 `docker-compose.override.yml` publica el puerto 3000 al host — Compose lo
