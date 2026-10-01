@@ -17,7 +17,7 @@ import {
 import { pageThemeStyle, tileTextColor } from "@/lib/theme";
 import type { PublicRaffleDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
-import { CopyButton } from "@/components/CopyButton";
+import { AccountsList } from "@/components/AccountsList";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { ReserveSheet } from "@/components/ReserveSheet";
 import { myReservations, reservationPath } from "@/lib/myReservations";
@@ -231,15 +231,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
             {raffle.accounts.length > 0 && (
               <div className="space-y-1 border-t border-line px-4 py-3 text-sm text-text-muted">
                 <p className="text-[11px] font-semibold uppercase tracking-wide">Cuentas de pago</p>
-                {raffle.accounts.map((account) => (
-                  <div key={account.id} className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 break-words">
-                      <span className="font-semibold text-text">{account.label}</span> {account.number}
-                      {account.holderName && <span> · {account.holderName}</span>}
-                    </p>
-                    <CopyButton text={account.number} label={`número de ${account.label}`} />
-                  </div>
-                ))}
+                <AccountsList accounts={raffle.accounts} token={token} />
               </div>
             )}
           </div>

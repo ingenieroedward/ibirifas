@@ -7,7 +7,8 @@ import { rememberReservation } from "@/lib/myReservations";
 import { pageThemeStyle } from "@/lib/theme";
 import type { ReservationDTO } from "@/lib/types";
 import { CrownIcon } from "@/components/icons/Crown";
-import { CopyButton } from "@/components/CopyButton";
+import { AccountsList } from "@/components/AccountsList";
+import { PayerNameInput, payerNameError } from "@/components/PayerNameInput";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
 
@@ -176,19 +177,13 @@ function Details({
       {r.state !== "paid" && r.accounts.length > 0 && (
         <div className="space-y-1 rounded-2xl border border-line bg-bg-elevated p-4 text-sm text-text-muted shadow-card">
           <p className="text-[11px] font-semibold uppercase tracking-wide">Paga aquí</p>
-          {r.accounts.map((a) => (
-            <div key={a.id} className="flex items-center justify-between gap-3">
-              <p className="min-w-0 break-words">
-                <span className="font-semibold text-text">{a.label}</span> {a.number}
-                {a.holderName && <span> · {a.holderName}</span>}
-              </p>
-              <CopyButton text={a.number} label={`número de ${a.label}`} />
-            </div>
-          ))}
+          <AccountsList accounts={r.accounts} token={token} />
         </div>
       )}
 
-      {canSend && <SendReceipt token={token} reservationKey={reservationKey} replacing={r.state === "review"} onSent={onChanged} />}
+      {canSend && (
+        <SendReceipt token={token} reservationKey={reservationKey} buyerName={r.buyerName} replacing={r.state === "review"} onSent={onChanged} />
+      )}
 
       <Link href={`/p/${token}`} className="block text-center text-sm font-semibold text-gold-400 underline-offset-2 hover:underline">
         Ver la rifa
@@ -200,11 +195,13 @@ function Details({
 function SendReceipt({
   token,
   reservationKey,
+  buyerName,
   replacing,
   onSent,
 }: {
   token: string;
   reservationKey: string;
+  buyerName: string | null;
   replacing: boolean;
   onSent: () => Promise<void>;
 }) {
@@ -213,16 +210,19 @@ function SendReceipt({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [payerName, setPayerName] = useState(buyerName ?? "");
 
   const send = async () => {
     if (!receipt) return;
+    const payerProblem = payerNameError(payerName);
+    if (payerProblem) return setError(payerProblem);
     setSending(true);
     setError(null);
     try {
       const res = await fetch(`/api/public/raffles/${token}/receipt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: reservationKey, photoDataUrl: receipt }),
+        body: JSON.stringify({ key: reservationKey, photoDataUrl: receipt, payerName: payerName.trim() }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -255,6 +255,7 @@ function SendReceipt({
         onError={setError}
         onBusyChange={setPreparing}
       />
+      {receipt && <PayerNameInput id="reservationPayerName" value={payerName} onChange={setPayerName} />}
       {error && (
         <p role="alert" className="text-sm font-medium text-red-400">
           {error}

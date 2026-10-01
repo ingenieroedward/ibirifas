@@ -824,11 +824,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       const number = /^\d{10}$/.test(account.number)
         ? `${account.number.slice(0, 3)} ${account.number.slice(3, 6)} ${account.number.slice(6)}`
         : account.number;
-      let holder = account.holderName ? `· Responsable: ${account.holderName}` : null;
+      let holder = account.holderName ? `· ${account.kind === "breb" ? "Titular" : "Responsable"}: ${account.holderName}` : null;
+      // A Bre-B llave says so, unless the organizer already named it that way.
+      const accountLabel = account.kind === "breb" && !/bre-?b/i.test(account.label) ? `${account.label} Bre-B` : account.label;
 
       const measure = (scale: number) => {
         ctx.font = `800 ${26 * scale}px ${headingFont}`;
-        const labelWidth = ctx.measureText(account.label).width;
+        const labelWidth = ctx.measureText(accountLabel).width;
         ctx.font = `700 ${26 * scale}px ${bodyFont}`;
         const numberWidth = ctx.measureText(number).width;
         ctx.font = `600 ${20 * scale}px ${bodyFont}`;
@@ -860,7 +862,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       ctx.textAlign = "left";
       ctx.font = `800 ${26 * scale}px ${headingFont}`;
       ctx.fillStyle = theme.numberColor;
-      ctx.fillText(account.label, x, rowCy + 9 * scale);
+      ctx.fillText(accountLabel, x, rowCy + 9 * scale);
       x += m.labelWidth + m.gap;
 
       ctx.font = `700 ${26 * scale}px ${bodyFont}`;

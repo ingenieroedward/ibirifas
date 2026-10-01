@@ -110,6 +110,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
         receiptRejectedAt: null,
         receiptRejectReason: null,
         privacyConsentAt: null,
+        payerName: null,
         updatedById: null,
       },
     });
@@ -222,6 +223,7 @@ async function sweepStageDeadline(raffleId: string, now: Date): Promise<number> 
           receiptRejectedAt: null,
           receiptRejectReason: null,
           privacyConsentAt: null,
+          payerName: null,
           updatedById: null,
         },
       }),

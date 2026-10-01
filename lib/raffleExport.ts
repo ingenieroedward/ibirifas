@@ -6,6 +6,7 @@ import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { salesBySeller } from "@/lib/sales";
 import { toStageDTO } from "@/lib/stageDto";
+import { accountLine, accountSelect, toAccountDTO } from "@/lib/accounts";
 import { amountRemaining, collectedOn, installmentCount, stageSettingsOf } from "@/lib/stages";
 import type { RaffleNumberDTO } from "@/lib/types";
 
@@ -57,7 +58,7 @@ export async function buildRaffleWorkbook(raffleId: string): Promise<{ buffer: B
       numbers: { include: numberInclude, orderBy: { value: "asc" } },
       groups: { orderBy: { position: "asc" } },
       stages: { orderBy: { position: "asc" } },
-      accounts: { orderBy: { position: "asc" } },
+      accounts: { orderBy: { position: "asc" }, select: accountSelect },
     },
   });
   if (!raffle) return null;
@@ -111,7 +112,7 @@ export async function buildRaffleWorkbook(raffleId: string): Promise<{ buffer: B
     ["Disponibles", numbers.length - sold.length],
     ["Recaudado", collected, MONEY],
     ["Por cobrar", pending, MONEY],
-    ["Cuentas de pago", raffle.accounts.map((a) => `${a.label}: ${a.number}`).join(" · ")],
+    ["Cuentas de pago", raffle.accounts.map((a) => accountLine(toAccountDTO(a))).join(" · ")],
     ["Exportado el", bogota(new Date()), DATE],
   ];
   const ws = wb.addWorksheet("Resumen");
@@ -143,6 +144,7 @@ export async function buildRaffleWorkbook(raffleId: string): Promise<{ buffer: B
       { header: "Pagado", key: "paid", width: 13, style: { numFmt: MONEY } },
       { header: "Debe", key: "owed", width: 13, style: { numFmt: MONEY } },
       { header: "Comprobante", key: "receipt", width: 13 },
+      { header: "Titular que pagó", key: "payer", width: 24 },
       { header: "Notas", key: "notes", width: 24 },
     ],
     numbers.map((n) => ({
@@ -161,6 +163,7 @@ export async function buildRaffleWorkbook(raffleId: string): Promise<{ buffer: B
       paid: paidOn(n),
       owed: owedOn(n),
       receipt: receipt(n),
+      payer: n.payerName ?? "",
       notes: n.notes ?? "",
     })),
   );

@@ -228,6 +228,11 @@ model RaffleAccount {
   label      String   // e.g. "Nequi", "Bancolombia", "Daviplata"
   number     String   // free text — phone numbers, account numbers, etc. vary in format
   holderName String?  // "responsable" — optional, shown only when set
+  // "bank": a regular account; "breb": a Bre-B llave (the key goes in `number`, its type in `keyType`).
+  kind       String   @default("bank")
+  keyType    String?  // breb only: "phone" | "email" | "document" | "alias" | "other"
+  qrDataUrl  String?  // optional QR image the bank gives for the llave (PNG/JPEG data URL)
+  hasQr      Boolean  @default(false) // so lists don't have to load the image to know there is one
   position   Int      @default(0) // preserves the order the organizer entered them in
   createdAt  DateTime @default(now())
 
@@ -277,6 +282,9 @@ model RaffleNumber {
   receiptRejectReason String?
   // When the online buyer accepted the privacy notice (their authorization to process their data).
   privacyConsentAt    DateTime?
+  // Who owns the account the payment came from, as the buyer typed it with the receipt: what the bank's
+  // notice shows, so a payment can be matched to its reservation.
+  payerName           String?
   // Installments paid, for a raffle by stages.
   quotas        NumberQuota[]
 

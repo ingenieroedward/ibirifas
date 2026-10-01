@@ -329,6 +329,12 @@ function SheetContent({
               </button>
             )}
 
+            {!isAvailable && number.payerName && (
+              <p className="text-sm text-text-muted">
+                Titular que pagó: <span className="font-semibold text-text">{!isAvailable && number.payerName}</span>
+              </p>
+            )}
+
             {number.status === "occupied" && onRejectReceipt && (
               <ReceiptReview
                 hasReceipt={Boolean(number.photoDataUrl)}

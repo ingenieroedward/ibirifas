@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { accountLine, accountQrPath, accountSelect, toAccountDTO } from "@/lib/accounts";
 import { ensureContrast, luminance, mix } from "@/lib/color";
 import { resolvedTheme, type RaffleTheme } from "@/lib/theme";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -77,6 +78,8 @@ interface Composed {
   paragraphs: string[];
   /** Account lines to show under the text. */
   accounts?: string[];
+  /** QR images (Bre-B) shown under the accounts. */
+  qrImages?: { label: string; url: string }[];
   button?: { label: string; url: string };
 }
 
@@ -119,6 +122,11 @@ ${
   c.accounts?.length
     ? `<div style="margin:6px 0 16px;padding:12px 14px;background:${colors.box};border-radius:12px;font-size:14px;color:#1f1d26"><div style="font-weight:bold;margin-bottom:6px">Puedes pagar en:</div>${c.accounts
         .map((a) => `<div>${escapeHtml(a)}</div>`)
+        .join("")}${(c.qrImages ?? [])
+        .map(
+          (q) =>
+            `<div style="margin-top:10px;text-align:center"><img src="${escapeHtml(q.url)}" alt="QR ${escapeHtml(q.label)}" width="180" style="width:180px;max-width:100%;border-radius:8px;background:#fff"><div style="font-size:12px;color:#5a556d">Escanea para pagar con Bre-B</div></div>`,
+        )
         .join("")}</div>`
     : ""
 }
@@ -149,7 +157,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
         stageDeadlineDays: true,
         fullPayPerk: true,
         fullPayDiscount: true,
-        accounts: { orderBy: { position: "asc" } },
+        accounts: { orderBy: { position: "asc" }, select: accountSelect },
         groups: { select: { id: true, label: true, price: true } },
         stages: true,
         themeBackground: true,
@@ -178,7 +186,12 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
       fullPayPerk: raffle.fullPayPerk === "discount" || raffle.fullPayPerk === "draw" ? raffle.fullPayPerk : "none",
       fullPayDiscount: raffle.fullPayDiscount,
     });
-    const accounts = raffle.accounts.map((a) => `${a.label}: ${a.number}${a.holderName ? ` (${a.holderName})` : ""}`);
+    const accounts = raffle.accounts.map((a) => accountLine(toAccountDTO(a)));
+    // QR images of Bre-B llaves, as links the email client loads from the app (only with a public link).
+    const qrImages =
+      origin && raffle.publicToken
+        ? raffle.accounts.filter((a) => a.hasQr).map((a) => ({ label: a.label, url: `${origin}${accountQrPath(a.id, raffle.publicToken)}` }))
+        : [];
 
     const byEmail = new Map<string, BuyerRow[]>();
     for (const r of withEmail) {
@@ -220,6 +233,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
               link ? "Cuando pagues, sube la foto del comprobante desde tu reserva:" : "Cuando pagues, envía el comprobante a quien te compartió la rifa.",
             ],
             accounts,
+            qrImages,
             button: link ? { label: "Subir comprobante", url: link } : undefined,
           };
           break;
@@ -264,6 +278,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
               owed > 0 ? `Te queda por pagar: **${formatCurrency(owed)}**.` : "",
             ].filter(Boolean),
             accounts: owed > 0 ? accounts : undefined,
+            qrImages: owed > 0 ? qrImages : undefined,
             button,
           };
           break;
@@ -279,6 +294,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
               link ? "Puedes subir un comprobante nuevo desde tu reserva:" : "Envía un comprobante nuevo a quien te compartió la rifa.",
             ].filter(Boolean),
             accounts,
+            qrImages,
             button: link ? { label: "Subir otro comprobante", url: link } : undefined,
           };
           break;

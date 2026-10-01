@@ -22,6 +22,8 @@ const receiptSchema = z
     phone: z.string().trim().max(30).optional(),
     // No SVG (it can carry scripts): only the formats a phone camera or screenshot produces.
     photoDataUrl: z.string().regex(RECEIPT_IMAGE_RE),
+    // Who owns the account the payment came from (what the bank's notice shows), to match the payment.
+    payerName: z.string().trim().max(80).optional(),
   })
   .refine((v) => (v.key === undefined) !== (v.phone === undefined));
 
@@ -89,7 +91,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   // A new receipt replaces a rejected one: it is back to "waiting for review".
   await prisma.raffleNumber.updateMany({
     where: { id: { in: mine.map((n) => n.id) } },
-    data: { photoDataUrl: parsed.data.photoDataUrl, receiptRejectedAt: null, receiptRejectReason: null },
+    data: {
+      photoDataUrl: parsed.data.photoDataUrl,
+      receiptRejectedAt: null,
+      receiptRejectReason: null,
+      ...(parsed.data.payerName ? { payerName: parsed.data.payerName } : {}),
+    },
   });
   const rows = await prisma.raffleNumber.findMany({ where: { id: { in: mine.map((n) => n.id) } }, select: buyerRowSelect });
   void emailBuyers(raffle.id, rows, { kind: "receipt" }, await mailOrigin());

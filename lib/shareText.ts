@@ -1,4 +1,5 @@
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
+import { accountLine } from "@/lib/accountText";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { installmentPrices, lastPayDay, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { numbersOfGroup } from "@/lib/groups";
@@ -117,7 +118,7 @@ export function buildAvailabilityText(raffle: RaffleDTO, link?: string | null): 
   if (raffle.accounts.length > 0) {
     lines.push("");
     lines.push("*Cuentas de pago*");
-    for (const a of raffle.accounts) lines.push(`${a.label}: ${a.number}${a.holderName ? ` (${a.holderName})` : ""}`);
+    for (const a of raffle.accounts) lines.push(accountLine(a));
   }
   if (link) {
     lines.push("");

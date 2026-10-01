@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { toStageDTO } from "@/lib/stageDto";
+import { accountSelect, toAccountDTO } from "@/lib/accounts";
 import { amountRemaining, installmentCount, standingOf, stageSettingsOf } from "@/lib/stages";
 import type { ReservationDTO } from "@/lib/types";
 
@@ -28,7 +29,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
       stageDeadlineDays: true,
       fullPayPerk: true,
       fullPayDiscount: true,
-      accounts: { orderBy: { position: "asc" }, select: { id: true, label: true, number: true, holderName: true } },
+      accounts: { orderBy: { position: "asc" }, select: accountSelect },
       groups: { select: { id: true, label: true, price: true } },
       stages: { orderBy: { position: "asc" } },
     },
@@ -100,7 +101,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
     state,
     rejectReason: rejected?.receiptRejectReason ?? null,
     deadline,
-    accounts: raffle.accounts,
+    accounts: raffle.accounts.map(toAccountDTO),
     stages,
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,

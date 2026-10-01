@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { mailEnabled } from "@/lib/mail";
+import { accountSelect, toAccountDTO } from "@/lib/accounts";
 import { turnstileSiteKey } from "@/lib/turnstile";
 import { MAX_LOOSE_PER_RESERVATION, MAX_SETS_PER_RESERVATION, reservationsOpen } from "@/lib/reservations";
 import type { DrawTrigger, FullPayPerk, PublicRaffleDTO } from "@/lib/types";
@@ -40,7 +41,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       themeBackground: true,
       themeNumberColor: true,
       themeTextColor: true,
-      accounts: { orderBy: { position: "asc" }, select: { id: true, label: true, number: true, holderName: true } },
+      accounts: { orderBy: { position: "asc" }, select: accountSelect },
       groups: { orderBy: { position: "asc" }, select: { id: true, label: true, price: true } },
       stages: {
         orderBy: { position: "asc" },
@@ -76,7 +77,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,
     themeTextColor: raffle.themeTextColor,
-    accounts: raffle.accounts,
+    accounts: raffle.accounts.map(toAccountDTO),
     groups: raffle.groups.map((g) => ({
       label: g.label,
       price: g.price,

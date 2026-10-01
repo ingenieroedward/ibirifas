@@ -10,11 +10,13 @@ export interface ResizeOptions {
   maxSize?: number;
   /** JPEG quality, 0–1. */
   quality?: number;
+  /** Output format: JPEG for photos, PNG for things that must stay sharp (a QR code). */
+  type?: "image/jpeg" | "image/png";
 }
 
 export async function fileToCompressedDataUrl(
   file: File,
-  { maxSize = 1000, quality = 0.72 }: ResizeOptions = {},
+  { maxSize = 1000, quality = 0.72, type = "image/jpeg" }: ResizeOptions = {},
 ): Promise<string> {
   const bitmap = await loadImage(file);
   try {
@@ -30,9 +32,14 @@ export async function fileToCompressedDataUrl(
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo procesar la imagen");
 
+    if (type === "image/jpeg") {
+      // JPEG has no transparency: a transparent PNG would otherwise turn black.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+    }
     ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
 
-    return canvas.toDataURL("image/jpeg", quality);
+    return type === "image/png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", quality);
   } finally {
     if ("close" in bitmap) bitmap.close();
   }

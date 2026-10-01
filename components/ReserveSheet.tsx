@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CopyButton } from "@/components/CopyButton";
+import { AccountsList } from "@/components/AccountsList";
+import { PayerNameInput, payerNameError } from "@/components/PayerNameInput";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
@@ -57,6 +58,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [receiptSent, setReceiptSent] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [payerName, setPayerName] = useState(contact.name);
 
   const holdDays = raffle.reservations.holdDays ?? 0;
   const items = [
@@ -98,6 +100,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         // Not remembering is fine.
       }
       setResult(body as ReserveResultDTO);
+      setPayerName(name.trim());
     } catch {
       setError("No se pudo reservar. Revisa tu conexión e inténtalo de nuevo.");
     } finally {
@@ -107,13 +110,15 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
 
   const sendReceipt = async () => {
     if (!receipt || !result) return;
+    const payerProblem = payerNameError(payerName);
+    if (payerProblem) return setReceiptError(payerProblem);
     setSendingReceipt(true);
     setReceiptError(null);
     try {
       const res = await fetch(`/api/public/raffles/${token}/receipt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: result.receiptKey, photoDataUrl: receipt }),
+        body: JSON.stringify({ key: result.receiptKey, photoDataUrl: receipt, payerName: payerName.trim() }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -149,15 +154,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         {raffle.accounts.length > 0 && (
           <div className="space-y-1 rounded-2xl border border-line bg-surface-2 p-4 text-sm text-text-muted">
             <p className="text-[11px] font-semibold uppercase tracking-wide">Paga aquí</p>
-            {raffle.accounts.map((account) => (
-              <div key={account.id} className="flex items-center justify-between gap-3">
-                <p className="min-w-0 break-words">
-                  <span className="font-semibold text-text">{account.label}</span> {account.number}
-                  {account.holderName && <span> · {account.holderName}</span>}
-                </p>
-                <CopyButton text={account.number} label={`número de ${account.label}`} />
-              </div>
-            ))}
+            <AccountsList accounts={raffle.accounts} token={token} />
           </div>
         )}
         <div className="space-y-2 rounded-2xl border border-line bg-surface-2 p-4">
@@ -181,6 +178,7 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
                   Se comprime antes de enviarse ({Math.max(1, Math.round((receipt.length * 0.75) / 1024))} KB).
                 </p>
               )}
+              {receipt && <PayerNameInput id="reservePayerName" value={payerName} onChange={setPayerName} />}
               {receiptError && (
                 <p role="alert" className="text-sm font-medium text-red-400">
                   {receiptError}
