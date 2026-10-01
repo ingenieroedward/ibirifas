@@ -339,6 +339,10 @@ export async function getVisitStats(raffleId: string): Promise<VisitStatsDTO> {
 }
 
 /** Changes the signed-in person's own 6-digit code (asks for the current one). */
+export async function changeMyName(name: string): Promise<MeDTO> {
+  return request<MeDTO>("/api/auth/me", { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
 export async function changeMyCode(currentCode: string, newCode: string): Promise<void> {
   await request<{ ok: true }>("/api/auth/change-code", { method: "POST", body: JSON.stringify({ currentCode, newCode }) });
 }
