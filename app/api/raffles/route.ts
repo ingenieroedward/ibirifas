@@ -5,6 +5,7 @@ import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { MAX_GROUPS } from "@/lib/groups";
 import { settingToDb } from "@/lib/reservations";
 import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
+import { accountInputSchema, accountRows } from "@/lib/accounts";
 import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 
@@ -18,11 +19,6 @@ const hexColorSchema = z
 
 const MAX_ACCOUNTS = 5;
 
-const accountSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  number: z.string().trim().min(1).max(60),
-  holderName: z.string().trim().max(80).nullable().optional(),
-});
 
 const groupSchema = z.object({
   label: z.string().regex(/^[A-Z]$/, "Etiqueta inválida"),
@@ -41,7 +37,7 @@ const createRaffleSchema = z.object({
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
-  accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
+  accounts: z.array(accountInputSchema).max(MAX_ACCOUNTS).optional(),
   groups: z.array(groupSchema).max(MAX_GROUPS).optional(),
   holdDays: z.number().int().min(1).max(365).nullable().optional(),
   autoRelease: z.boolean().optional(),
@@ -296,13 +292,7 @@ export async function POST(req: NextRequest) {
 
     if (input.accounts && input.accounts.length > 0) {
       await tx.raffleAccount.createMany({
-        data: input.accounts.map((account, position) => ({
-          raffleId: created.id,
-          label: account.label,
-          number: account.number,
-          holderName: account.holderName || null,
-          position,
-        })),
+        data: accountRows(created.id, input.accounts),
       });
     }
 

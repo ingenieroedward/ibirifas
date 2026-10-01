@@ -4,15 +4,17 @@ import { useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
+import { PayerNameInput, payerNameError } from "@/components/PayerNameInput";
 
 /** Same key the reservation form uses, so the phone typed there comes back here. */
 const CONTACT_KEY = "ibirifas_reserve_contact";
 
-function readPhone(): string {
+function readContact(): { phone: string; name: string } {
   try {
-    return (JSON.parse(window.localStorage.getItem(CONTACT_KEY) ?? "{}") as { phone?: string }).phone ?? "";
+    const saved = JSON.parse(window.localStorage.getItem(CONTACT_KEY) ?? "{}") as { phone?: string; name?: string };
+    return { phone: saved.phone ?? "", name: saved.name ?? "" };
   } catch {
-    return "";
+    return { phone: "", name: "" };
   }
 }
 
@@ -22,7 +24,9 @@ function readPhone(): string {
  * compressed by PhotoPicker before it leaves the phone.
  */
 export function ReceiptSheet({ token, onClose }: { token: string; onClose: () => void }) {
-  const [phone, setPhone] = useState(readPhone);
+  const [contact] = useState(readContact);
+  const [phone, setPhone] = useState(contact.phone);
+  const [payerName, setPayerName] = useState(contact.name);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
@@ -32,13 +36,15 @@ export function ReceiptSheet({ token, onClose }: { token: string; onClose: () =>
   const send = async () => {
     if (phone.replace(/\D/g, "").length < 7) return setError("Escribe el teléfono con el que reservaste.");
     if (!receipt) return setError("Elige la foto o captura de tu pago.");
+    const payerProblem = payerNameError(payerName);
+    if (payerProblem) return setError(payerProblem);
     setSending(true);
     setError(null);
     try {
       const res = await fetch(`/api/public/raffles/${token}/receipt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), photoDataUrl: receipt }),
+        body: JSON.stringify({ phone: phone.trim(), photoDataUrl: receipt, payerName: payerName.trim() }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -100,6 +106,8 @@ export function ReceiptSheet({ token, onClose }: { token: string; onClose: () =>
               Se comprime antes de enviarse ({Math.max(1, Math.round((receipt.length * 0.75) / 1024))} KB).
             </p>
           )}
+
+          <PayerNameInput id="receiptPayerName" value={payerName} onChange={setPayerName} />
 
           {error && (
             <p role="alert" className="text-sm font-medium text-red-400">

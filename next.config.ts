@@ -41,8 +41,9 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Everything the API returns is private to whoever asked (the live stream sets its own cache headers).
-        source: "/api/((?!raffles/[^/]+/events$).*)",
+        // Everything the API returns is private to whoever asked (the live stream and account QR images set
+        // their own cache headers).
+        source: "/api/((?!raffles/[^/]+/events$|accounts/[^/]+/qr$).*)",
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {

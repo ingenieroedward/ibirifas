@@ -253,6 +253,12 @@ export function GroupSheet({ group, members, knownBuyers, canRelease = true, onC
             </button>
           )}
 
+          {first?.payerName && (
+            <p className="text-sm text-text-muted">
+              Titular que pagó: <span className="font-semibold text-text">{first.payerName}</span>
+            </p>
+          )}
+
           {status === "occupied" && first && onRejectReceipt && (
             <ReceiptReview
               hasReceipt={Boolean(savedPhoto)}

@@ -73,6 +73,8 @@ producción. El superadmin entra **sin** código de organización.
 - `RaffleAccount`: una o varias cuentas de pago publicadas en la rifa
   (label + número + "responsable" opcional), visibles en el dashboard y en
   la imagen para compartir — para que el comprador sepa dónde consignar.
+  Cada una es una **cuenta** normal o una **llave Bre-B** (`kind = "breb"`,
+  tipo de llave y QR opcional; ver "Pagos por Bre-B").
 - **Enlace para compradores** (`/p/<token>`): página pública y de solo lectura
   para que un comprador vea, sin cuenta, qué números o letras siguen
   disponibles. Viene **apagada**: el organizador la activa desde "Crear enlace
@@ -311,7 +313,7 @@ Excel** (y desde "Eliminar rifa", para guardarla antes de borrarla). Hojas:
 - **Resumen**: datos de la rifa, vendidos, pagados, disponibles, recaudado y por cobrar.
 - **Números**: una fila por número con estado, comprador, teléfono, correo,
   origen (equipo / en línea), quién lo vendió y cuándo, método de pago, valor,
-  pagado, debe, comprobante y notas (y cuotas "1/3" en una rifa por etapas).
+  pagado, debe, comprobante, titular que pagó y notas (y cuotas "1/3" en una rifa por etapas).
 - **Compradores**: cada comprador una vez (mismo nombre escrito distinto se une),
   con sus números, total, pagado y debe.
 - **Conjuntos** (si vende por letras), **Vendedores** (lo mismo que el reporte de
@@ -323,6 +325,33 @@ en hora de Colombia, la primera fila fija y con filtros. El precio de un conjunt
 se reparte entre sus números en pesos enteros que suman exacto. Lo que escriben
 los compradores se guarda como texto, nunca como fórmula. Solo el organizador
 puede exportar: el archivo tiene los datos personales de todos los compradores.
+
+## Pagos por Bre-B
+
+En el formulario de la rifa cada cuenta de pago puede ser **Cuenta** (Nequi,
+Bancolombia…) o **Llave Bre-B**: tipo de llave (celular, correo, documento,
+alfanumérica u otra), la llave, el titular como aparece en el banco y, si se
+quiere, la **imagen del QR** que da el banco para recibir. El QR se reduce en el
+celular a 700 px (PNG, nítido para escanear) antes de subirse.
+
+- El QR **no viaja** con la rifa (pesaría cada actualización de la página): se
+  sirve aparte en `/api/accounts/<id>/qr`. Los compradores lo ven con el enlace
+  público (`?t=<token>`, con límite de peticiones y caché de un día); el equipo,
+  con su sesión. Sin uno de los dos, o de otra organización, responde 404.
+- En la página pública, la reserva y "Mi reserva" la llave se ve con su tipo,
+  botón **Copiar** y **Ver QR para pagar**. Los correos a compradores incluyen
+  la imagen del QR; WhatsApp, el texto para compartir, la imagen y el Excel
+  dicen "Bre-B (llave celular): …".
+- Al editar la rifa el QR se conserva solo (las cuentas se reemplazan enteras,
+  pero cada una indica de qué cuenta anterior toma su QR), se cambia o se quita.
+
+**Titular que pagó.** Al subir el comprobante (en la reserva, en "Ya reservé" y
+en "Mi reserva") el comprador escribe el **titular de la cuenta desde la que
+pagó** (viene lleno con su nombre). Se guarda en el número (`payerName`), lo ve
+el equipo en la hoja del número o conjunto ("Titular que pagó") y sale en el
+Excel; se borra al liberar el número. Con el valor, es lo que permite cruzar la
+transferencia con el aviso del banco (el lector automático de pagos irá en un
+servicio aparte, no dentro de la app).
 
 ## Organizaciones y acceso
 

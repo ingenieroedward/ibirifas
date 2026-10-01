@@ -1,4 +1,5 @@
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { accountLine } from "@/lib/accountText";
 import type { RaffleAccountDTO } from "@/lib/types";
 
 /**
@@ -81,7 +82,7 @@ export function buildReminderMessage(c: ReminderContext): string {
   if (c.accounts.length > 0) {
     lines.push("", "Puedes pagar por:");
     for (const account of c.accounts) {
-      lines.push(`• ${account.label}: ${account.number}${account.holderName ? ` (${account.holderName})` : ""}`);
+      lines.push(`• ${accountLine(account)}`);
     }
     lines.push("", "Cuando pagues, envíame el comprobante por aquí.");
   }

@@ -30,6 +30,7 @@ export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
     buyerEmail: n.buyerEmail,
     receiptRejectedAt: n.receiptRejectedAt ? n.receiptRejectedAt.toISOString() : null,
     receiptRejectReason: n.receiptRejectReason,
+    payerName: n.payerName,
     quotas: n.quotas.map((q) => ({
       quota: q.quota,
       amount: q.amount,

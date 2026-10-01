@@ -7,8 +7,12 @@ import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { contrastRatio, lighten, luminance } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME, tileTextColor } from "@/lib/theme";
+import { fileToCompressedDataUrl } from "@/lib/image";
+import { accountQrPath } from "@/lib/accountText";
 import type {
+  BrebKeyType,
   DrawTrigger,
+  RaffleAccountDTO,
   RaffleAccountInput,
   RaffleDTO,
   RaffleGroupInput,
@@ -27,9 +31,13 @@ const MAX_ACCOUNTS = 5;
 /** A payment-account row being edited in the form, before submit. */
 interface AccountRow {
   key: string;
+  kind: "bank" | "breb";
   label: string;
   number: string;
   holderName: string;
+  keyType: BrebKeyType;
+  /** The Bre-B QR: none, the one the account already has (kept on save), or a newly picked image. */
+  qr: { state: "none" } | { state: "existing"; id: string } | { state: "new"; dataUrl: string };
 }
 
 let nextRowKey = 0;
@@ -37,10 +45,39 @@ function newAccountRow(source?: Partial<AccountRow>): AccountRow {
   nextRowKey += 1;
   return {
     key: `row-${nextRowKey}`,
+    kind: source?.kind ?? "bank",
     label: source?.label ?? "",
     number: source?.number ?? "",
     holderName: source?.holderName ?? "",
+    keyType: source?.keyType ?? "phone",
+    qr: source?.qr ?? { state: "none" },
   };
+}
+
+function accountRowFrom(a: RaffleAccountDTO): AccountRow {
+  return newAccountRow({
+    kind: a.kind,
+    label: a.label,
+    number: a.number,
+    holderName: a.holderName ?? "",
+    keyType: a.keyType ?? "phone",
+    qr: a.hasQr ? { state: "existing", id: a.id } : { state: "none" },
+  });
+}
+
+const KEY_TYPE_OPTIONS: { value: BrebKeyType; label: string; placeholder: string; inputMode: "tel" | "email" | "numeric" | "text" }[] = [
+  { value: "phone", label: "Celular", placeholder: "Ej. 3001234567", inputMode: "tel" },
+  { value: "email", label: "Correo", placeholder: "Ej. pagos@correo.com", inputMode: "email" },
+  { value: "document", label: "Documento", placeholder: "Ej. 1012345678", inputMode: "numeric" },
+  { value: "alias", label: "Alfanumérica (@)", placeholder: "Ej. @mirifa", inputMode: "text" },
+  { value: "other", label: "Otra", placeholder: "La llave", inputMode: "text" },
+];
+
+/** QR images are kept sharp (PNG) and small; a photo-heavy screenshot falls back to a high-quality JPEG. */
+async function qrFileToDataUrl(file: File): Promise<string> {
+  const png = await fileToCompressedDataUrl(file, { maxSize: 700, type: "image/png" });
+  if (png.length <= 450 * 1024) return png;
+  return fileToCompressedDataUrl(file, { maxSize: 700, quality: 0.9 });
 }
 
 const DEFAULT_SET_SIZE = 10;
@@ -154,7 +191,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
 
   const [accounts, setAccounts] = useState<AccountRow[]>(() =>
     raffle?.accounts && raffle.accounts.length > 0
-      ? raffle.accounts.map((a) => newAccountRow({ label: a.label, number: a.number, holderName: a.holderName ?? "" }))
+      ? raffle.accounts.map(accountRowFrom)
       : [],
   );
 
@@ -344,7 +381,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
     const nonEmptyAccounts = accounts.filter((a) => a.label.trim() || a.number.trim());
     const incomplete = nonEmptyAccounts.some((a) => !a.label.trim() || !a.number.trim());
     if (incomplete) {
-      setError("Cada cuenta de pago necesita un nombre (ej. Nequi) y un número.");
+      setError("Cada cuenta de pago necesita un nombre (ej. Nequi o Bre-B) y un número o llave.");
       return;
     }
     const holdValue = Number(holdDays);
@@ -361,6 +398,13 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       label: a.label.trim(),
       number: a.number.trim(),
       holderName: a.holderName.trim() || null,
+      kind: a.kind,
+      ...(a.kind === "breb"
+        ? {
+            keyType: a.keyType,
+            ...(a.qr.state === "existing" ? { qrFrom: a.qr.id } : { qrDataUrl: a.qr.state === "new" ? a.qr.dataUrl : null }),
+          }
+        : { keyType: null, qrDataUrl: null }),
     }));
 
     setSubmitting(true);
@@ -809,8 +853,8 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         <div>
           <p className="text-sm font-semibold text-text">Cuentas de pago (opcional)</p>
           <p className="mt-0.5 text-xs text-text-muted">
-            Agrega dónde pueden pagarte tus compradores (Nequi, Bancolombia, etc.). El responsable
-            es opcional y solo se muestra si lo llenas.
+            Agrega dónde pueden pagarte tus compradores: una cuenta (Nequi, Bancolombia, etc.) o una
+            llave Bre-B con su QR. El responsable es opcional y solo se muestra si lo llenas.
           </p>
         </div>
 
@@ -836,47 +880,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={row.label}
-                    onChange={(e) =>
-                      setAccounts((rows) =>
-                        rows.map((r) => (r.key === row.key ? { ...r, label: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="Ej. Nequi"
-                    disabled={submitting}
-                    aria-label="Nombre de la cuenta"
-                    className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
-                  />
-                  <input
-                    type="text"
-                    value={row.number}
-                    onChange={(e) =>
-                      setAccounts((rows) =>
-                        rows.map((r) => (r.key === row.key ? { ...r, number: e.target.value } : r)),
-                      )
-                    }
-                    placeholder="Ej. 300 123 4567"
-                    disabled={submitting}
-                    aria-label="Número de la cuenta"
-                    className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
-                  />
-                </div>
-
-                <input
-                  type="text"
-                  value={row.holderName}
-                  onChange={(e) =>
-                    setAccounts((rows) =>
-                      rows.map((r) => (r.key === row.key ? { ...r, holderName: e.target.value } : r)),
-                    )
-                  }
-                  placeholder="Responsable (opcional)"
+                <AccountFields
+                  row={row}
                   disabled={submitting}
-                  aria-label="Responsable de la cuenta"
-                  className="h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+                  onChange={(patch) => setAccounts((rows) => rows.map((r) => (r.key === row.key ? { ...r, ...patch } : r)))}
+                  onError={setError}
                 />
               </div>
             ))}
@@ -1103,6 +1111,190 @@ function Field({
       {children}
       {hint && <p className="text-xs text-text-muted">{hint}</p>}
     </div>
+  );
+}
+
+const ACCOUNT_INPUT =
+  "h-11 w-full rounded-xl border border-line bg-bg-elevated px-3 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60";
+
+/** The fields of one payment account: a regular account, or a Bre-B llave with its type and QR. */
+function AccountFields({
+  row,
+  disabled,
+  onChange,
+  onError,
+}: {
+  row: AccountRow;
+  disabled: boolean;
+  onChange: (patch: Partial<AccountRow>) => void;
+  onError: (message: string) => void;
+}) {
+  const [preparingQr, setPreparingQr] = useState(false);
+  const breb = row.kind === "breb";
+  const keyOption = KEY_TYPE_OPTIONS.find((o) => o.value === row.keyType) ?? KEY_TYPE_OPTIONS[0]!;
+
+  const pickQr = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return onError("El QR debe ser una imagen (foto o captura).");
+    setPreparingQr(true);
+    try {
+      onChange({ qr: { state: "new", dataUrl: await qrFileToDataUrl(file) } });
+    } catch {
+      onError("No se pudo leer la imagen del QR. Prueba con otra captura.");
+    } finally {
+      setPreparingQr(false);
+    }
+  };
+
+  const qrSrc = row.qr.state === "new" ? row.qr.dataUrl : row.qr.state === "existing" ? accountQrPath(row.qr.id) : null;
+
+  return (
+    <>
+      <div role="radiogroup" aria-label="Tipo de cuenta" className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-bg-elevated p-1">
+        {(["bank", "breb"] as const).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            role="radio"
+            aria-checked={row.kind === kind}
+            disabled={disabled}
+            onClick={() =>
+              onChange(
+                kind === "breb" && !row.label.trim()
+                  ? { kind, label: "Bre-B" }
+                  : kind === "bank" && row.label.trim() === "Bre-B"
+                    ? { kind, label: "" }
+                    : { kind },
+              )
+            }
+            className={`h-9 rounded-lg text-sm font-semibold transition disabled:opacity-60 ${
+              row.kind === kind ? "bg-gold-400 text-on-accent" : "text-text-muted"
+            }`}
+          >
+            {kind === "bank" ? "Cuenta" : "Llave Bre-B"}
+          </button>
+        ))}
+      </div>
+
+      {breb ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={row.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              placeholder="Ej. Bre-B Nequi"
+              disabled={disabled}
+              aria-label="Nombre de la cuenta"
+              className={ACCOUNT_INPUT}
+            />
+            <select
+              value={row.keyType}
+              onChange={(e) => onChange({ keyType: e.target.value as BrebKeyType })}
+              disabled={disabled}
+              aria-label="Tipo de llave"
+              className={ACCOUNT_INPUT}
+            >
+              {KEY_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <input
+            type="text"
+            inputMode={keyOption.inputMode}
+            value={row.number}
+            onChange={(e) => onChange({ number: e.target.value })}
+            placeholder={keyOption.placeholder}
+            disabled={disabled}
+            aria-label="Llave Bre-B"
+            className={ACCOUNT_INPUT}
+          />
+          <input
+            type="text"
+            value={row.holderName}
+            onChange={(e) => onChange({ holderName: e.target.value })}
+            placeholder="Titular, como aparece en el banco"
+            disabled={disabled}
+            aria-label="Titular de la llave"
+            className={ACCOUNT_INPUT}
+          />
+          <div className="flex items-center gap-3">
+            {qrSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a data URL or our own API route
+              <img src={qrSrc} alt="QR de la llave" className="h-20 w-20 shrink-0 rounded-lg bg-white object-contain p-1" />
+            ) : null}
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label
+                className={`flex h-10 cursor-pointer items-center justify-center rounded-xl border border-dashed border-line px-3 text-sm font-semibold text-gold-400 ${
+                  disabled || preparingQr ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
+                {preparingQr ? "Preparando…" : qrSrc ? "Cambiar QR" : "Subir QR (opcional)"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  aria-label="Imagen del QR"
+                  disabled={disabled || preparingQr}
+                  onChange={(e) => {
+                    void pickQr(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {qrSrc && (
+                <button
+                  type="button"
+                  onClick={() => onChange({ qr: { state: "none" } })}
+                  disabled={disabled}
+                  className="text-xs font-semibold text-text-muted underline-offset-2 hover:underline disabled:opacity-60"
+                >
+                  Quitar QR
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-text-muted">
+            El QR es la imagen que te da tu banco para recibir por Bre-B (descárgala o toma una captura y recórtala).
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={row.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              placeholder="Ej. Nequi"
+              disabled={disabled}
+              aria-label="Nombre de la cuenta"
+              className={ACCOUNT_INPUT}
+            />
+            <input
+              type="text"
+              value={row.number}
+              onChange={(e) => onChange({ number: e.target.value })}
+              placeholder="Ej. 300 123 4567"
+              disabled={disabled}
+              aria-label="Número de la cuenta"
+              className={ACCOUNT_INPUT}
+            />
+          </div>
+          <input
+            type="text"
+            value={row.holderName}
+            onChange={(e) => onChange({ holderName: e.target.value })}
+            placeholder="Responsable (opcional)"
+            disabled={disabled}
+            aria-label="Responsable de la cuenta"
+            className={ACCOUNT_INPUT}
+          />
+        </>
+      )}
+    </>
   );
 }
 

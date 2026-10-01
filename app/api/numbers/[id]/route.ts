@@ -129,6 +129,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       receiptRejectedAt: null,
       receiptRejectReason: null,
       privacyConsentAt: null,
+      payerName: null,
     };
   } else {
     const resultingBuyerName =
@@ -163,6 +164,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.holdToken = null;
       data.buyerEmail = null;
       data.privacyConsentAt = null;
+      data.payerName = null;
     }
     // Paid: whatever was said about an earlier receipt no longer matters.
     if (status === "paid") {

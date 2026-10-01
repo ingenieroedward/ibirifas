@@ -14,6 +14,7 @@ import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { accountInputSchema, accountRows, accountSelect, toAccountDTO } from "@/lib/accounts";
 
 const MAX_ACCOUNTS = 5;
 
@@ -22,7 +23,7 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
     numbers: {
       include: typeof numberInclude;
     };
-    accounts: true;
+    accounts: { select: { id: true; label: true; number: true; holderName: true; kind: true; keyType: true; hasQr: true; position: true } };
     groups: true;
     stages: true;
     owner: { select: { publicReservations: true } };
@@ -41,12 +42,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
   const accounts: RaffleAccountDTO[] = raffle.accounts
     .slice()
     .sort((a, b) => a.position - b.position)
-    .map((a) => ({
-      id: a.id,
-      label: a.label,
-      number: a.number,
-      holderName: a.holderName,
-    }));
+    .map(toAccountDTO);
 
   return {
     id: raffle.id,
@@ -90,11 +86,6 @@ const hexColorSchema = z
   .nullable()
   .optional();
 
-const accountSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  number: z.string().trim().min(1).max(60),
-  holderName: z.string().trim().max(80).nullable().optional(),
-});
 
 const updateRaffleSchema = z.object({
   status: z.enum(["active", "closed"]).optional(),
@@ -108,7 +99,7 @@ const updateRaffleSchema = z.object({
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
   themeTextColor: hexColorSchema,
-  accounts: z.array(accountSchema).max(MAX_ACCOUNTS).optional(),
+  accounts: z.array(accountInputSchema).max(MAX_ACCOUNTS).optional(),
   stages: z.array(stageInputSchema).max(MAX_STAGES + 1).optional(),
   stageDeadlineDays: z.number().int().min(0).max(30).optional(),
   fullPayPerk: z.enum(["none", "discount", "draw"]).optional(),
@@ -135,7 +126,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           orderBy: { value: "asc" },
           include: numberInclude,
         },
-        accounts: true,
+        accounts: { select: { ...accountSelect, position: true } },
         groups: true,
         stages: stagesInclude,
         owner: { select: { publicReservations: true } },
@@ -320,17 +311,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // other optional fields: absent means "leave untouched", present means
     // "this is the complete desired list" (full replace).
     if (input.accounts !== undefined) {
+      // A QR image the organizer didn't change is carried over from the account it belonged to (`qrFrom`).
+      const before = await tx.raffleAccount.findMany({ where: { raffleId: id }, select: { id: true, qrDataUrl: true } });
       await tx.raffleAccount.deleteMany({ where: { raffleId: id } });
       if (input.accounts.length > 0) {
-        await tx.raffleAccount.createMany({
-          data: input.accounts.map((account, position) => ({
-            raffleId: id,
-            label: account.label,
-            number: account.number,
-            holderName: account.holderName || null,
-            position,
-          })),
-        });
+        await tx.raffleAccount.createMany({ data: accountRows(id, input.accounts, before) });
       }
     }
   });
@@ -345,7 +330,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         orderBy: { value: "asc" },
         include: numberInclude,
       },
-      accounts: true,
+      accounts: { select: { ...accountSelect, position: true } },
       groups: true,
       stages: stagesInclude,
       owner: { select: { publicReservations: true } },

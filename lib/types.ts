@@ -102,6 +102,8 @@ export interface RaffleNumberDTO {
   /** The team rejected the receipt this buyer sent (and why); cleared when they send another or pay. */
   receiptRejectedAt: string | null;
   receiptRejectReason: string | null;
+  /** Who owns the account the buyer paid from, as they typed it with the receipt. */
+  payerName: string | null;
   /** Installments paid (raffles by stages only; empty otherwise), in order. */
   quotas: QuotaDTO[];
   updatedAt: string;
@@ -135,11 +137,19 @@ export interface RaffleSummaryDTO {
 
 // A payment account the organizer publishes on the raffle (Nequi, Bancolombia,
 // etc.), ordered as entered. `holderName` ("responsable") is shown only when set.
+export type BrebKeyType = "phone" | "email" | "document" | "alias" | "other";
+
 export interface RaffleAccountDTO {
   id: string;
   label: string;
+  /** The account number, or the llave for a Bre-B account. */
   number: string;
   holderName: string | null;
+  /** "bank": a regular account; "breb": a Bre-B llave. */
+  kind: "bank" | "breb";
+  keyType: BrebKeyType | null;
+  /** The account has a QR image (served at /api/accounts/<id>/qr). */
+  hasQr: boolean;
 }
 
 /**
@@ -303,6 +313,12 @@ export interface RaffleAccountInput {
   label: string;
   number: string;
   holderName?: string | null;
+  kind?: "bank" | "breb";
+  keyType?: BrebKeyType | null;
+  /** A new QR image (data URL), or null to remove it. */
+  qrDataUrl?: string | null;
+  /** Keep the QR image of this existing account (editing replaces the accounts as a whole). */
+  qrFrom?: string;
 }
 
 /**
