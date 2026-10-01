@@ -303,6 +303,27 @@ producción. El superadmin entra **sin** código de organización.
   una miniatura por imagen. Al tocar se abre a pantalla completa.
 - `RefreshToken`: sesiones revocables (rotación en cada refresh).
 
+## Exportar a Excel
+
+El organizador descarga la rifa como archivo `.xlsx` desde **Participantes →
+Excel** (y desde "Eliminar rifa", para guardarla antes de borrarla). Hojas:
+
+- **Resumen**: datos de la rifa, vendidos, pagados, disponibles, recaudado y por cobrar.
+- **Números**: una fila por número con estado, comprador, teléfono, correo,
+  origen (equipo / en línea), quién lo vendió y cuándo, método de pago, valor,
+  pagado, debe, comprobante y notas (y cuotas "1/3" en una rifa por etapas).
+- **Compradores**: cada comprador una vez (mismo nombre escrito distinto se une),
+  con sus números, total, pagado y debe.
+- **Conjuntos** (si vende por letras), **Vendedores** (lo mismo que el reporte de
+  comisiones), y en una rifa por etapas **Etapas** (resultados) y **Cuotas** (cada
+  cobro con fecha, valor, método y quién cobró).
+
+El dinero va como número con formato de pesos (Excel puede sumarlo), las fechas
+en hora de Colombia, la primera fila fija y con filtros. El precio de un conjunto
+se reparte entre sus números en pesos enteros que suman exacto. Lo que escriben
+los compradores se guarda como texto, nunca como fórmula. Solo el organizador
+puede exportar: el archivo tiene los datos personales de todos los compradores.
+
 ## Organizaciones y acceso
 
 Cada organizador es una **organización** (él y sus vendedores forman su

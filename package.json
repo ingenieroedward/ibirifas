@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
     "jsonwebtoken": "^9.0.3",
     "next": "16.3.6",
     "nodemailer": "^10.0.13",
@@ -38,5 +39,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }
