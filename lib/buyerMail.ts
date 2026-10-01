@@ -7,6 +7,7 @@ import { mailEnabled, sendMail } from "@/lib/mail";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { amountRemaining, installmentCount, standingOf, stageSettingsOf } from "@/lib/stages";
 import { describeHoldings } from "@/lib/whatsapp";
+import { holdDeadline } from "@/lib/holds";
 import type { PaymentMethod } from "@/lib/types";
 
 /**
@@ -153,6 +154,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
         name: true,
         numberPrice: true,
         holdDays: true,
+        drawDate: true,
         publicToken: true,
         stageDeadlineDays: true,
         fullPayPerk: true,
@@ -213,7 +215,10 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
       const key = mine.find((r) => r.holdToken)?.holdToken;
       const link = origin && key && raffle.publicToken ? `${origin}/p/${raffle.publicToken}/reserva/${key}` : null;
       const soldAt = mine.map((r) => r.soldAt).find(Boolean) ?? null;
-      const deadline = soldAt && raffle.holdDays ? formatDate(new Date(soldAt.getTime() + raffle.holdDays * 86_400_000).toISOString()) : null;
+      const deadline =
+        soldAt && raffle.holdDays
+          ? formatDate(new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null)).toISOString())
+          : null;
       const button = link ? { label: "Ver mi reserva", url: link } : undefined;
 
       let c: Composed;

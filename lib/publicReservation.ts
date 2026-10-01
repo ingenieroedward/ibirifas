@@ -3,9 +3,9 @@ import { toStageDTO } from "@/lib/stageDto";
 import { accountSelect, toAccountDTO } from "@/lib/accounts";
 import { amountRemaining, installmentCount, standingOf, stageSettingsOf } from "@/lib/stages";
 import type { ReservationDTO } from "@/lib/types";
+import { holdDeadline } from "@/lib/holds";
 
 const SHAPE = /^[A-Za-z0-9_-]{22}$/;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * One online reservation, as its buyer sees it on "Mi reserva" (/p/<token>/reserva/<key>): what they
@@ -24,6 +24,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
       status: true,
       numberPrice: true,
       holdDays: true,
+      drawDate: true,
       themeBackground: true,
       themeNumberColor: true,
       stageDeadlineDays: true,
@@ -73,7 +74,11 @@ export async function getReservation(token: string, key: string): Promise<Reserv
   const soldAt = rows.map((r) => r.soldAt).find(Boolean) ?? null;
   // The payment deadline only applies while nothing at all has been paid.
   const nothingPaid = rows.every((r) => r.status !== "paid" && r.quotas.length === 0);
-  const deadline = nothingPaid && soldAt && raffle.holdDays ? new Date(soldAt.getTime() + raffle.holdDays * DAY_MS).toISOString() : null;
+  // Due after `holdDays`, or the day before the draw if that's sooner (raffles by stages: their own deadlines).
+  const deadline =
+    nothingPaid && soldAt && raffle.holdDays
+      ? new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null)).toISOString()
+      : null;
 
   let stages: ReservationDTO["stages"] = null;
   if (stageSettings) {

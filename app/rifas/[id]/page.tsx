@@ -30,7 +30,7 @@ import {
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { groupLabelOf, makePricer, numbersOfGroup } from "@/lib/groups";
 import { buildAvailabilityText } from "@/lib/shareText";
-import { isOverdue } from "@/lib/holds";
+import { drawCutoff, isOverdue } from "@/lib/holds";
 import { useRaffleLive } from "@/lib/useRaffleLive";
 import { amountRemaining, discountNow, installmentPrices, stageSettingsOf, standingOf, type StageSettings } from "@/lib/stages";
 import type {
@@ -280,7 +280,7 @@ export default function RaffleDashboardPage() {
   const overdueHolds = useMemo(
     () =>
       raffle && raffle.status === "active" && raffle.holdDays
-        ? raffle.numbers.filter((n) => isOverdue(n, raffle.holdDays, openedAt))
+        ? raffle.numbers.filter((n) => isOverdue(n, raffle.holdDays, openedAt, raffle.stages.length === 0 ? raffle.drawDate : null))
         : [],
     [raffle, openedAt],
   );
@@ -878,7 +878,9 @@ export default function RaffleDashboardPage() {
                   <span className="min-w-0 text-sm font-semibold text-red-300">
                     {overdueBuyers === 1 ? "1 comprador tiene" : `${overdueBuyers} compradores tienen`} apartados vencidos
                     <span className="block text-xs font-normal text-red-300/80">
-                      Más de {raffle.holdDays} {raffle.holdDays === 1 ? "día" : "días"} sin pagar
+                      {raffle.stages.length === 0 && (drawCutoff(raffle.drawDate) ?? Infinity) <= openedAt
+                        ? "Llegó el día del sorteo y siguen sin pagar"
+                        : `Más de ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} sin pagar`}
                     </span>
                   </span>
                   <span className="shrink-0 text-xs font-bold text-red-300">Ver</span>
@@ -985,6 +987,7 @@ export default function RaffleDashboardPage() {
                       raffle={raffle}
                       winnerValue={raffle.winnerValue}
                       holdDays={raffleClosed ? null : raffle.holdDays}
+                      drawDate={raffle.stages.length === 0 ? raffle.drawDate : null}
                       autoRelease={raffle.autoRelease}
                       onSelect={openNumber}
                       onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}

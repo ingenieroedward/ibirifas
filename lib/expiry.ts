@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { DAY_MS, daysText } from "@/lib/holds";
+import { DAY_MS, daysText, drawCutoff } from "@/lib/holds";
 import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
@@ -40,16 +40,25 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
 
   const raffle = await prisma.raffle.findUnique({
     where: { id: raffleId },
-    select: { id: true, name: true, ownerId: true, status: true, holdDays: true, autoRelease: true, expiryNoticeAt: true, numberPrice: true },
+    select: { id: true, name: true, ownerId: true, status: true, holdDays: true, autoRelease: true, expiryNoticeAt: true, numberPrice: true, drawDate: true, _count: { select: { stages: true } } },
   });
   if (!raffle || raffle.status !== "active") return result;
   result.released += await sweepStageDeadline(raffleId, now);
   if (!raffle.holdDays) return result;
 
   const cutoff = new Date(now.getTime() - raffle.holdDays * DAY_MS);
+  // Once the draw day starts, every hold made before it is due too: the last day to pay was the day before.
+  // (Raffles by stages have their own per-stage deadlines.)
+  const drawDay = raffle._count.stages === 0 ? drawCutoff(raffle.drawDate) : null;
+  const pastDrawCutoff = drawDay !== null && now.getTime() >= drawDay;
   const late = await prisma.raffleNumber.findMany({
     // In a raffle by stages, a number with an installment paid is a paying customer, not a stale hold.
-    where: { raffleId, status: "occupied", soldAt: { lt: cutoff }, quotas: { none: {} } },
+    where: {
+      raffleId,
+      status: "occupied",
+      quotas: { none: {} },
+      OR: [{ soldAt: { lt: cutoff } }, ...(pastDrawCutoff ? [{ soldAt: { lt: new Date(drawDay) } }] : [])],
+    },
     select: { id: true, ...buyerRowSelect, group: { select: { label: true, price: true } } },
     orderBy: { value: "asc" },
   });
@@ -122,7 +131,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
       await syncCompletion(raffleId);
       await notifyTeam(raffle.ownerId, "", {
         title: `${raffle.name} · apartados liberados`,
-        body: `Pasaron ${daysText(raffle.holdDays)} sin pago y volvieron a la venta: ${summary}`,
+        body: `${pastDrawCutoff ? "Llegó el día del sorteo sin pago" : `Pasaron ${daysText(raffle.holdDays)} sin pago`} y volvieron a la venta: ${summary}`,
         url,
       });
     }
@@ -134,7 +143,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
     await prisma.raffle.update({ where: { id: raffleId }, data: { expiryNoticeAt: now } });
     await notifyTeam(raffle.ownerId, "", {
       title: `${raffle.name} · apartados vencidos`,
-      body: `Llevan más de ${daysText(raffle.holdDays)} sin pagar: ${summary}`,
+      body: `${pastDrawCutoff ? "Es el día del sorteo y siguen sin pagar" : `Llevan más de ${daysText(raffle.holdDays)} sin pagar`}: ${summary}`,
       url,
     });
     result.warned = true;

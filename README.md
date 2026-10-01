@@ -252,7 +252,11 @@ producción. El superadmin entra **sin** código de organización.
   vez (la migración lo rellena así). Liberar un número borra su vendedor y fecha.
 - **Apartados que vencen**: en "Editar rifa" (o al crearla) el organizador puede
   activar "Los apartados sin pagar vencen" con un plazo en días
-  (`Raffle.holdDays`, 1–365), contado desde `soldAt`. Pasado el plazo, un número
+  (`Raffle.holdDays`, 1–365), contado desde `soldAt`. **Si el sorteo es antes, el
+  apartado vence al terminar el día anterior al sorteo** (lo que llegue primero), para
+  que nadie juegue con un número sin pagar; la página pública, la reserva en línea, el
+  correo al comprador y Participantes muestran esa fecha. Un apartado hecho el mismo día
+  del sorteo solo sigue la regla de días (las rifas por etapas usan sus plazos de cuota). Pasado el plazo, un número
   vendido y sin pagar está **vencido**: aparece un aviso rojo en el tablero, el
   comprador sube al inicio de Participantes con "Vencido · N días sin pagar" (los
   demás muestran "Vence en N días") y el equipo recibe una notificación push, como

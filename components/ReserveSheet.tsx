@@ -6,7 +6,7 @@ import { PayerNameInput, payerNameError } from "@/components/PayerNameInput";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { rememberReservation, reservationPath } from "@/lib/myReservations";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import type { PublicRaffleDTO, ReserveResultDTO } from "@/lib/types";
@@ -147,9 +147,18 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
           ))}
         </div>
         <p className="text-sm text-text">
-          Quedaron apartados a nombre de <span className="font-semibold">{name.trim()}</span>. Tienes{" "}
-          <span className="font-semibold">{daysText(result.holdDays)}</span> para pagar; pasado ese tiempo se liberan para
-          otras personas.
+          Quedaron apartados a nombre de <span className="font-semibold">{name.trim()}</span>.{" "}
+          {result.payBy ? (
+            <>
+              Tienes hasta el <span className="font-semibold">{formatDrawDate(result.payBy)}</span> (el día antes del sorteo) para
+              pagar; si no, se liberan para otras personas.
+            </>
+          ) : (
+            <>
+              Tienes <span className="font-semibold">{daysText(result.holdDays)}</span> para pagar; pasado ese tiempo se liberan
+              para otras personas.
+            </>
+          )}
         </p>
         {raffle.accounts.length > 0 && (
           <div className="space-y-1 rounded-2xl border border-line bg-surface-2 p-4 text-sm text-text-muted">
@@ -323,7 +332,9 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
       )}
 
       <p className="text-xs text-text-muted">
-        Se apartan a tu nombre y tienes {daysText(holdDays)} para pagar. Si no pagas a tiempo, se liberan.
+        Se apartan a tu nombre y tienes{" "}
+        {raffle.reservations.payBy ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)` : daysText(holdDays)} para
+        pagar. Si no pagas a tiempo, se liberan.
       </p>
 
       {error && (
