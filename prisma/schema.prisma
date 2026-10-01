@@ -42,6 +42,9 @@ model AdminUser {
   // Only meaningful for ORGANIZER: where buyers' replies to our emails go (Reply-To), and where a test
   // email is sent. Optional.
   contactEmail  String?
+  // Only meaningful for ORGANIZER: a Bre-B payment reported by the bank (pagoradar) that matches exactly one
+  // reservation is approved on its own. Off = it is only suggested and the team approves it.
+  autoApprovePayments Boolean @default(true)
 
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]
@@ -313,4 +316,39 @@ model RaffleVisit {
 
   @@unique([raffleId, day, visitor])
   @@index([raffleId, day])
+}
+
+// A payment the bank reported (through pagoradar: a Bre-B transfer that reached the organization's account),
+// and what was done with it. `id` is pagoradar's own id, so the same notice is never stored twice.
+//   status: "auto"      matched exactly one reservation and approved it on its own
+//           "approved"  the team approved it for a reservation
+//           "review"    it could be one of several reservations, or the name doesn't fully match: the team decides
+//           "unmatched" no reservation for that amount
+//           "ignored"   the team set it aside (not a raffle payment, a duplicate…)
+// The numbers it paid carry its id in RaffleNumber.paymentRef, which is how "Deshacer" finds them.
+model ReceivedPayment {
+  id          String    @id
+  ownerId     String
+  bank        String
+  method      String?
+  amount      Int
+  payerName   String
+  payerBank   String?
+  reference   String?
+  paidAt      DateTime
+  // When pagoradar got it (its clock): the cursor for catching up on missed notices.
+  sourceReceivedAt DateTime
+  createdAt   DateTime  @default(now())
+  status      String
+  raffleId    String?
+  // A short description of what it paid ("Ana Pérez · 04, 05"), kept even if the numbers change later.
+  matchLabel  String?
+  // Why it is waiting for the team, in plain words.
+  note        String?
+  // Who approved, ignored or undid it; null with "auto".
+  resolvedById String?
+  resolvedAt  DateTime?
+
+  @@index([ownerId, status])
+  @@index([ownerId, sourceReceivedAt])
 }

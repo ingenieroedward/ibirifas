@@ -5,17 +5,21 @@ import { getCurrentUser } from "@/lib/session";
 import type { OrgSettingsDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { EMAIL_RE, mailEnabled } from "@/lib/mail";
+import { pagoradarTenantId } from "@/lib/pagoradar";
 
 const updateSchema = z.object({
   publicReservations: z.boolean().optional(),
   contactEmail: z.string().trim().max(120).nullable().optional(),
+  autoApprovePayments: z.boolean().optional(),
 });
 
-const SELECT = { publicReservations: true, contactEmail: true } as const;
-const toDTO = (row: { publicReservations: boolean; contactEmail: string | null }): OrgSettingsDTO => ({
+const SELECT = { id: true, publicReservations: true, contactEmail: true, autoApprovePayments: true } as const;
+const toDTO = async (row: { id: string; publicReservations: boolean; contactEmail: string | null; autoApprovePayments: boolean }): Promise<OrgSettingsDTO> => ({
   publicReservations: row.publicReservations,
   contactEmail: row.contactEmail,
   mailEnabled: mailEnabled(),
+  paymentsEnabled: (await pagoradarTenantId()) === row.id,
+  autoApprovePayments: row.autoApprovePayments,
 });
 
 /** The organization's own settings: only its organizer reads or changes them. */
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
   const auth = await organizerOnly(req);
   if (auth.error) return auth.error;
   const row = await prisma.adminUser.findUniqueOrThrow({ where: { id: auth.user.id }, select: SELECT });
-  return NextResponse.json(toDTO(row));
+  return NextResponse.json(await toDTO(row));
 }
 
 export async function PATCH(req: NextRequest) {
@@ -52,8 +56,9 @@ export async function PATCH(req: NextRequest) {
     data: {
       ...(parsed.data.publicReservations !== undefined ? { publicReservations: parsed.data.publicReservations } : {}),
       ...(contactEmail !== undefined ? { contactEmail } : {}),
+      ...(parsed.data.autoApprovePayments !== undefined ? { autoApprovePayments: parsed.data.autoApprovePayments } : {}),
     },
     select: SELECT,
   });
-  return NextResponse.json(toDTO(row));
+  return NextResponse.json(await toDTO(row));
 }

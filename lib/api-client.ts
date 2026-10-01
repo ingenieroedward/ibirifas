@@ -1,4 +1,6 @@
 import type {
+  PaymentCandidateDTO,
+  ReceivedPaymentsDTO,
   BulkNumberInput,
   CreateRaffleInput,
   CreateUserInput,
@@ -348,4 +350,26 @@ export async function sendTestEmail(): Promise<void> {
 
 export async function updateOrgSettings(input: Partial<OrgSettingsDTO>): Promise<OrgSettingsDTO> {
   return request<OrgSettingsDTO>("/api/org/settings", { method: "PATCH", body: JSON.stringify(input) });
+}
+
+// ---------- Payments reported by the bank (pagoradar)
+
+export async function getReceivedPayments(filter: "pending" | "approved" | "ignored"): Promise<ReceivedPaymentsDTO> {
+  return request<ReceivedPaymentsDTO>(`/api/payments?filter=${filter}`);
+}
+
+/** How many reported payments wait for the team (0 when the organization isn't connected). */
+export async function getPendingPaymentsCount(): Promise<{ enabled: boolean; pending: number }> {
+  return request<{ enabled: boolean; pending: number }>("/api/payments?count=1", {}, { skipRedirectOn401: true });
+}
+
+export type PaymentAction = { action: "approve"; numberIds: string[] } | { action: "undo" } | { action: "ignore" } | { action: "reopen" };
+
+export async function actOnPayment(id: string, input: PaymentAction): Promise<void> {
+  await request<{ ok: true }>(`/api/payments/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function getOpenReservations(payer: string, amount: number): Promise<PaymentCandidateDTO[]> {
+  const q = new URLSearchParams({ payer, amount: String(amount) });
+  return (await request<{ reservations: PaymentCandidateDTO[] }>(`/api/payments/reservations?${q}`)).reservations;
 }

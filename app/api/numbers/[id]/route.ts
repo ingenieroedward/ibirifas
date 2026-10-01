@@ -30,7 +30,7 @@ const updateNumberSchema = z.object({
   buyerPhone: trimmedString(120),
   notes: trimmedString(120),
   expectAvailable: z.boolean().optional(),
-  paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]).nullable().optional(),
+  paymentMethod: z.enum(["cash", "nequi", "breb", "transfer", "other"]).nullable().optional(),
   photoDataUrl: z
     .string()
     .regex(RECEIPT_IMAGE_RE, { message: "photoDataUrl debe ser una imagen JPEG, PNG o WebP en data URL" })
@@ -120,6 +120,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       notes: null,
       paymentStatus: "pending" satisfies PaymentStatus,
       paymentMethod: null,
+      paymentRef: null,
       updatedBy: { connect: { id: user.id } },
       soldBy: { disconnect: true },
       soldAt: null,
@@ -153,6 +154,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       status,
       paymentStatus,
       paymentMethod,
+      // The bank payment that paid it (pagoradar) only stays linked while it stays paid the same way.
+      ...(status === "paid" && existing.status === "paid" && paymentMethod === existing.paymentMethod ? {} : { paymentRef: null }),
       updatedBy: { connect: { id: user.id } },
     };
 

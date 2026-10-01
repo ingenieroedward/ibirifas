@@ -16,17 +16,17 @@ const schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("next"),
     ids: z.array(z.string().min(1)).min(1).max(100),
-    paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]),
+    paymentMethod: z.enum(["cash", "nequi", "breb", "transfer", "other"]),
   }),
   z.object({
     action: z.literal("due"),
     ids: z.array(z.string().min(1)).min(1).max(100),
-    paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]),
+    paymentMethod: z.enum(["cash", "nequi", "breb", "transfer", "other"]),
   }),
   z.object({
     action: z.literal("all"),
     ids: z.array(z.string().min(1)).min(1).max(100),
-    paymentMethod: z.enum(["cash", "nequi", "transfer", "other"]),
+    paymentMethod: z.enum(["cash", "nequi", "breb", "transfer", "other"]),
   }),
   z.object({ action: z.literal("undo"), ids: z.array(z.string().min(1)).min(1).max(100) }),
 ]);
@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
             status: full ? "paid" : "occupied",
             paymentStatus: (full ? "paid" : "pending") satisfies PaymentStatus,
             paymentMethod: full ? (input.action === "undo" ? undefined : input.paymentMethod) : null,
+            paymentRef: null,
             updatedById: user.id,
           },
         });

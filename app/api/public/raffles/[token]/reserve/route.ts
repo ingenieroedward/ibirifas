@@ -146,6 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           status: "occupied",
           paymentStatus: "pending",
           paymentMethod: null,
+          paymentRef: null,
           buyerName: input.name,
           buyerPhone: input.phone,
           photoDataUrl: null,

@@ -7,6 +7,7 @@ import { phoneDigits, samePhone } from "@/lib/reservations";
 import { publishRaffleChange } from "@/lib/realtime";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
 import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
+import { pagoradarTenantId, rematchPayments } from "@/lib/pagoradar";
 
 const KEY_SHAPE = /^[A-Za-z0-9_-]{22}$/;
 
@@ -106,6 +107,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     body: `${mine[0]!.buyerName ?? "Un comprador"} subió su comprobante de pago`,
     url: `/rifas/${raffle.id}`,
   });
+
+  // The bank's notice often arrives before the receipt: now that we know who paid, try again.
+  void (async () => {
+    if ((await pagoradarTenantId()) === raffle.ownerId) await rematchPayments(raffle.ownerId);
+  })().catch((err) => console.error("[pagoradar] rematch after receipt failed:", err instanceof Error ? err.message : err));
 
   return NextResponse.json({ ok: true });
 }

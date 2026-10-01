@@ -276,7 +276,7 @@ export function GroupSheet({ group, members, knownBuyers, canRelease = true, onC
               <>
                 <div className="space-y-1.5">
                   <span className="text-sm font-medium text-text-muted">Método de pago</span>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                     {PAYMENT_METHODS.map((method) => (
                       <button
                         key={method}

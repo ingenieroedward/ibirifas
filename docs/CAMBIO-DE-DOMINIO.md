@@ -71,7 +71,7 @@ Comprobar: reservar un número desde el enlace público del dominio nuevo.
 - **Imágenes y textos para compartir**: se generan con el dominio con el que se abre
   la app; las que ya circulan funcionan por la redirección del paso 3.
 
-## 8. Lector de pagos (cuando exista)
+## 8. Lector de pagos (pagoradar)
 
 Recomendación: la dirección que **recibe** los avisos de los bancos (ej.
 `pagos-xxxx@pagos.edwsystem.com`) puede **quedarse en el dominio actual** aunque la
@@ -82,10 +82,14 @@ filtros de Gmail. Si igual la cambias:
 2. En cada Gmail, editar el filtro de reenvío con la dirección nueva (Gmail pide
    confirmarla con un código).
 3. En la configuración del lector, actualizar la URL del aviso hacia la app
-   (`https://<nuevo-dominio>/api/...`), y su secreto si se regenera.
+   (`https://<nuevo-dominio>/api/pagoradar/webhook`), y su secreto si se regenera.
 
 Aunque la dirección de recepción no cambie, **la URL a la que el lector avisa a la
-app sí** cambia con el dominio de la app (paso 3 de esta sección).
+app sí** cambia con el dominio de la app: en Dokploy, en la app **pagoradar**, edita
+`PAGORADAR_SOURCES` y cambia la `url` del webhook a
+`https://<nuevo-dominio>/api/pagoradar/webhook`; redespliega pagoradar. Si además
+cambias el dominio de pagoradar, actualiza `PAGORADAR_URL` en Ibirifas y la variable
+`PAGORADAR_URL` del Worker de Cloudflare.
 
 ## Lista rápida
 
