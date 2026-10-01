@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
 import { EditUserSheet } from "@/components/EditUserSheet";
 import { Spinner } from "@/components/Spinner";
+import { PaymentsAccountCard } from "@/components/PaymentsAccountCard";
 import { formatDate } from "@/lib/format";
 
 export default function UsersPage() {
@@ -154,7 +155,7 @@ export default function UsersPage() {
           {!isSuperadmin && user.orgCode && <OrgCodeCard orgCode={user.orgCode} onCopied={show} />}
           {!isSuperadmin && <ReservationsCard onError={show} />}
           {!isSuperadmin && <EmailCard onError={show} />}
-          {!isSuperadmin && <PaymentsCard onError={show} />}
+          {user.role === "ORGANIZER" && <PaymentsAccountCard onNotify={show} defaultEmail={null} />}
 
           {loading && (
             <div className="flex flex-1 items-center justify-center py-24">
@@ -339,66 +340,6 @@ function ReservationsCard({ onError }: { onError: (message: string, variant?: "s
           </span>
         </span>
       </label>
-    </section>
-  );
-}
-
-/** Bank payments (pagoradar): whether one that matches exactly one reservation is approved on its own. */
-function PaymentsCard({ onError }: { onError: (message: string, variant?: "success" | "error" | "info") => void }) {
-  const [settings, setSettings] = useState<OrgSettingsDTO | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    getOrgSettings()
-      .then((s) => {
-        if (!cancelled) setSettings(s);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!settings?.paymentsEnabled) return null;
-
-  const toggle = async (next: boolean) => {
-    const previous = settings;
-    setSettings({ ...settings, autoApprovePayments: next });
-    setSaving(true);
-    try {
-      setSettings(await updateOrgSettings({ autoApprovePayments: next }));
-    } catch {
-      setSettings(previous);
-      onError("No se pudo guardar el cambio. Inténtalo de nuevo.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <section className="mb-4 space-y-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          id="autoApprovePayments"
-          type="checkbox"
-          checked={settings.autoApprovePayments ?? true}
-          disabled={saving}
-          onChange={(e) => void toggle(e.target.checked)}
-          className="mt-1 h-5 w-5 accent-[#f5c542]"
-        />
-        <span>
-          <span className="block text-sm font-semibold text-text">Aprobar solos los pagos Bre-B</span>
-          <span className="mt-0.5 block text-xs text-text-muted">
-            Cuando el banco avisa un pago y coincide con una sola reserva en línea (mismo valor, el titular que escribió el
-            comprador y hecho después de reservar), se marca pagado solo y el equipo recibe un aviso para revisarlo; se puede
-            deshacer. Apagado, cada pago espera en &quot;Pagos recibidos&quot; a que alguien lo apruebe.
-          </span>
-        </span>
-      </label>
-      <a href="/pagos" className="inline-block text-sm font-semibold text-gold-400 underline-offset-2 hover:underline">
-        Ver pagos recibidos
-      </a>
     </section>
   );
 }

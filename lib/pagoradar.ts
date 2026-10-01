@@ -34,29 +34,72 @@ const MAX_CANDIDATES = 5;
 
 export interface PagoradarConfig {
   secret: string;
-  orgCode: string;
+  /** Old single-organization setup (PAGORADAR_ORG): payments of accounts not linked to anyone go there. */
+  legacyOrgCode: string | null;
   url: string | null;
   apiKey: string | null;
 }
 
-/** Null when the server isn't connected to pagoradar (no secret or no organization). */
+/** Null when the server isn't connected to pagoradar (no webhook secret). */
 export function pagoradarConfig(): PagoradarConfig | null {
   const secret = process.env.PAGORADAR_WEBHOOK_SECRET ?? "";
-  const orgCode = (process.env.PAGORADAR_ORG ?? "").trim().toLowerCase();
-  if (secret.length < 24 || !orgCode) return null;
+  if (secret.length < 24) return null;
+  const legacyOrgCode = (process.env.PAGORADAR_ORG ?? "").trim().toLowerCase() || null;
   const url = (process.env.PAGORADAR_URL ?? "").trim().replace(/\/+$/, "");
-  return { secret, orgCode, url: /^https?:\/\//.test(url) ? url : null, apiKey: process.env.PAGORADAR_API_KEY || null };
+  return { secret, legacyOrgCode, url: /^https?:\/\//.test(url) ? url : null, apiKey: process.env.PAGORADAR_API_KEY || null };
 }
 
-/** The organization (its organizer's id) whose account pagoradar watches. */
-export async function pagoradarTenantId(): Promise<string | null> {
-  const config = pagoradarConfig();
-  if (!config) return null;
-  const org = await prisma.adminUser.findFirst({
-    where: { orgCode: config.orgCode, role: "ORGANIZER", active: true },
-    select: { id: true },
-  });
+/** Organizers can connect their own account from Mi equipo (needs the API URL and key). */
+export function pagoradarApiReady(): boolean {
+  const c = pagoradarConfig();
+  return Boolean(c?.url && c.apiKey);
+}
+
+async function legacyTenantId(): Promise<string | null> {
+  const code = pagoradarConfig()?.legacyOrgCode;
+  if (!code) return null;
+  const org = await prisma.adminUser.findFirst({ where: { orgCode: code, role: "ORGANIZER", active: true }, select: { id: true } });
   return org?.id ?? null;
+}
+
+/**
+ * Which organization a payment (or account event) belongs to: the organizer who connected that receiving
+ * account; otherwise, for the old single-organization setup, PAGORADAR_ORG. Null = nobody here.
+ */
+export async function tenantForAccount(accountId: string | null | undefined): Promise<string | null> {
+  if (accountId) {
+    const org = await prisma.adminUser.findFirst({ where: { pagoradarAccountId: accountId, role: "ORGANIZER", active: true }, select: { id: true } });
+    if (org) return org.id;
+  }
+  return legacyTenantId();
+}
+
+/** Does this organization receive bank payments (its own connected account, or the old setup)? */
+export async function paymentsConnected(tenantId: string): Promise<boolean> {
+  if (!pagoradarConfig()) return false;
+  const org = await prisma.adminUser.findUnique({ where: { id: tenantId }, select: { pagoradarAccountId: true } });
+  if (org?.pagoradarAccountId) return true;
+  return (await legacyTenantId()) === tenantId;
+}
+
+/** Calls pagoradar's API with the app's key. Throws PagoradarUnavailable on network errors or 5xx. */
+export class PagoradarUnavailable extends Error {}
+export async function pagoradarApi<T>(path: string, init: { method?: string; body?: unknown } = {}, fetchImpl: typeof fetch = fetch): Promise<{ status: number; data: T }> {
+  const c = pagoradarConfig();
+  if (!c?.url || !c.apiKey) throw new PagoradarUnavailable("pagoradar no está configurado");
+  let res: Response;
+  try {
+    res = await fetchImpl(`${c.url}${path}`, {
+      method: init.method ?? "GET",
+      headers: { Authorization: `Bearer ${c.apiKey}`, ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}) },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    throw new PagoradarUnavailable(err instanceof Error ? err.message : String(err));
+  }
+  if (res.status >= 500 || res.status === 401) throw new PagoradarUnavailable(`HTTP ${res.status}`);
+  return { status: res.status, data: (await res.json().catch(() => ({}))) as T };
 }
 
 /** `Pagoradar-Signature: t=<unix>,v1=<hex HMAC-SHA256 of "<t>.<body>">`, signed in the last 5 minutes. */
@@ -84,6 +127,8 @@ export const pagoradarPaymentSchema = z.object({
   reference: z.string().max(120).nullable().optional(),
   paidAt: z.string().datetime({ offset: true }),
   receivedAt: z.string().datetime({ offset: true }),
+  accountId: z.string().max(60).nullable().optional(),
+  account: z.object({ id: z.string().max(60) }).passthrough().nullable().optional(),
 });
 export type PagoradarPayment = z.infer<typeof pagoradarPaymentSchema>;
 
@@ -139,7 +184,7 @@ const better = (a: NameMatch, b: NameMatch): NameMatch => (RANK[a] >= RANK[b] ? 
  * Payment notices go to the organizer only: the bank reports every payment to the account (with the
  * payer's name), and the account may also receive money that has nothing to do with the raffles.
  */
-async function notifyOrganizer(tenantId: string, payload: PushPayload): Promise<void> {
+export async function notifyOrganizer(tenantId: string, payload: PushPayload): Promise<void> {
   try {
     await sendPush([tenantId], payload);
   } catch (err) {
@@ -537,30 +582,26 @@ export async function ingestPayment(tenantId: string, data: PagoradarPayment): P
 export async function reconcilePagoradar(fetchImpl: typeof fetch = fetch): Promise<number> {
   const config = pagoradarConfig();
   if (!config?.url || !config.apiKey) return 0;
-  const tenantId = await pagoradarTenantId();
-  if (!tenantId) return 0;
-  const last = await prisma.receivedPayment.findFirst({
-    where: { ownerId: tenantId },
-    orderBy: { sourceReceivedAt: "desc" },
-    select: { sourceReceivedAt: true },
-  });
+  const last = await prisma.receivedPayment.findFirst({ orderBy: { sourceReceivedAt: "desc" }, select: { sourceReceivedAt: true } });
   let since = (last?.sourceReceivedAt ?? new Date(Date.now() - MATCH_WINDOW_DAYS * 86400_000)).toISOString();
   let stored = 0;
   try {
     for (let page = 0; page < 10; page++) {
-      const res = await fetchImpl(`${config.url}/v1/payments?since=${encodeURIComponent(since)}&limit=200`, {
-        headers: { Authorization: `Bearer ${config.apiKey}` },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) return stored;
-      const body = (await res.json()) as { payments?: unknown[]; next?: string | null };
-      const list = Array.isArray(body.payments) ? body.payments : [];
+      const { status, data } = await pagoradarApi<{ payments?: unknown[]; next?: string | null }>(
+        `/v1/payments?since=${encodeURIComponent(since)}&limit=200`,
+        {},
+        fetchImpl,
+      );
+      if (status !== 200) return stored;
+      const list = Array.isArray(data.payments) ? data.payments : [];
       for (const raw of list) {
         const parsed = pagoradarPaymentSchema.safeParse(raw);
-        if (parsed.success && (await ingestPayment(tenantId, parsed.data)) === "stored") stored++;
+        if (!parsed.success) continue;
+        const tenantId = await tenantForAccount(parsed.data.account?.id ?? parsed.data.accountId);
+        if (tenantId && (await ingestPayment(tenantId, parsed.data)) === "stored") stored++;
       }
-      if (list.length < 200 || !body.next || body.next === since) break;
-      since = body.next;
+      if (list.length < 200 || !data.next || data.next === since) break;
+      since = data.next;
     }
   } catch (err) {
     console.error("[pagoradar] catch-up failed:", err instanceof Error ? err.message : err);

@@ -511,3 +511,26 @@ export interface ReceivedPaymentsDTO {
   pending: number;
   payments: ReceivedPaymentDTO[];
 }
+
+/** An organization's own receiving account in pagoradar (Mi equipo → Pagos Bre-B automáticos). */
+export interface PaymentsAccountDTO {
+  /** The server can connect accounts (pagoradar's API is configured). */
+  available: boolean;
+  /** Payments arrive through the server's old single-organization setup (PAGORADAR_ORG). */
+  legacy: boolean;
+  autoApprove: boolean;
+  /** pagoradar couldn't be reached just now. */
+  unreachable?: boolean;
+  account: null | {
+    id: string;
+    address: string;
+    ownerEmails: string[];
+    banks: string[];
+    status: "pending" | "active" | "disabled";
+    confirmationCode: string | null;
+    confirmationLink: string | null;
+    confirmationAt: string | null;
+    lastPaymentAt: string | null;
+    gmailFilterFrom: string;
+  };
+}

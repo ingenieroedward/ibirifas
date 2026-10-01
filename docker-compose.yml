@@ -37,8 +37,8 @@ services:
       BACKUP_KEEP: ${BACKUP_KEEP:-}
       BACKUP_SNAPSHOTS: ${BACKUP_SNAPSHOTS:-}
       # Bre-B payments read from the bank's emails by pagoradar (optional). The secret signs its
-      # webhooks; PAGORADAR_ORG is the organization code that owns the account. URL + API key let the
-      # app catch up on payments whose webhook it missed.
+      # webhooks; URL + API key let each organizer connect their own account (Mi equipo) and let the
+      # app catch up on missed webhooks. PAGORADAR_ORG (legacy) gets payments of unlinked accounts.
       PAGORADAR_WEBHOOK_SECRET: ${PAGORADAR_WEBHOOK_SECRET:-}
       PAGORADAR_ORG: ${PAGORADAR_ORG:-}
       PAGORADAR_URL: ${PAGORADAR_URL:-}

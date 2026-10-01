@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
-import { BANK_LABEL, candidatesFor, openReservations, pagoradarTenantId, toCandidateDTO } from "@/lib/pagoradar";
+import { BANK_LABEL, candidatesFor, openReservations, paymentsConnected, toCandidateDTO } from "@/lib/pagoradar";
 import type { ReceivedPaymentDTO, ReceivedPaymentStatus, ReceivedPaymentsDTO } from "@/lib/types";
 
 const FILTERS: Record<string, ReceivedPaymentStatus[]> = {
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     if (req.nextUrl.searchParams.get("count")) return NextResponse.json({ enabled: false, pending: 0 });
     return NextResponse.json({ error: "Solo el organizador ve los pagos recibidos" }, { status: 403 });
   }
-  const enabled = (await pagoradarTenantId()) === tenantId;
+  const enabled = await paymentsConnected(tenantId);
   const pending = enabled ? await prisma.receivedPayment.count({ where: { ownerId: tenantId, status: { in: FILTERS.pending } } }) : 0;
   if (req.nextUrl.searchParams.get("count")) return NextResponse.json({ enabled, pending });
 
