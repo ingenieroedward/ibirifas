@@ -5,6 +5,7 @@ import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { triggerCondition } from "@/lib/drawPlan";
 import { daysLeft, daysText, daysWaiting, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
+import { PhoneEditor } from "@/components/PhoneEditor";
 import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/whatsapp";
 import {
@@ -34,6 +35,8 @@ interface ParticipantsListProps {
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
+  /** Saves the phone on all of a buyer's numbers (for buyers registered without one). */
+  onEditPhone?: (numbers: RaffleNumberDTO[], phone: string | null) => Promise<void>;
   /** A raffle by stages: amounts come from the installments, and each number shows how many are paid. */
   stageSettings?: StageSettings | null;
 }
@@ -109,6 +112,7 @@ export function ParticipantsList({
   autoRelease = false,
   onSelect,
   onPayAll,
+  onEditPhone,
   stageSettings = null,
 }: ParticipantsListProps) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -244,6 +248,7 @@ export function ParticipantsList({
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
               onPayAll={onPayAll}
+              onEditPhone={onEditPhone}
               onViewReceipt={setReceiptOpen}
               stageSettings={stageSettings}
             />
@@ -299,6 +304,7 @@ function ParticipantCard({
   isWinner,
   onSelect,
   onPayAll,
+  onEditPhone,
   onViewReceipt,
   stageSettings,
 }: {
@@ -311,6 +317,7 @@ function ParticipantCard({
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
+  onEditPhone?: (numbers: RaffleNumberDTO[], phone: string | null) => Promise<void>;
   onViewReceipt: (photoDataUrl: string) => void;
   stageSettings: StageSettings | null;
 }) {
@@ -421,7 +428,7 @@ function ParticipantCard({
           <p className="break-words font-[family-name:var(--font-heading)] text-lg font-bold leading-tight text-text">
             {p.name}
           </p>
-          {p.phone && (
+          {!onEditPhone && p.phone && (
             <a href={`tel:${p.phone}`} className="text-sm text-gold-400 underline-offset-2 hover:underline">
               {p.phone}
             </a>
@@ -447,6 +454,12 @@ function ParticipantCard({
           </span>
         )}
       </div>
+
+      {onEditPhone && p.numbers.every((n) => n.buyerName) && (
+        <div className="-mt-0.5">
+          <PhoneEditor phone={p.phone} onSave={(phone) => onEditPhone(p.numbers, phone)} />
+        </div>
+      )}
 
       {p.numbers.some((n) => n.online) && (
         <p className="mt-2 mr-1.5 inline-block rounded-full border border-gold-600/40 bg-gold-400/10 px-2.5 py-0.5 text-[11px] font-bold text-gold-400">

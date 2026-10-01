@@ -707,6 +707,31 @@ export default function RaffleDashboardPage() {
     [mergeNumbers, show, refreshAfterConflict],
   );
 
+  /**
+   * Saves a buyer's phone on the given numbers (one request per spelling of the name, since the request also
+   * carries the name and each number keeps its own).
+   */
+  const handleEditPhone = useCallback(
+    async (numbers: RaffleNumberDTO[], phone: string | null) => {
+      const byName = new Map<string, string[]>();
+      for (const n of numbers) {
+        if (!n.buyerName) continue;
+        byName.set(n.buyerName, [...(byName.get(n.buyerName) ?? []), n.id]);
+      }
+      try {
+        for (const [buyerName, ids] of byName) {
+          mergeNumbers(await updateNumbersBulk({ action: "edit", ids, buyerName, buyerPhone: phone }));
+        }
+        show(phone ? "Teléfono guardado" : "Teléfono quitado", "success");
+      } catch (err) {
+        show(err instanceof ApiError ? err.message : "No se pudo guardar el teléfono. Inténtalo de nuevo.", "error");
+        if (err instanceof ApiError && err.status === 409) await refreshAfterConflict();
+        throw err;
+      }
+    },
+    [mergeNumbers, show, refreshAfterConflict],
+  );
+
   const handleSave = useCallback(
     async (id: string, input: UpdateNumberInput) => {
       const original = raffle?.numbers.find((n) => n.id === id);
@@ -963,6 +988,7 @@ export default function RaffleDashboardPage() {
                       autoRelease={raffle.autoRelease}
                       onSelect={openNumber}
                       onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
+                      onEditPhone={handleEditPhone}
                       stageSettings={stageSettings}
                     />
                   ) : (
@@ -1016,6 +1042,10 @@ export default function RaffleDashboardPage() {
         stageSettings={stageSettings}
         onQuotas={(id, action, method) => handleQuotas([id], action, method)}
         onRejectReceipt={handleRejectReceipt}
+        onEditPhone={(id, phone) => {
+          const n = raffle?.numbers.find((x) => x.id === id);
+          return n ? handleEditPhone([n], phone) : Promise.resolve();
+        }}
       />
 
       {publicLinkOpen && raffle && (
