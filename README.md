@@ -484,6 +484,22 @@ Ejecútalo una vez a mano y revisa que el archivo aparezca en el bucket.
 `/app/data/prod.db` del volumen por esa copia (con el nombre `prod.db`) y vuelve a
 iniciarla; las migraciones pendientes se aplican solas al arrancar.
 
+### Monitoreo (aviso si la app se cae)
+
+`GET /api/health` responde `200 {"ok":true}` solo si la app puede leer su base de
+datos, y `503` si no; no necesita sesión ni dice nada más. Úsalo en un monitor
+externo, por ejemplo UptimeRobot (gratis): monitor *HTTP(s)*, URL
+`https://<tu-dominio>/api/health`, cada 5 minutos, y en *Alert contacts* tu correo
+y/o Telegram. Con Cloudflare en modo proxy no hace falta excepción: es un GET normal.
+
+**Comprobar un respaldo sin tocar producción**: en Dokploy no restaures sobre el
+volumen de la app mientras corre (lo bloquea, y si lo forzaras reemplazarías los
+datos reales). Descarga el `.tar` de R2, ábrelo (7-Zip) y abre
+`backups/ibirifas-AAAA-MM-DD.db` con *DB Browser for SQLite*: deben aparecer las
+tablas `Raffle`, `RaffleNumber`, etc. con tus rifas. Otra opción en el servidor es
+restaurar a un volumen con **otro nombre** (ej. `ibirifas_restore_test`), revisarlo
+y borrarlo.
+
 ### Probarlo en local con Docker
 
 `docker-compose.override.yml` publica el puerto 3000 al host — Compose lo
