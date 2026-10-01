@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
-import { ApiError, changeMyCode } from "@/lib/api-client";
+import { ApiError, changeMyCode, changeMyName } from "@/lib/api-client";
 import { AppHeader } from "@/components/AppHeader";
 import { CodeInput } from "@/components/CodeInput";
 import { Spinner } from "@/components/Spinner";
@@ -14,7 +14,7 @@ const ROLE_LABEL = { SUPERADMIN: "Administrador de la plataforma", ORGANIZER: "O
 /** "Mi cuenta": who is signed in and changing one's own 6-digit code. */
 export default function AccountPage() {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, refresh } = useAuth();
   const { show } = useToast();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -73,6 +73,14 @@ export default function AccountPage() {
             </p>
           </section>
 
+          <NameCard
+            current={user.name}
+            onSaved={async () => {
+              await refresh();
+              show("Nombre actualizado.", "success");
+            }}
+          />
+
           <section className="space-y-4 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
             <div>
               <h2 className="text-sm font-semibold text-text">Cambiar mi código</h2>
@@ -111,5 +119,61 @@ export default function AccountPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+/** Changing one's own name: what the team sees in the header, in "vendido por" and in notifications. */
+function NameCard({ current, onSaved }: { current: string; onSaved: () => Promise<void> }) {
+  const [name, setName] = useState(current);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const changed = name.trim() !== current;
+
+  const save = async () => {
+    setError(null);
+    if (name.trim().length < 2) return setError("Escribe tu nombre (mínimo 2 letras).");
+    setSaving(true);
+    try {
+      await changeMyName(name.trim());
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+      <div>
+        <h2 className="text-sm font-semibold text-text">Mi nombre</h2>
+        <p className="mt-0.5 text-xs text-text-muted">Así te ve tu equipo: arriba en la app, en &quot;vendido por&quot; y en las notificaciones.</p>
+      </div>
+      <input
+        id="myName"
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={80}
+        autoComplete="name"
+        aria-label="Mi nombre"
+        className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400"
+      />
+      {error && (
+        <p role="alert" className="text-sm font-medium text-red-400">
+          {error}
+        </p>
+      )}
+      {changed && (
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="flex h-11 w-full items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 text-sm font-bold text-[#241a02] transition active:scale-[0.98] disabled:opacity-50"
+        >
+          {saving ? <Spinner size={16} /> : "Guardar nombre"}
+        </button>
+      )}
+    </section>
   );
 }
