@@ -12,6 +12,7 @@ import { describeHolder } from "@/components/CloseRaffleSheet";
 import { CrownIcon } from "@/components/icons/Crown";
 import { NotificationsButton } from "@/components/NotificationsButton";
 import { PaymentsLink } from "@/components/PaymentsLink";
+import { UserMenu } from "@/components/UserMenu";
 import { Spinner } from "@/components/Spinner";
 
 // Whether the folding part of the header is hidden. Remembered on the device (localStorage),
@@ -135,24 +136,10 @@ export function DashboardHeader({
               Ibirifas
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/cuenta"
-              aria-label={`Mi cuenta (${userName})`}
-              className="max-w-[9rem] truncate rounded-full px-1 text-sm font-medium text-text-muted underline-offset-4 hover:underline"
-            >
-              {userName}
-            </Link>
+          <div className="flex items-center gap-2.5">
             <PaymentsLink />
             <NotificationsButton />
-            <button
-              type="button"
-              onClick={onLogout}
-              aria-label="Cerrar sesión"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
-            >
-              <LogoutIcon className="h-4 w-4" />
-            </button>
+            <UserMenu userName={userName} onLogout={onLogout} />
           </div>
         </div>
 
@@ -497,20 +484,6 @@ function EditIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
       <path
         d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function LogoutIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M15 17l5-5-5-5M20 12H9M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"

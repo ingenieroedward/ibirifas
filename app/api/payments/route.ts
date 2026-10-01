@@ -13,8 +13,7 @@ const FILTERS: Record<string, ReceivedPaymentStatus[]> = {
 
 /**
  * The payments the bank reported for the signed-in user's organization: `?filter=pending|approved|ignored`
- * (default pending), or `?count=1` for just the number waiting (the badge). Whole team: approving a payment
- * is the same as marking numbers paid, which every seller can do.
+ * (default pending), or `?count=1` for just the number waiting (the badge). Organizer only.
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -22,6 +21,11 @@ export async function GET(req: NextRequest) {
   const tenantId = tenantIdFor(user);
   if (!tenantId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
+  // Organizer only: the bank reports every payment to the account, not just the raffles' (see lib/pagoradar.ts).
+  if (user.role !== "ORGANIZER") {
+    if (req.nextUrl.searchParams.get("count")) return NextResponse.json({ enabled: false, pending: 0 });
+    return NextResponse.json({ error: "Solo el organizador ve los pagos recibidos" }, { status: 403 });
+  }
   const enabled = (await pagoradarTenantId()) === tenantId;
   const pending = enabled ? await prisma.receivedPayment.count({ where: { ownerId: tenantId, status: { in: FILTERS.pending } } }) : 0;
   if (req.nextUrl.searchParams.get("count")) return NextResponse.json({ enabled, pending });

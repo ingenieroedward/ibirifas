@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
-import { notifyTeam } from "@/lib/push";
+import { sendPush, type PushPayload } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { syncCompletion } from "@/lib/completion";
 import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
@@ -15,9 +15,12 @@ import type { PaymentCandidateDTO, PaymentStatus } from "@/lib/types";
  *
  *   - same amount, paid after the reservation was made, and the holder's name matching what the buyer typed
  *     with their receipt (or their own name) → if exactly ONE online reservation fits, it is approved on its
- *     own and the team is told (with "Deshacer" in Pagos recibidos);
+ *     own and the organizer is told (with "Deshacer" in Pagos recibidos);
  *   - several fit, the name only partly matches, the reservation was made by the team, or automatic approval
  *     is off → it waits in "Por revisar" with the candidates;
+ *
+ * Only the organizer sees and resolves these payments (the account may receive other money too); sellers
+ * just see the numbers turn paid.
  *   - nothing has that amount → "Sin reserva".
  *
  * Raffles by stages are left out: their installments are collected from the number's sheet.
@@ -131,6 +134,18 @@ export function nameMatch(typed: string | null | undefined, bank: string | null 
 
 const RANK: Record<NameMatch, number> = { strong: 2, weak: 1, none: 0 };
 const better = (a: NameMatch, b: NameMatch): NameMatch => (RANK[a] >= RANK[b] ? a : b);
+
+/**
+ * Payment notices go to the organizer only: the bank reports every payment to the account (with the
+ * payer's name), and the account may also receive money that has nothing to do with the raffles.
+ */
+async function notifyOrganizer(tenantId: string, payload: PushPayload): Promise<void> {
+  try {
+    await sendPush([tenantId], payload);
+  } catch (err) {
+    console.error("[pagoradar] could not notify the organizer:", err instanceof Error ? err.message : err);
+  }
+}
 
 // ---------- open reservations
 
@@ -368,16 +383,11 @@ async function approveUnlocked(paymentId: string, numberIds: string[], actor: { 
   void syncCompletion(result.raffleId);
   const rows = await prisma.raffleNumber.findMany({ where: { id: { in: ids } }, select: buyerRowSelect });
   void emailBuyers(result.raffleId, rows, { kind: "approved", method: "breb" }, await mailOrigin());
+  // Only the organizer approves by hand, so only an automatic approval needs telling them.
   if (!actor) {
-    void notifyTeam(result.payment.ownerId, "", {
+    void notifyOrganizer(result.payment.ownerId, {
       title: `${result.raffleName} · pago Bre-B aprobado`,
       body: `${result.payment.payerName} pagó ${formatCurrency(result.payment.amount)}: ${result.matchLabel}. Se aprobó solo; si no es correcto, deshazlo en Pagos.`,
-      url: "/pagos",
-    });
-  } else {
-    void notifyTeam(result.payment.ownerId, actor.id, {
-      title: `${result.raffleName} · pago Bre-B aprobado`,
-      body: `${actor.name} asignó el pago de ${result.payment.payerName} (${formatCurrency(result.payment.amount)}) a ${result.matchLabel}.`,
       url: "/pagos",
     });
   }
@@ -480,7 +490,7 @@ export function rematchPayments(tenantId: string, fresh?: string): Promise<void>
         });
       }
       if (p.id === fresh) {
-        void notifyTeam(tenantId, "", {
+        void notifyOrganizer(tenantId, {
           title: decision.status === "review" ? "Pago Bre-B por revisar" : "Pago Bre-B sin reserva",
           body: `${p.payerName} · ${formatCurrency(p.amount)} (${BANK_LABEL[p.bank] ?? p.bank}). ${decision.note}`,
           url: "/pagos",

@@ -377,7 +377,12 @@ organización (rifas abiertas, no por etapas):
 
 El aviso del banco suele llegar **antes** que el comprobante: cuando el comprador lo
 sube (con el titular), se vuelve a intentar el cruce. Un pago que alguien deshizo no
-se vuelve a aprobar solo. El botón con el ícono de banco (arriba, junto a la campana)
+se vuelve a aprobar solo.
+
+**Solo el organizador** ve "Pagos recibidos" y recibe sus notificaciones: el banco
+avisa todo lo que entra a la cuenta (con el nombre de quien paga), también lo que no
+es de las rifas. Los vendedores solo ven los números quedar pagados en el tablero.
+Mejor aún: usa para las rifas una cuenta que no reciba otros pagos. El botón con el ícono de banco (arriba, junto a la campana)
 lleva a **Pagos recibidos** y muestra cuántos esperan. En **Mi equipo** el
 organizador apaga o enciende "Aprobar solos los pagos Bre-B". Cada número pagado así
 guarda el id del pago (`paymentRef`).

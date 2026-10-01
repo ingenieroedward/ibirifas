@@ -17,7 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const tenantId = tenantIdFor(user);
-  if (!tenantId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  if (!tenantId || user.role !== "ORGANIZER") {
+    return NextResponse.json({ error: "Solo el organizador maneja los pagos recibidos" }, { status: 403 });
+  }
 
   const { id } = await params;
   const payment = await prisma.receivedPayment.findUnique({ where: { id }, select: { ownerId: true } });
