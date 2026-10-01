@@ -6,6 +6,7 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { rememberReservation, reservationPath } from "@/lib/myReservations";
 import type { PublicRaffleDTO, ReserveResultDTO } from "@/lib/types";
 
 interface ReserveSheetProps {
@@ -21,12 +22,12 @@ interface ReserveSheetProps {
 /** What the visitor typed is remembered on their own device for the next reservation. */
 const CONTACT_KEY = "ibirifas_reserve_contact";
 
-function readContact(): { name: string; phone: string } {
+function readContact(): { name: string; phone: string; email: string } {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(CONTACT_KEY) ?? "{}") as { name?: string; phone?: string };
-    return { name: saved.name ?? "", phone: saved.phone ?? "" };
+    const saved = JSON.parse(window.localStorage.getItem(CONTACT_KEY) ?? "{}") as { name?: string; phone?: string; email?: string };
+    return { name: saved.name ?? "", phone: saved.phone ?? "", email: saved.email ?? "" };
   } catch {
-    return { name: "", phone: "" };
+    return { name: "", phone: "", email: "" };
   }
 }
 
@@ -39,6 +40,8 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
   const [contact] = useState(readContact);
   const [name, setName] = useState(contact.name);
   const [phone, setPhone] = useState(contact.phone);
+  const [email, setEmail] = useState(contact.email);
+  const askEmail = raffle.reservations.email;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReserveResultDTO | null>(null);
@@ -59,13 +62,15 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
   const submit = async () => {
     if (name.trim().length < 2) return setError("Escribe tu nombre.");
     if (phone.replace(/\D/g, "").length < 7) return setError("Escribe un teléfono válido para poder contactarte.");
+    const mail = askEmail ? email.trim() : "";
+    if (mail && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(mail)) return setError("Revisa tu correo: no parece válido.");
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/public/raffles/${token}/reserve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), numbers, sets }),
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), ...(mail ? { email: mail } : {}), numbers, sets }),
       });
       const body = (await res.json().catch(() => ({}))) as Partial<ReserveResultDTO> & { error?: string };
       if (!res.ok) {
@@ -75,7 +80,8 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         return;
       }
       try {
-        window.localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: name.trim(), phone: phone.trim() }));
+        window.localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: name.trim(), phone: phone.trim(), email: mail }));
+        rememberReservation(token, (body as ReserveResultDTO).receiptKey);
       } catch {
         // Not remembering is fine.
       }
@@ -188,7 +194,17 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
             </>
           )}
         </div>
-        <p className="text-xs text-text-muted">Quien organiza la rifa te va a escribir para confirmar tu pago.</p>
+        <a
+          href={reservationPath(token, result.receiptKey)}
+          className="flex h-12 w-full items-center justify-center rounded-2xl border border-gold-600/50 text-sm font-semibold text-gold-400 transition active:scale-[0.98]"
+        >
+          Ver mi reserva
+        </a>
+        <p className="text-xs text-text-muted">
+          {askEmail && email.trim()
+            ? `Te escribiremos a ${email.trim()} cuando confirmen o rechacen tu pago. También puedes revisarlo en "Ver mi reserva" (guarda ese enlace).`
+            : "En \"Ver mi reserva\" puedes revisar cuando confirmen tu pago (guarda ese enlace)."}
+        </p>
         <button
           type="button"
           onClick={() => onClose(true)}
@@ -249,6 +265,26 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400"
         />
       </div>
+
+      {askEmail && (
+        <div className="space-y-1.5">
+          <label htmlFor="reserveEmail" className="text-sm font-medium text-text-muted">
+            Tu correo (opcional)
+          </label>
+          <input
+            id="reserveEmail"
+            type="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Ej. maria@gmail.com"
+            autoComplete="email"
+            maxLength={120}
+            className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400"
+          />
+          <p className="text-xs text-text-muted">Te avisamos ahí cuando confirmen o rechacen tu pago.</p>
+        </div>
+      )}
 
       <p className="text-xs text-text-muted">
         Se apartan a tu nombre y tienes {daysText(holdDays)} para pagar. Si no pagas a tiempo, se liberan.

@@ -39,6 +39,9 @@ model AdminUser {
   // Only meaningful for ORGANIZER: the organization's default for letting people
   // reserve numbers from a raffle's public link. Each raffle can override it.
   publicReservations Boolean    @default(false)
+  // Only meaningful for ORGANIZER: where buyers' replies to our emails go (Reply-To), and where a test
+  // email is sent. Optional.
+  contactEmail  String?
 
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]
@@ -265,6 +268,12 @@ model RaffleNumber {
   // attach their payment receipt afterwards. Same value on all of one
   // reservation's numbers; cleared when the numbers are freed or resold.
   holdToken     String?
+  // Optional email left by a visitor who reserved online: where we tell them about their reservation
+  // (receipt received, payment approved or rejected, released). Cleared with the buyer.
+  buyerEmail    String?
+  // The team rejected the receipt the buyer sent (it was removed so they can send another): when and why.
+  receiptRejectedAt   DateTime?
+  receiptRejectReason String?
   // Installments paid, for a raffle by stages.
   quotas        NumberQuota[]
 

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
-import { ApiError, getOrgSettings, getUsers, updateOrgSettings, updateUser } from "@/lib/api-client";
-import type { ManagedUserDTO } from "@/lib/types";
+import { ApiError, getOrgSettings, getUsers, sendTestEmail, updateOrgSettings, updateUser } from "@/lib/api-client";
+import type { ManagedUserDTO, OrgSettingsDTO } from "@/lib/types";
 import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
 import { EditUserSheet } from "@/components/EditUserSheet";
@@ -153,6 +153,7 @@ export default function UsersPage() {
         <div className="mx-auto w-full max-w-2xl">
           {!isSuperadmin && user.orgCode && <OrgCodeCard orgCode={user.orgCode} onCopied={show} />}
           {!isSuperadmin && <ReservationsCard onError={show} />}
+          {!isSuperadmin && <EmailCard onError={show} />}
 
           {loading && (
             <div className="flex flex-1 items-center justify-center py-24">
@@ -337,6 +338,107 @@ function ReservationsCard({ onError }: { onError: (message: string, variant?: "s
           </span>
         </span>
       </label>
+    </section>
+  );
+}
+
+/** The organization's contact email (Reply-To of the emails buyers get) and a test email to check the setup. */
+function EmailCard({ onError }: { onError: (message: string, variant?: "success" | "error" | "info") => void }) {
+  const [settings, setSettings] = useState<OrgSettingsDTO | null>(null);
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getOrgSettings()
+      .then((s) => {
+        if (cancelled) return;
+        setSettings(s);
+        setEmail(s.contactEmail ?? "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!settings) return null;
+  const changed = email.trim() !== (settings.contactEmail ?? "");
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const saved = await updateOrgSettings({ contactEmail: email.trim() || null });
+      setSettings(saved);
+      setEmail(saved.contactEmail ?? "");
+      onError("Correo guardado", "success");
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : "No se pudo guardar el correo.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    try {
+      await sendTestEmail();
+      onError(`Correo de prueba enviado a ${settings.contactEmail}`, "success");
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : "No se pudo enviar la prueba.", "error");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <section className="mb-4 space-y-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+      <div>
+        <p className="text-sm font-semibold text-text">Correos a compradores</p>
+        <p className="mt-0.5 text-xs text-text-muted">
+          {settings.mailEnabled
+            ? "Quien reserva desde el enlace y deja su correo recibe avisos: reserva hecha, comprobante recibido, pago confirmado o rechazado y reserva liberada. Si responde, la respuesta llega a tu correo de contacto."
+            : "El servidor todavía no tiene el correo configurado (SMTP), así que no se envían correos. Pídele a quien administra la app que lo active."}
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <label htmlFor="contactEmail" className="text-sm font-medium text-text-muted">
+          Tu correo de contacto
+        </label>
+        <input
+          id="contactEmail"
+          type="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Ej. rifas@tu-negocio.com"
+          maxLength={120}
+          className="h-11 w-full rounded-xl border border-line bg-surface-2 px-3 text-base text-text outline-none focus:border-gold-400"
+        />
+      </div>
+      <div className="flex gap-2">
+        {changed && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="flex h-10 flex-1 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 text-sm font-bold text-[#241a02] transition active:scale-[0.98] disabled:opacity-50"
+          >
+            {saving ? <Spinner size={16} /> : "Guardar"}
+          </button>
+        )}
+        {settings.mailEnabled && settings.contactEmail && !changed && (
+          <button
+            type="button"
+            onClick={test}
+            disabled={testing}
+            className="flex h-10 flex-1 items-center justify-center rounded-xl border border-gold-600/50 text-sm font-semibold text-gold-400 transition active:scale-[0.98] disabled:opacity-50"
+          >
+            {testing ? <Spinner size={16} /> : "Enviar correo de prueba"}
+          </button>
+        )}
+      </div>
     </section>
   );
 }

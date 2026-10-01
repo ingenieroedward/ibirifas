@@ -417,6 +417,13 @@ de tipo **Docker Compose** en Dokploy.
      revísalos ahí antes de que se pierdan.
    - Opcional, para las notificaciones push: `VAPID_PUBLIC_KEY`,
      `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` (ver "Notificaciones push" abajo).
+   - Recomendado: `APP_URL` (la dirección pública, ej. `https://rifas.tu-dominio.com`;
+     se usa en los enlaces de los correos) y `TRUSTED_PROXY_HOPS` (`1` si delante
+     solo está Dokploy; `2` con Cloudflare en modo proxy, la nube naranja).
+   - Opcional, para los correos a compradores: `SMTP_HOST`, `SMTP_PORT`,
+     `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM` (ver "Correos a compradores" abajo).
+   - Solo las variables listadas en `docker-compose.yml` llegan al contenedor:
+     si agregas una nueva en Dokploy, también debe estar ahí.
 3. Configura el dominio de la app en Dokploy apuntando al puerto **interno**
    3000 del servicio `app` (el `docker-compose.yml` del repo no publica
    ningún puerto del host a propósito — Dokploy enruta por su propio proxy
@@ -477,6 +484,56 @@ Requisitos y límites:
   a direcciones internas.
 - El aviso se envía después de guardar la venta y nunca la retrasa ni la
   hace fallar: si el servicio de push está caído, la venta se guarda igual.
+
+## Correos a compradores
+
+Quien reserva desde el enlace público puede dejar su **correo** (opcional) y
+recibe un aviso cuando pasa algo con su reserva:
+
+- **Reserva hecha**: lo que apartó, el total, hasta cuándo tiene para pagar, las
+  cuentas de pago y el botón "Subir comprobante".
+- **Comprobante recibido**: el organizador lo va a revisar.
+- **Pago confirmado** cuando el equipo marca el número o el conjunto como pagado
+  (en una rifa por etapas: "Recibimos tu cuota N de M" con lo que le falta, y
+  "Pago confirmado" al completar).
+- **Comprobante rechazado**: el equipo usa "Rechazar comprobante" en la hoja del
+  número o del conjunto, con un motivo opcional ("No llegó el pago", "No se ve el
+  valor o la fecha"…). El comprobante se quita, la reserva sigue activa y el
+  comprador recibe el motivo y el enlace para subir otro.
+- **Reserva liberada**, por el equipo o porque venció el plazo de pago (o la
+  cuota de una etapa).
+
+Además, cada reserva tiene su página **"Mi reserva"** (`/p/<token>/reserva/<clave>`),
+que funciona aunque no deje correo: muestra el estado (pendiente, en revisión,
+rechazado con su motivo, confirmado), lo que apartó, cuánto paga y hasta cuándo,
+y permite subir o reemplazar el comprobante. Se abre desde la confirmación de la
+reserva, desde los correos y desde el botón "Ver mi reserva" del enlace público
+(en el mismo dispositivo). La clave es secreta y solo da acceso a esa reserva.
+Varios números de un mismo correo en una sola acción se avisan en **un solo
+correo**.
+
+**Configuración** (Dokploy → Environment Variables), con cualquier servidor SMTP:
+
+| Variable | Ejemplo |
+| --- | --- |
+| `SMTP_HOST` | `smtp.resend.com`, `smtp-relay.brevo.com`, `smtp.gmail.com` |
+| `SMTP_PORT` | `587` (STARTTLS) o `465` (TLS directo) |
+| `SMTP_USER` / `SMTP_PASS` | el usuario y la clave SMTP del proveedor |
+| `MAIL_FROM` | `Rifas <rifas@tu-dominio.com>` |
+| `APP_URL` | `https://rifas.tu-dominio.com` (para los enlaces de los correos) |
+
+Para que los correos no lleguen a spam, envía desde tu propio dominio y
+verifícalo en el proveedor (registros SPF/DKIM que te da, en Cloudflare). Con
+Gmail sirve una "contraseña de aplicación", pero tiene límite diario y es fácil
+que caiga en spam; para una rifa grande es mejor Resend o Brevo (ambos tienen
+plan gratis). Sin `SMTP_HOST` la app funciona igual: el formulario no pide correo
+y no se envía nada, pero "Mi reserva" sigue disponible.
+
+En **Mi equipo → Correos a compradores** el organizador guarda su **correo de
+contacto** (las respuestas de los compradores llegan ahí) y puede enviarse un
+**correo de prueba** para revisar la configuración. El equipo ve el correo del
+comprador en la hoja del número, y en Participantes aparece "Comprobante
+rechazado" mientras espera uno nuevo.
 
 ## Actualización en tiempo real
 

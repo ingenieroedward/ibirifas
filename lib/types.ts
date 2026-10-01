@@ -57,6 +57,10 @@ export type ReservationSetting = "inherit" | "on" | "off";
 export interface OrgSettingsDTO {
   /** Default for its raffles: may visitors of a public link reserve numbers? */
   publicReservations: boolean;
+  /** Where buyers' replies to our emails go; also where the test email is sent. */
+  contactEmail: string | null;
+  /** Read-only: the server has email set up (SMTP). */
+  mailEnabled?: boolean;
 }
 
 export interface AdminUserDTO {
@@ -93,6 +97,11 @@ export interface RaffleNumberDTO {
   soldAt: string | null;
   /** Reserved by a visitor of the public link rather than sold by the team. */
   online: boolean;
+  /** Email left by an online buyer, where they are told about their reservation. */
+  buyerEmail: string | null;
+  /** The team rejected the receipt this buyer sent (and why); cleared when they send another or pay. */
+  receiptRejectedAt: string | null;
+  receiptRejectReason: string | null;
   /** Installments paid (raffles by stages only; empty otherwise), in order. */
   quotas: QuotaDTO[];
   updatedAt: string;
@@ -165,13 +174,15 @@ export interface PublicRaffleDTO {
   /** Every number: `sold` is true for anything taken (pending or paid); `group` is the set's letter. */
   numbers: { value: number; sold: boolean; group: string | null }[];
   /** Whether visitors can reserve from this page, and how many days they get to pay. */
-  reservations: { open: boolean; holdDays: number | null; maxLoose: number; maxSets: number };
+  /** `email`: the server can send email, so the reservation form asks for one (optional). */
+  reservations: { open: boolean; holdDays: number | null; maxLoose: number; maxSets: number; email: boolean };
 }
 
 /** What a visitor sends to reserve: loose numbers and/or whole sets by letter. */
 export interface ReserveInput {
   name: string;
   phone: string;
+  email?: string;
   numbers: number[];
   sets: string[];
 }
@@ -184,6 +195,36 @@ export interface ReserveResultDTO {
   sets: string[];
   /** Secret that lets this visitor attach their payment receipt to the reservation afterwards. */
   receiptKey: string;
+}
+
+/** One online reservation as its buyer sees it on "Mi reserva" (see lib/publicReservation.ts). */
+export interface ReservationDTO {
+  raffleName: string;
+  raffleClosed: boolean;
+  buyerName: string | null;
+  /** They left an email: we'll write to them when something changes. */
+  hasEmail: boolean;
+  sets: { label: string; price: number }[];
+  numbers: number[];
+  total: number;
+  /** pending: waiting for payment · review: receipt sent, not checked yet · rejected: the receipt wasn't valid · paid. */
+  state: "pending" | "review" | "rejected" | "paid";
+  rejectReason: string | null;
+  /** When an unpaid reservation is freed; null once something was paid or with no deadline. */
+  deadline: string | null;
+  accounts: RaffleAccountDTO[];
+  /** Raffles by stages: installments paid and what's owed. */
+  stages: {
+    paid: number;
+    total: number;
+    paidAmount: number;
+    owed: number;
+    dueNow: number;
+    nextStage: string | null;
+    lastDay: string | null;
+  } | null;
+  themeBackground: string | null;
+  themeNumberColor: string | null;
 }
 
 export type PublicLinkAction = "enable" | "disable" | "regenerate";
@@ -340,6 +381,8 @@ export type BulkNumberInput =
   // Undo a payment (paid -> pending), free the numbers, or fix the buyer's details.
   | { action: "unpay"; ids: string[] }
   | { action: "release"; ids: string[] }
+  // The buyer's receipt isn't valid: remove it and tell them why (they can send another).
+  | { action: "rejectReceipt"; ids: string[]; reason?: string | null }
   | { action: "edit"; ids: string[]; buyerName: string; buyerPhone?: string | null };
 
 type WithoutIds<T> = T extends { ids: string[] } ? Omit<T, "ids"> : never;

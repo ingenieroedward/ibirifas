@@ -10,6 +10,7 @@ import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
 import { currentPaidStage, deadlineOf, installmentPrices, installmentsNeeded, paidStages } from "@/lib/stages";
 import type { PaymentStatus } from "@/lib/types";
+import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
 const schema = z.discriminatedUnion("action", [
   z.object({
@@ -156,6 +157,16 @@ export async function POST(req: NextRequest) {
       body: `${user.name} cobró ${what} a ${who} · ${formatCurrency(collected)}`,
       url: `/rifas/${raffleId}`,
     });
+  }
+
+  if (input.action !== "undo" && touched.length > 0) {
+    // Buyers with an email: "cuota N de M" or, once everything is paid, "pago confirmado".
+    const rows = await prisma.raffleNumber.findMany({ where: { id: { in: ids } }, select: { ...buyerRowSelect, status: true } });
+    const origin = await mailOrigin();
+    const full = rows.filter((r) => r.status === "paid");
+    const partial = rows.filter((r) => r.status !== "paid");
+    if (full.length > 0) void emailBuyers(raffleId, full, { kind: "approved", method: input.paymentMethod }, origin);
+    if (partial.length > 0) void emailBuyers(raffleId, partial, { kind: "installment" }, origin);
   }
 
   const updated = await prisma.raffleNumber.findMany({ where: { id: { in: ids } }, orderBy: { value: "asc" }, include: numberInclude });

@@ -7,6 +7,7 @@ import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { amountRemaining, type StageSettings } from "@/lib/stages";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { QuotaPanel } from "@/components/QuotaPanel";
+import { ReceiptReview } from "@/components/ReceiptReview";
 import { Spinner } from "@/components/Spinner";
 
 interface NumberSheetProps {
@@ -21,6 +22,8 @@ interface NumberSheetProps {
   /** A raffle by stages: the number is paid in installments instead of "Marcar como pagado". */
   stageSettings?: StageSettings | null;
   onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
+  /** Reject the receipt a buyer sent (it is removed; they are told why). */
+  onRejectReceipt?: (id: string, reason: string | null) => Promise<void>;
 }
 
 const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
@@ -38,6 +41,7 @@ export function NumberSheet({
   onSave,
   stageSettings = null,
   onQuotas,
+  onRejectReceipt,
 }: NumberSheetProps) {
   if (!number) return null;
 
@@ -60,6 +64,7 @@ export function NumberSheet({
         onSave={onSave}
         stageSettings={stageSettings}
         onQuotas={onQuotas}
+        onRejectReceipt={onRejectReceipt}
       />
     </div>
   );
@@ -74,6 +79,7 @@ function SheetContent({
   onSave,
   stageSettings,
   onQuotas,
+  onRejectReceipt,
 }: {
   number: RaffleNumberDTO;
   numberPrice: number;
@@ -83,6 +89,7 @@ function SheetContent({
   onSave: (id: string, input: UpdateNumberInput) => Promise<void>;
   stageSettings: StageSettings | null;
   onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
+  onRejectReceipt?: (id: string, reason: string | null) => Promise<void>;
 }) {
   const [buyerName, setBuyerName] = useState(number.buyerName ?? "");
   const [buyerPhone, setBuyerPhone] = useState(number.buyerPhone ?? "");
@@ -97,6 +104,8 @@ function SheetContent({
   );
 
   const isAvailable = number.status === "available";
+  // A sold number shows the receipt as it is now (the buyer may send or replace it while the sheet is open).
+  const shownPhoto = isAvailable ? photoDataUrl : number.photoDataUrl;
 
   const handleSell = async () => {
     const trimmedName = buyerName.trim();
@@ -270,6 +279,16 @@ function SheetContent({
             <div className="space-y-3 rounded-2xl border border-line bg-surface-2 p-4">
               <InfoRow label="Comprador" value={number.buyerName || "Sin nombre"} />
               {number.online && <InfoRow label="Origen" value="Reserva en línea" />}
+              {number.buyerEmail && (
+                <InfoRow
+                  label="Correo"
+                  value={
+                    <a href={`mailto:${number.buyerEmail}`} className="break-all text-gold-400 underline-offset-2 hover:underline">
+                      {number.buyerEmail}
+                    </a>
+                  }
+                />
+              )}
               {number.updatedByName && (
                 <InfoRow label="Registrado por" value={number.updatedByName} />
               )}
@@ -299,15 +318,25 @@ function SheetContent({
               />
             </div>
 
-            {photoDataUrl && (
+            {shownPhoto && (
               <button
                 type="button"
                 onClick={() => setPhotoViewerOpen(true)}
                 className="block h-48 w-full overflow-hidden rounded-2xl border border-line"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoDataUrl} alt="Comprobante" className="h-full w-full object-cover" />
+                <img src={shownPhoto} alt="Comprobante" className="h-full w-full object-cover" />
               </button>
+            )}
+
+            {number.status === "occupied" && onRejectReceipt && (
+              <ReceiptReview
+                hasReceipt={Boolean(number.photoDataUrl)}
+                rejectedAt={number.receiptRejectedAt}
+                rejectReason={number.receiptRejectReason}
+                buyerEmail={number.buyerEmail}
+                onReject={(reason) => onRejectReceipt(number.id, reason)}
+              />
             )}
 
             {formError && <p className="text-sm font-medium text-red-400">{formError}</p>}
@@ -394,13 +423,13 @@ function SheetContent({
         )}
       </div>
 
-      {photoViewerOpen && photoDataUrl && (
+      {photoViewerOpen && shownPhoto && (
         <div
           className="fixed inset-0 z-[110] flex animate-fade-in items-center justify-center bg-black/95 p-4"
           onClick={() => setPhotoViewerOpen(false)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoDataUrl} alt="Comprobante ampliado" className="max-h-full max-w-full rounded-lg object-contain" />
+          <img src={shownPhoto} alt="Comprobante ampliado" className="max-h-full max-w-full rounded-lg object-contain" />
           <button
             type="button"
             onClick={() => setPhotoViewerOpen(false)}
