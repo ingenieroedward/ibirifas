@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { ensureContrast, luminance, mix } from "@/lib/color";
+import { resolvedTheme, type RaffleTheme } from "@/lib/theme";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { mailEnabled, sendMail } from "@/lib/mail";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
@@ -78,7 +80,26 @@ interface Composed {
   button?: { label: string; url: string };
 }
 
-function render(c: Composed, raffleName: string): { text: string; html: string } {
+/** The raffle's own look for its emails (same colors as its public page), always readable. */
+export function emailColors(raffle: RaffleTheme) {
+  const { background, numberColor, textColor } = resolvedTheme(raffle);
+  return {
+    header: background,
+    // The raffle's color as the title on the header, nudged until it reads there.
+    headerText: ensureContrast(numberColor, [background], 4.5),
+    button: numberColor,
+    buttonText: textColor,
+    // A pale wash of the raffle's color for the page around the card and the accounts box.
+    page: mix(numberColor, 0.92),
+    box: mix(numberColor, 0.88),
+    // Links and emphasis on the white card.
+    accent: ensureContrast(numberColor, ["#ffffff"], 4.5),
+    // A light header would blend into the white card: underline it in the raffle's color.
+    headerBorder: luminance(background) > 0.8 ? `border-bottom:4px solid ${numberColor};` : "",
+  };
+}
+
+export function render(c: Composed, raffleName: string, colors: ReturnType<typeof emailColors>): { text: string; html: string } {
   const text = [
     ...c.paragraphs.map((p) => p.replace(/\*\*/g, "")),
     ...(c.accounts?.length ? ["", "Puedes pagar en:", ...c.accounts.map((a) => `• ${a}`)] : []),
@@ -88,22 +109,22 @@ function render(c: Composed, raffleName: string): { text: string; html: string }
   ].join("\n");
 
   const para = (p: string) =>
-    `<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:#1f1d26">${escapeHtml(p).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</p>`;
-  const html = `<!doctype html><html><body style="margin:0;background:#f4f2ea;padding:24px 12px;font-family:Arial,Helvetica,sans-serif">
-<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e8e3d3">
-<div style="background:#0b0b0f;padding:18px 24px;color:#f5c518;font-size:18px;font-weight:bold">${escapeHtml(raffleName)}</div>
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:#1f1d26">${escapeHtml(p).replace(/\*\*(.+?)\*\*/g, `<strong style="color:${colors.accent}">$1</strong>`)}</p>`;
+  const html = `<!doctype html><html><body style="margin:0;background:${colors.page};padding:24px 12px;font-family:Arial,Helvetica,sans-serif">
+<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${colors.box}">
+<div style="background:${colors.header};${colors.headerBorder}padding:18px 24px;color:${colors.headerText};font-size:18px;font-weight:bold">${escapeHtml(raffleName)}</div>
 <div style="padding:24px">
 ${c.paragraphs.map(para).join("\n")}
 ${
   c.accounts?.length
-    ? `<div style="margin:6px 0 16px;padding:12px 14px;background:#faf7ec;border-radius:12px;font-size:14px;color:#1f1d26"><div style="font-weight:bold;margin-bottom:6px">Puedes pagar en:</div>${c.accounts
+    ? `<div style="margin:6px 0 16px;padding:12px 14px;background:${colors.box};border-radius:12px;font-size:14px;color:#1f1d26"><div style="font-weight:bold;margin-bottom:6px">Puedes pagar en:</div>${c.accounts
         .map((a) => `<div>${escapeHtml(a)}</div>`)
         .join("")}</div>`
     : ""
 }
 ${
   c.button
-    ? `<p style="margin:20px 0 4px"><a href="${escapeHtml(c.button.url)}" style="display:inline-block;background:#f5c518;color:#241a02;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:12px">${escapeHtml(c.button.label)}</a></p>`
+    ? `<p style="margin:20px 0 4px"><a href="${escapeHtml(c.button.url)}" style="display:inline-block;background:${colors.button};color:${colors.buttonText};text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:12px">${escapeHtml(c.button.label)}</a></p>`
     : ""
 }
 </div></div>
@@ -131,6 +152,9 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
         accounts: { orderBy: { position: "asc" } },
         groups: { select: { id: true, label: true, price: true } },
         stages: true,
+        themeBackground: true,
+        themeNumberColor: true,
+        themeTextColor: true,
         owner: { select: { contactEmail: true } },
       },
     });
@@ -273,7 +297,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
           };
           break;
       }
-      const { text, html } = render(c, raffle.name);
+      const { text, html } = render(c, raffle.name, emailColors(raffle));
       await sendMail({ to, subject: c.subject, text, html, replyTo: raffle.owner.contactEmail });
     }
   } catch (err) {

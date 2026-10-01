@@ -15,6 +15,7 @@ import type {
   UpdateNumberInput,
   UpdateRaffleInput,
   UpdateUserInput,
+  VisitStatsDTO,
 } from "@/lib/types";
 
 /**
@@ -317,6 +318,16 @@ export async function updateUser(
 /** The organization's settings (organizer only). */
 export async function getOrgSettings(): Promise<OrgSettingsDTO> {
   return request<OrgSettingsDTO>("/api/org/settings");
+}
+
+/** Visits to a raffle's public link. */
+export async function getVisitStats(raffleId: string): Promise<VisitStatsDTO> {
+  return request<VisitStatsDTO>(`/api/raffles/${raffleId}/visits`);
+}
+
+/** Changes the signed-in person's own 6-digit code (asks for the current one). */
+export async function changeMyCode(currentCode: string, newCode: string): Promise<void> {
+  await request<{ ok: true }>("/api/auth/change-code", { method: "POST", body: JSON.stringify({ currentCode, newCode }) });
 }
 
 /** Sends a test email to the organizer's contact address. */

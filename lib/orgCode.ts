@@ -64,3 +64,11 @@ export async function firstFreeOrgCode(base: string, isTaken: (code: string) => 
   }
   return candidate;
 }
+
+/** A 6-digit code anyone would try first: one digit repeated (111111) or a straight run (123456, 987654). */
+export function isWeakLoginCode(code: string): boolean {
+  if (!/^\d{6}$/.test(code)) return false;
+  if (/^(\d)\1{5}$/.test(code)) return true;
+  const steps = new Set([...code].slice(1).map((d, i) => Number(d) - Number(code[i])));
+  return steps.size === 1 && (steps.has(1) || steps.has(-1));
+}

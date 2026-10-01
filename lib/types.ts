@@ -175,7 +175,15 @@ export interface PublicRaffleDTO {
   numbers: { value: number; sold: boolean; group: string | null }[];
   /** Whether visitors can reserve from this page, and how many days they get to pay. */
   /** `email`: the server can send email, so the reservation form asks for one (optional). */
-  reservations: { open: boolean; holdDays: number | null; maxLoose: number; maxSets: number; email: boolean };
+  reservations: {
+    open: boolean;
+    holdDays: number | null;
+    maxLoose: number;
+    maxSets: number;
+    email: boolean;
+    /** Cloudflare Turnstile site key when the anti-bot check is on; null otherwise. */
+    turnstileSiteKey: string | null;
+  };
 }
 
 /** What a visitor sends to reserve: loose numbers and/or whole sets by letter. */
@@ -183,6 +191,7 @@ export interface ReserveInput {
   name: string;
   phone: string;
   email?: string;
+  turnstileToken?: string;
   numbers: number[];
   sets: string[];
 }
@@ -195,6 +204,17 @@ export interface ReserveResultDTO {
   sets: string[];
   /** Secret that lets this visitor attach their payment receipt to the reservation afterwards. */
   receiptKey: string;
+}
+
+/** Visits to a raffle's public link (see lib/visits.ts). People are counted once a day. */
+export interface VisitStatsDTO {
+  today: number;
+  last7: number;
+  /** People-days since the link was shared (one person on three days counts 3). */
+  total: number;
+  /** Page openings, repeats included. */
+  views: number;
+  last14: { day: string; visitors: number }[];
 }
 
 /** One online reservation as its buyer sees it on "Mi reserva" (see lib/publicReservation.ts). */

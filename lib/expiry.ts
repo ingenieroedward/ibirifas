@@ -5,6 +5,7 @@ import { describeNumbers, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
 import { currentPaidStage, deadlineOf, installmentsNeeded } from "@/lib/stages";
 import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
+import { pruneVisits } from "@/lib/visits";
 import { formatNumberValue } from "@/lib/format";
 import { syncCompletion } from "@/lib/completion";
 
@@ -108,6 +109,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
         buyerEmail: null,
         receiptRejectedAt: null,
         receiptRejectReason: null,
+        privacyConsentAt: null,
         updatedById: null,
       },
     });
@@ -141,6 +143,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
 /** Sweeps every open raffle that has a deadline. Never throws: it runs on a timer. */
 export async function sweepAllRaffles(now: Date = new Date()): Promise<SweepResult[]> {
   const results: SweepResult[] = [];
+  await pruneVisits(now).catch(() => {});
   try {
     const raffles = await prisma.raffle.findMany({
       where: { status: "active", OR: [{ holdDays: { not: null } }, { stages: { some: {} } }] },
@@ -218,6 +221,7 @@ async function sweepStageDeadline(raffleId: string, now: Date): Promise<number> 
           buyerEmail: null,
           receiptRejectedAt: null,
           receiptRejectReason: null,
+          privacyConsentAt: null,
           updatedById: null,
         },
       }),

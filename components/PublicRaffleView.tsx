@@ -402,6 +402,11 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               <span className="h-3 w-3 rounded border border-line bg-surface-2" /> Vendido / apartado
             </span>
           </div>
+          <p className="text-center text-xs text-text-muted">
+            <a href={`/p/${token}/privacidad`} className="underline-offset-2 hover:underline">
+              Aviso de privacidad
+            </a>
+          </p>
         </div>
       </main>
 

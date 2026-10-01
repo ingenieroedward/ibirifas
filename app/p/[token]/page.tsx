@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { PublicRaffleView } from "@/components/PublicRaffleView";
 import { formatCurrency } from "@/lib/format";
 import { stagesPrizeSummary } from "@/lib/stages";
+import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
+import { clientIpFromHeaders } from "@/lib/rateLimit";
+import { recordVisit } from "@/lib/visits";
 import { getPublicRaffle } from "@/lib/publicRaffle";
 import { requestOrigin } from "@/lib/siteUrl";
 
@@ -41,6 +45,13 @@ export default async function PublicRafflePage({ params }: { params: Promise<{ t
 
   // A real 404, so nothing (a crawler, a link preview) mistakes a dead link for a page.
   if (!raffle) notFound();
+
+  // Count the visit (robots and link previews are skipped) so the team knows people are arriving.
+  const row = await prisma.raffle.findUnique({ where: { publicToken: token }, select: { id: true } });
+  if (row) {
+    const h = await headers();
+    await recordVisit(row.id, clientIpFromHeaders(h), h.get("user-agent"));
+  }
 
   return <PublicRaffleView token={token} initial={raffle} />;
 }

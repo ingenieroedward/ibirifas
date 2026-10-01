@@ -135,9 +135,13 @@ export function DashboardHeader({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="max-w-[9rem] truncate text-sm font-medium text-text-muted">
+            <Link
+              href="/cuenta"
+              aria-label={`Mi cuenta (${userName})`}
+              className="max-w-[9rem] truncate rounded-full px-1 text-sm font-medium text-text-muted underline-offset-4 hover:underline"
+            >
               {userName}
-            </span>
+            </Link>
             <NotificationsButton />
             <button
               type="button"
