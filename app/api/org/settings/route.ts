@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import type { OrgSettingsDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { EMAIL_RE, mailEnabled } from "@/lib/mail";
-import { pagoradarTenantId } from "@/lib/pagoradar";
+import { paymentsConnected } from "@/lib/pagoradar";
 
 const updateSchema = z.object({
   publicReservations: z.boolean().optional(),
@@ -18,7 +18,7 @@ const toDTO = async (row: { id: string; publicReservations: boolean; contactEmai
   publicReservations: row.publicReservations,
   contactEmail: row.contactEmail,
   mailEnabled: mailEnabled(),
-  paymentsEnabled: (await pagoradarTenantId()) === row.id,
+  paymentsEnabled: await paymentsConnected(row.id),
   autoApprovePayments: row.autoApprovePayments,
 });
 

@@ -1,4 +1,5 @@
 import type {
+  PaymentsAccountDTO,
   PaymentCandidateDTO,
   ReceivedPaymentsDTO,
   BulkNumberInput,
@@ -376,4 +377,20 @@ export async function actOnPayment(id: string, input: PaymentAction): Promise<vo
 export async function getOpenReservations(payer: string, amount: number): Promise<PaymentCandidateDTO[]> {
   const q = new URLSearchParams({ payer, amount: String(amount) });
   return (await request<{ reservations: PaymentCandidateDTO[] }>(`/api/payments/reservations?${q}`)).reservations;
+}
+
+export async function getPaymentsAccount(): Promise<PaymentsAccountDTO> {
+  return request<PaymentsAccountDTO>("/api/org/payments-account");
+}
+
+export async function connectPaymentsAccount(ownerEmail: string, banks: string[]): Promise<PaymentsAccountDTO> {
+  return request<PaymentsAccountDTO>("/api/org/payments-account", { method: "POST", body: JSON.stringify({ ownerEmail, banks }) });
+}
+
+export async function updatePaymentsAccount(ownerEmail: string, banks: string[]): Promise<PaymentsAccountDTO> {
+  return request<PaymentsAccountDTO>("/api/org/payments-account", { method: "PATCH", body: JSON.stringify({ ownerEmail, banks }) });
+}
+
+export async function disconnectPaymentsAccount(): Promise<PaymentsAccountDTO> {
+  return request<PaymentsAccountDTO>("/api/org/payments-account", { method: "DELETE" });
 }

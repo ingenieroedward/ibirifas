@@ -45,6 +45,9 @@ model AdminUser {
   // Only meaningful for ORGANIZER: a Bre-B payment reported by the bank (pagoradar) that matches exactly one
   // reservation is approved on its own. Off = it is only suggested and the team approves it.
   autoApprovePayments Boolean @default(true)
+  // Only meaningful for ORGANIZER: their receiving account in pagoradar (the bank inbox that forwards the
+  // payment notices of their own account). Null = not connected.
+  pagoradarAccountId String? @unique
 
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]

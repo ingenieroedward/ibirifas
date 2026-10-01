@@ -384,17 +384,38 @@ avisa todo lo que entra a la cuenta (con el nombre de quien paga), también lo q
 es de las rifas. Los vendedores solo ven los números quedar pagados en el tablero.
 Mejor aún: usa para las rifas una cuenta que no reciba otros pagos. El botón con el ícono de banco (arriba, junto a la campana)
 lleva a **Pagos recibidos** y muestra cuántos esperan. En **Mi equipo** el
-organizador apaga o enciende "Aprobar solos los pagos Bre-B". Cada número pagado así
+organizador conecta su cuenta y apaga o enciende "Aprobar solos los pagos". Cada número pagado así
 guarda el id del pago (`paymentRef`).
+
+### Conectar la cuenta de cada organizador
+
+Cada organizador conecta **su propia cuenta** en **Mi equipo → Pagos Bre-B
+automáticos**: escribe el Gmail donde el banco le avisa y elige los bancos. La app
+crea en pagoradar una cuenta receptora (con `tenantRef` = id del organizador) y le
+muestra los pasos ahí mismo:
+
+1. La **dirección de reenvío** para agregar en Gmail (con botón Copiar).
+2. El **código de confirmación** que Gmail le manda a esa dirección: aparece solo en
+   la tarjeta (y le llega una notificación).
+3. El texto del **filtro** (remitentes de sus bancos) para reenviar solo los avisos.
+4. Con el primer aviso de pago la cuenta queda **Conectado**.
+
+Puede cambiar el Gmail o los bancos, o desconectarla (si la cuenta ya tiene pagos,
+pagoradar la desactiva en vez de borrarla). Cada pago llega con el id de su cuenta y
+se cruza solo con las reservas de ese organizador; un pago de una cuenta que nadie
+tiene conectada se ignora.
 
 Configuración en Dokploy (además de pagoradar, ver su README):
 
 | Variable | Qué es |
 |---|---|
-| `PAGORADAR_WEBHOOK_SECRET` | El `secret` del webhook en la fuente de pagoradar |
-| `PAGORADAR_ORG` | El **código de organización** dueña de la cuenta (ej. `demo`) |
-| `PAGORADAR_URL` | `https://pagoradar.tu-dominio.com` (para ponerse al día) |
-| `PAGORADAR_API_KEY` | La `apiKey` de la fuente (para ponerse al día) |
+| `PAGORADAR_WEBHOOK_SECRET` | El `secret` del webhook de la app en pagoradar |
+| `PAGORADAR_URL` | `https://pagoradar.tu-dominio.com` |
+| `PAGORADAR_API_KEY` | Una API key de la app en pagoradar (crear cuentas y ponerse al día) |
+| `PAGORADAR_ORG` | *Opcional, heredado:* código de la organización que recibe los pagos de cuentas configuradas en pagoradar sin organizador (la configuración anterior). |
+
+Sin `PAGORADAR_URL` y `PAGORADAR_API_KEY` la tarjeta no permite conectar cuentas
+(solo funciona la configuración heredada con `PAGORADAR_ORG`).
 
 El webhook es `POST https://<tu-dominio>/api/pagoradar/webhook`. Cada 10 minutos (y
 al arrancar) la app pide a pagoradar los pagos que no le llegaron por webhook.
