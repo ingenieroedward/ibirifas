@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { triggerCondition } from "@/lib/drawPlan";
-import { daysLeft, daysText, daysWaiting, isOverdue } from "@/lib/holds";
+import { DAY_MS, daysLeft, daysText, daysWaiting, drawCutoff, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { PhoneEditor } from "@/components/PhoneEditor";
 import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
@@ -30,6 +30,8 @@ interface ParticipantsListProps {
   winnerValue?: number | null;
   /** Days a sold number may wait for its payment before it is overdue; null = no deadline. */
   holdDays?: number | null;
+  /** The draw date when unpaid holds must be paid the day before it (raffles without stages). */
+  drawDate?: string | null;
   /** Overdue numbers go back on sale by themselves. */
   autoRelease?: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
@@ -109,6 +111,7 @@ export function ParticipantsList({
   raffle,
   winnerValue,
   holdDays = null,
+  drawDate = null,
   autoRelease = false,
   onSelect,
   onPayAll,
@@ -126,9 +129,9 @@ export function ParticipantsList({
     const list = groupByBuyer(numbers);
     if (!holdDays) return list;
     // Whoever's payment is overdue goes to the top, longest wait first.
-    const overdueDays = (p: Participant) => Math.max(0, ...p.numbers.filter((n) => isOverdue(n, holdDays, now)).map((n) => daysWaiting(n, now)));
+    const overdueDays = (p: Participant) => Math.max(0, ...p.numbers.filter((n) => isOverdue(n, holdDays, now, drawDate)).map((n) => daysWaiting(n, now)));
     return list.sort((a, b) => overdueDays(b) - overdueDays(a));
-  }, [numbers, holdDays, now]);
+  }, [numbers, holdDays, now, drawDate]);
 
   const totals = useMemo(() => {
     let pending = 0;
@@ -182,6 +185,7 @@ export function ParticipantsList({
       {holdDays !== null && (
         <p className="text-xs text-text-muted">
           Los apartados vencen a los {daysText(holdDays)} sin pago
+          {drawDate && (drawCutoff(drawDate) ?? 0) > now ? `, o el ${formatDrawDate(new Date(new Date(drawDate).getTime() - DAY_MS).toISOString())} (día antes del sorteo) si llega primero` : ""}
           {autoRelease ? " y se liberan solos." : ": te avisamos una vez al día y tú decides."}
         </p>
       )}
@@ -244,6 +248,7 @@ export function ParticipantsList({
               priceOf={priceOf}
               raffle={raffle}
               holdDays={holdDays}
+              drawDate={drawDate}
               now={now}
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
@@ -300,6 +305,7 @@ function ParticipantCard({
   priceOf,
   raffle,
   holdDays,
+  drawDate,
   now,
   isWinner,
   onSelect,
@@ -313,6 +319,7 @@ function ParticipantCard({
   priceOf: (subset: RaffleNumberDTO[]) => number;
   raffle: WhatsAppRaffle;
   holdDays: number | null;
+  drawDate: string | null;
   now: number;
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
@@ -345,10 +352,10 @@ function ParticipantCard({
 
   // The deadline for unpaid sales: how long the worst one has waited, or how long is left before the first expires.
   const unpaid = p.numbers.filter((n) => n.status === "occupied");
-  const overdue = holdDays ? unpaid.filter((n) => isOverdue(n, holdDays, now)) : [];
+  const overdue = holdDays ? unpaid.filter((n) => isOverdue(n, holdDays, now, drawDate)) : [];
   const isLate = overdue.length > 0;
   const lateDays = Math.max(0, ...overdue.map((n) => daysWaiting(n, now)));
-  const soonest = holdDays && !isLate ? Math.min(...unpaid.map((n) => daysLeft(n, holdDays, now) ?? Infinity)) : Infinity;
+  const soonest = holdDays && !isLate ? Math.min(...unpaid.map((n) => daysLeft(n, holdDays, now, drawDate) ?? Infinity)) : Infinity;
   const paidItems = holdings.length - pendingItems;
 
   // WhatsApp messages: one about what's still owed, one confirming what's paid.

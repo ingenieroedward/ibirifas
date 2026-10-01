@@ -569,6 +569,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
               />
             </Field>
             {!useStages && (
+              <p className="-mt-1 text-xs text-text-muted">
+                Si el sorteo es antes, vencen al terminar el día anterior al sorteo: nadie juega con un número sin pagar.
+              </p>
+            )}
+            {!useStages && (
               <label className="flex cursor-pointer items-start gap-3">
                 <input
                   id="autoRelease"

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { payByDay } from "@/lib/holds";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDrawDate } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { checkReserveRateLimit, getClientIp } from "@/lib/rateLimit";
 import { publishRaffleChange } from "@/lib/realtime";
@@ -89,6 +90,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       numberPrice: true,
       totalNumbers: true,
       holdDays: true,
+      drawDate: true,
+      _count: { select: { stages: true } },
       publicReservations: true,
       owner: { select: { publicReservations: true } },
       groups: { select: { id: true, label: true, price: true } },
@@ -178,9 +181,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     ...(labels.length > 0 ? [`${labels.length > 1 ? "los conjuntos" : "el conjunto"} ${labels.join(", ")}`] : []),
     ...(values.length > 0 ? [values.length > 1 ? `los números ${describeNumbers(values)}` : `el ${describeNumbers(values)}`] : []),
   ].join(" y ");
+  const payBy = raffle._count.stages === 0 ? payByDay(raffle.holdDays, raffle.drawDate) : null;
   void notifyTeam(raffle.ownerId, "", {
     title: `${raffle.name} · reserva en línea`,
-    body: `${input.name} reservó ${what} · ${formatCurrency(total)}. Tiene ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} para pagar`,
+    body: `${input.name} reservó ${what} · ${formatCurrency(total)}. ${payBy ? `Tiene hasta el ${formatDrawDate(payBy)} (día antes del sorteo) para pagar` : `Tiene ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} para pagar`}`,
     url: `/rifas/${raffle.id}`,
   });
 
@@ -192,6 +196,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   return NextResponse.json({
     total,
     holdDays: raffle.holdDays!,
+    payBy,
     numbers: values.sort((a, b) => a - b),
     sets: labels.sort(),
     receiptKey,

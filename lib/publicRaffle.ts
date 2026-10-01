@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { payByDay } from "@/lib/holds";
 import { prisma } from "@/lib/prisma";
 import { mailEnabled } from "@/lib/mail";
 import { accountSelect, toAccountDTO } from "@/lib/accounts";
@@ -106,6 +107,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
         status: raffle.status,
       }),
       holdDays: raffle.holdDays,
+      payBy: raffle.stages.length === 0 ? payByDay(raffle.holdDays, raffle.drawDate) : null,
       maxLoose: MAX_LOOSE_PER_RESERVATION,
       email: mailEnabled(),
       turnstileSiteKey: turnstileSiteKey(),

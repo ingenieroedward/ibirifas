@@ -192,6 +192,8 @@ export interface PublicRaffleDTO {
   reservations: {
     open: boolean;
     holdDays: number | null;
+    /** When the draw comes first: the last day to pay (the day before the draw). Null when `holdDays` rules. */
+    payBy: string | null;
     maxLoose: number;
     maxSets: number;
     email: boolean;
@@ -214,6 +216,8 @@ export interface ReserveResultDTO {
   /** What the reservation comes to. */
   total: number;
   holdDays: number;
+  /** The last day to pay when the draw comes before `holdDays` would (the day before the draw). */
+  payBy: string | null;
   numbers: number[];
   sets: string[];
   /** Secret that lets this visitor attach their payment receipt to the reservation afterwards. */

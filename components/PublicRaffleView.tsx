@@ -248,7 +248,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           {!closed && available > 0 && (
             <p className="mt-1 text-center text-xs text-text-muted">
               {canReserve
-                ? `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"} para pagar.`
+                ? `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.payBy ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)` : `${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"}`} para pagar.`
                 : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
             </p>
           )}
