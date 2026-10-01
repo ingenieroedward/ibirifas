@@ -122,6 +122,10 @@ producción. El superadmin entra **sin** código de organización.
   dígitos recibe el `57` solo; uno con código de país se respeta; sin teléfono se
   abre el selector de contactos de WhatsApp. No hay integración ni costo: el
   mensaje sale del WhatsApp del propio vendedor.
+- **Agregar o corregir el teléfono** de un comprador ya registrado: en su tarjeta
+  de Participantes ("+ Agregar teléfono" / "Editar") se guarda en todos sus
+  números de esa rifa; en la hoja de un número, solo en ese número (en un
+  conjunto, desde "Editar" de la hoja del conjunto). Vaciar el campo lo quita.
 - **Copiar la cuenta de pago**: cada cuenta de pago tiene un botón "Copiar" que
   copia solo el número (sin nombre ni responsable) y muestra "¡Copiado!". Está
   en la página pública, en la confirmación de la reserva y en la cabecera del

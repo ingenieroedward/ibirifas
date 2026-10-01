@@ -5,6 +5,7 @@ import type { PaymentMethod, QuotaAction, RaffleNumberDTO, UpdateNumberInput } f
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { amountRemaining, type StageSettings } from "@/lib/stages";
+import { PhoneEditor } from "@/components/PhoneEditor";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { QuotaPanel } from "@/components/QuotaPanel";
 import { ReceiptReview } from "@/components/ReceiptReview";
@@ -24,6 +25,8 @@ interface NumberSheetProps {
   onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
   /** Reject the receipt a buyer sent (it is removed; they are told why). */
   onRejectReceipt?: (id: string, reason: string | null) => Promise<void>;
+  /** Save the buyer's phone on a sold number (for buyers registered without one). */
+  onEditPhone?: (id: string, phone: string | null) => Promise<void>;
 }
 
 const STATUS_LABEL: Record<RaffleNumberDTO["status"], string> = {
@@ -42,6 +45,7 @@ export function NumberSheet({
   stageSettings = null,
   onQuotas,
   onRejectReceipt,
+  onEditPhone,
 }: NumberSheetProps) {
   if (!number) return null;
 
@@ -65,6 +69,7 @@ export function NumberSheet({
         stageSettings={stageSettings}
         onQuotas={onQuotas}
         onRejectReceipt={onRejectReceipt}
+        onEditPhone={onEditPhone}
       />
     </div>
   );
@@ -80,6 +85,7 @@ function SheetContent({
   stageSettings,
   onQuotas,
   onRejectReceipt,
+  onEditPhone,
 }: {
   number: RaffleNumberDTO;
   numberPrice: number;
@@ -90,6 +96,8 @@ function SheetContent({
   stageSettings: StageSettings | null;
   onQuotas?: (id: string, action: QuotaAction, method: PaymentMethod) => Promise<void>;
   onRejectReceipt?: (id: string, reason: string | null) => Promise<void>;
+  /** Saves the buyer's phone on a sold number (for buyers registered without one). */
+  onEditPhone?: (id: string, phone: string | null) => Promise<void>;
 }) {
   const [buyerName, setBuyerName] = useState(number.buyerName ?? "");
   const [buyerPhone, setBuyerPhone] = useState(number.buyerPhone ?? "");
@@ -292,15 +300,22 @@ function SheetContent({
               {number.updatedByName && (
                 <InfoRow label="Registrado por" value={number.updatedByName} />
               )}
-              {number.buyerPhone && (
-                <InfoRow
-                  label="Teléfono"
-                  value={
-                    <a href={`tel:${number.buyerPhone}`} className="text-gold-400 underline-offset-2 hover:underline">
-                      {number.buyerPhone}
-                    </a>
-                  }
-                />
+              {onEditPhone && number.buyerName ? (
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <span className="text-sm text-text-muted">Teléfono</span>
+                  <PhoneEditor phone={number.buyerPhone} onSave={(phone) => onEditPhone(number.id, phone)} />
+                </div>
+              ) : (
+                number.buyerPhone && (
+                  <InfoRow
+                    label="Teléfono"
+                    value={
+                      <a href={`tel:${number.buyerPhone}`} className="text-gold-400 underline-offset-2 hover:underline">
+                        {number.buyerPhone}
+                      </a>
+                    }
+                  />
+                )
               )}
               <InfoRow
                 label="Pago"
