@@ -8,6 +8,7 @@ import {
   ApiError,
   deleteRaffle,
   drawStage,
+  exportRaffleExcel,
   getRaffleById,
   getRaffles,
   payQuotas,
@@ -365,6 +366,20 @@ export default function RaffleDashboardPage() {
       show("Rifa reabierta", "success");
     } catch (err) {
       show(err instanceof ApiError ? err.message : "No se pudo reabrir la rifa.", "error");
+    }
+  }, [raffleId, show]);
+
+  const [exporting, setExporting] = useState(false);
+  const handleExportExcel = useCallback(async () => {
+    setExporting(true);
+    try {
+      const { blob, filename } = await exportRaffleExcel(raffleId);
+      downloadBlob(blob, filename);
+      show("Excel descargado", "success");
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "No se pudo generar el Excel. Inténtalo de nuevo.", "error");
+    } finally {
+      setExporting(false);
     }
   }, [raffleId, show]);
 
@@ -924,6 +939,18 @@ export default function RaffleDashboardPage() {
                     <PeopleChip active={people === "sellers"} onClick={() => setPeople("sellers")}>
                       {isOrganizer ? "Vendedores" : "Mis ventas"}
                     </PeopleChip>
+                    {isOrganizer && (
+                      <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        disabled={exporting}
+                        aria-label="Exportar a Excel"
+                        className="ml-auto flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-green-500/40 px-3.5 text-xs font-semibold text-green-400 transition active:scale-95 disabled:opacity-60"
+                      >
+                        {exporting ? <Spinner size={14} /> : <SheetIcon className="h-4 w-4" />}
+                        Excel
+                      </button>
+                    )}
                   </div>
                   {people === "buyers" ? (
                     <ParticipantsList
@@ -1037,6 +1064,8 @@ export default function RaffleDashboardPage() {
           raffleName={raffle.name}
           onClose={() => setDeletingRaffle(false)}
           onConfirm={handleDeleteRaffle}
+          onExport={handleExportExcel}
+          exporting={exporting}
         />
       )}
 
@@ -1172,5 +1201,14 @@ function FullScreenSpinner() {
     <div className="flex flex-1 items-center justify-center py-24">
       <Spinner size={32} className="text-gold-400" />
     </div>
+  );
+}
+
+function SheetIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M4 9h16M4 15h16M10 3v18" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }

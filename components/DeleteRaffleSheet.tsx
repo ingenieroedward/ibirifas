@@ -8,10 +8,13 @@ interface DeleteRaffleSheetProps {
   raffleName: string;
   onClose: () => void;
   onConfirm: () => Promise<void>;
+  /** Download the raffle as Excel before it's gone. */
+  onExport?: () => void;
+  exporting?: boolean;
 }
 
 /** Deleting a raffle is permanent, so it asks for the raffle's name first. */
-export function DeleteRaffleSheet({ raffleName, onClose, onConfirm }: DeleteRaffleSheetProps) {
+export function DeleteRaffleSheet({ raffleName, onClose, onConfirm, onExport, exporting = false }: DeleteRaffleSheetProps) {
   const [typed, setTyped] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -32,6 +35,17 @@ export function DeleteRaffleSheet({ raffleName, onClose, onConfirm }: DeleteRaff
         <p className="font-semibold">Esto no se puede deshacer.</p>
         <p>Se borran la rifa, todos sus números, los compradores, los pagos y los comprobantes.</p>
       </div>
+
+      {onExport && (
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={exporting || deleting}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-green-500/40 text-sm font-semibold text-green-400 transition active:scale-[0.98] disabled:opacity-60"
+        >
+          {exporting ? <Spinner size={16} /> : "Descargar el Excel antes de eliminar"}
+        </button>
+      )}
 
       <div className="space-y-1.5">
         <label htmlFor="confirmRaffleName" className="text-sm font-medium text-text-muted">

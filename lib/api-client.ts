@@ -320,6 +320,17 @@ export async function getOrgSettings(): Promise<OrgSettingsDTO> {
   return request<OrgSettingsDTO>("/api/org/settings");
 }
 
+/** The raffle as an Excel file (organizer only), with the name the server gave it. */
+export async function exportRaffleExcel(raffleId: string): Promise<{ blob: Blob; filename: string }> {
+  const doFetch = () => fetch(`/api/raffles/${raffleId}/export`, { credentials: "include" });
+  let res = await doFetch();
+  if (res.status === 401 && (await refreshSession())) res = await doFetch();
+  if (res.status === 401) redirectToLogin();
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "rifa.xlsx";
+  return { blob: await res.blob(), filename: name };
+}
+
 /** Visits to a raffle's public link. */
 export async function getVisitStats(raffleId: string): Promise<VisitStatsDTO> {
   return request<VisitStatsDTO>(`/api/raffles/${raffleId}/visits`);
