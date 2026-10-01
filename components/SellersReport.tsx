@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { commissionOn, salesBySeller, sumSales, type SellerSales } from "@/lib/sales";
+import type { StageSettings } from "@/lib/stages";
 import type { RaffleNumberDTO } from "@/lib/types";
 import { whatsAppUrl } from "@/lib/whatsapp";
 
@@ -15,6 +16,8 @@ interface SellersReportProps {
   /** A seller only sees their own line; the organizer sees the whole team. */
   viewerId: string;
   canSeeAll: boolean;
+  /** A raffle by stages: collected money comes from the installments. */
+  stageSettings?: StageSettings | null;
 }
 
 const storageKey = (raffleId: string) => `ibirifas_commission_${raffleId}`;
@@ -38,14 +41,22 @@ function itemsText(row: { numbers: number; sets: number }): string {
 }
 
 /** Sales per seller of one raffle: what each sold, what of it is paid, what is owed, and an optional commission. */
-export function SellersReport({ raffleId, raffleName, numbers, priceOf, viewerId, canSeeAll }: SellersReportProps) {
+export function SellersReport({
+  raffleId,
+  raffleName,
+  numbers,
+  priceOf,
+  viewerId,
+  canSeeAll,
+  stageSettings = null,
+}: SellersReportProps) {
   const [percentText, setPercentText] = useState(() => readPercent(raffleId));
   const percent = parsePercent(percentText);
 
   const rows = useMemo(() => {
-    const all = salesBySeller(numbers, priceOf);
+    const all = salesBySeller(numbers, priceOf, stageSettings);
     return canSeeAll ? all : all.filter((r) => r.id === viewerId);
-  }, [numbers, priceOf, canSeeAll, viewerId]);
+  }, [numbers, priceOf, canSeeAll, viewerId, stageSettings]);
   const total = useMemo(() => sumSales(rows), [rows]);
 
   const changePercent = (text: string) => {

@@ -136,12 +136,64 @@ model Raffle {
 
   accounts     RaffleAccount[]
 
+  // A raffle "by stages" (etapas): the same number plays several draws in a row, each with its own prize,
+  // paid in one installment (cuota) per stage. Empty = an ordinary raffle with a single draw.
+  stages            RaffleStage[]
+  // Installments for a stage must be paid this many days before its draw; later ones don't count for it.
+  stageDeadlineDays Int        @default(3)
+  // What paying every installment up front earns: "none", "discount" (fullPayDiscount pesos off) or "draw"
+  // (a bonus stage, flagged `bonus`, that only numbers paid in full before the first deadline play).
+  fullPayPerk       String     @default("none")
+  fullPayDiscount   Int?
+
   // Optional "sets" (A, B, C…). When a raffle has groups, each group's numbers
   // are sold together at the group's price; numbers without a group stay loose
   // and sell one by one at `numberPrice`.
   groups       RaffleGroup[]
 
   @@index([ownerId])
+}
+
+// One draw of a raffle by stages. Stages are played in `position` order; each non-bonus stage costs one
+// installment (`price`) and a number plays it only if it has paid that many installments by the stage's
+// deadline. The result is stored once drawn: `outcome` "won" (the number was up to date, `winnerName` is its
+// buyer) or "house" (it wasn't, or nobody had it: the prize stays with the organizer).
+model RaffleStage {
+  id          String    @id @default(cuid())
+  raffleId    String
+  raffle      Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  position    Int
+  label       String
+  prize       String
+  price       Int
+  bonus       Boolean   @default(false)
+  lottery     String?
+  drawDate    DateTime?
+  winnerValue Int?
+  outcome     String?
+  winnerName  String?
+  drawnAt     DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([raffleId, position])
+  @@index([raffleId])
+}
+
+// One installment paid on a number of a raffle by stages: installment `quota` (1, 2, 3…) of `amount`
+// pesos, collected by `method` at `paidAt`. Deleted when the number is freed.
+model NumberQuota {
+  id        String       @id @default(cuid())
+  numberId  String
+  number    RaffleNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+  raffleId  String
+  quota     Int
+  amount    Int
+  method    String
+  paidAt    DateTime     @default(now())
+  byId      String?
+
+  @@unique([numberId, quota])
+  @@index([raffleId])
 }
 
 // A lettered set of numbers sold as one unit. Which numbers belong to it is
@@ -213,6 +265,8 @@ model RaffleNumber {
   // attach their payment receipt afterwards. Same value on all of one
   // reservation's numbers; cleared when the numbers are freed or resold.
   holdToken     String?
+  // Installments paid, for a raffle by stages.
+  quotas        NumberQuota[]
 
   // Null = a loose number sold on its own; otherwise it can only be sold, paid
   // or released together with the rest of its group.

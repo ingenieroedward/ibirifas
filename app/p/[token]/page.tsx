@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicRaffleView } from "@/components/PublicRaffleView";
 import { formatCurrency } from "@/lib/format";
+import { stagesPrizeSummary } from "@/lib/stages";
 import { getPublicRaffle } from "@/lib/publicRaffle";
 import { requestOrigin } from "@/lib/siteUrl";
 
@@ -16,10 +17,11 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   if (!raffle) return { metadataBase: await requestOrigin(), title: "Rifa no disponible · Ibirifas", robots };
 
   const available = raffle.numbers.filter((n) => !n.sold).length;
+  const prize = raffle.prizeLabel || stagesPrizeSummary(raffle.stages);
   const description =
     raffle.status === "closed"
       ? "Rifa cerrada."
-      : `${raffle.prizeLabel ? `${raffle.prizeLabel} · ` : ""}${available} ${available === 1 ? "número disponible" : "números disponibles"}${
+      : `${prize ? `${prize} · ` : ""}${available} ${available === 1 ? "número disponible" : "números disponibles"}${
           raffle.groups.length === 0 ? ` a ${formatCurrency(raffle.numberPrice)}` : ""
         }`;
   return {

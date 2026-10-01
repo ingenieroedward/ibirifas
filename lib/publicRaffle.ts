@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { MAX_LOOSE_PER_RESERVATION, MAX_SETS_PER_RESERVATION, reservationsOpen } from "@/lib/reservations";
-import type { DrawTrigger, PublicRaffleDTO } from "@/lib/types";
+import type { DrawTrigger, FullPayPerk, PublicRaffleDTO } from "@/lib/types";
 
 /** 128 bits of randomness, URL-safe (22 characters). Unguessable, so the link itself is the secret. */
 export function newPublicToken(): string {
@@ -40,6 +40,13 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       themeTextColor: true,
       accounts: { orderBy: { position: "asc" }, select: { id: true, label: true, number: true, holderName: true } },
       groups: { orderBy: { position: "asc" }, select: { id: true, label: true, price: true } },
+      stages: {
+        orderBy: { position: "asc" },
+        select: { position: true, label: true, prize: true, price: true, bonus: true, lottery: true, drawDate: true, winnerValue: true, outcome: true },
+      },
+      stageDeadlineDays: true,
+      fullPayPerk: true,
+      fullPayDiscount: true,
       numbers: { orderBy: { value: "asc" }, select: { value: true, status: true, groupId: true } },
     },
   });
@@ -74,6 +81,20 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       sold: numbers.filter((n) => n.group === g.label).every((n) => n.sold),
     })),
     numbers,
+    stages: raffle.stages.map((s) => ({
+      position: s.position,
+      label: s.label,
+      prize: s.prize,
+      price: s.price,
+      bonus: s.bonus,
+      lottery: s.lottery,
+      drawDate: s.drawDate ? s.drawDate.toISOString() : null,
+      winnerValue: s.winnerValue,
+      outcome: s.outcome === "won" || s.outcome === "house" ? s.outcome : null,
+    })),
+    stageDeadlineDays: raffle.stageDeadlineDays,
+    fullPayPerk: (["none", "discount", "draw"].includes(raffle.fullPayPerk) ? raffle.fullPayPerk : "none") as FullPayPerk,
+    fullPayDiscount: raffle.fullPayDiscount,
     reservations: {
       open: reservationsOpen({
         raffleSetting: raffle.publicReservations,

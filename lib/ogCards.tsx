@@ -4,6 +4,7 @@ import { luminance } from "@/lib/color";
 import { tileTextColor } from "@/lib/theme";
 import { drawPlanOf } from "@/lib/drawPlan";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { stagesPrizeSummary } from "@/lib/stages";
 import type { PublicRaffleDTO } from "@/lib/types";
 
 /**
@@ -84,7 +85,7 @@ export function RaffleCard({ raffle }: { raffle: PublicRaffleDTO }) {
   const panel = dark ? "rgba(0,0,0,0.34)" : "rgba(255,255,255,0.6)";
 
   const name = clip(raffle.name, 60);
-  const prize = clip(raffle.prizeLabel ?? "Por definir", 40);
+  const prize = clip(raffle.prizeLabel || stagesPrizeSummary(raffle.stages) || "Por definir", 40);
   const hasSets = raffle.groups.length > 0;
   const closed = raffle.status === "closed";
 

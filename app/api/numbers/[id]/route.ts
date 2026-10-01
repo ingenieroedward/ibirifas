@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await prisma.raffleNumber.findUnique({
     where: { id },
     include: {
-      raffle: { select: { ownerId: true, name: true, numberPrice: true, status: true } },
+      raffle: { select: { ownerId: true, name: true, numberPrice: true, status: true, _count: { select: { stages: true } } } },
       group: { select: { label: true } },
     },
   });
@@ -97,6 +97,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Payments and buyer details can still be kept up to date.
   if (existing.raffle.status === "closed" && (existing.status === "available" || status === "available")) {
     return NextResponse.json({ error: "La rifa está cerrada: ya no se venden ni se liberan números." }, { status: 409 });
+  }
+
+  // In a raffle by stages money comes in installments (/api/numbers/quotas), never as a plain "paid".
+  const byStages = existing.raffle._count.stages > 0;
+  if (byStages && (status === "paid" || (existing.status === "paid" && status === "occupied"))) {
+    return NextResponse.json(
+      { error: "En una rifa por etapas se cobra por cuotas: usa «Cobrar cuota» o «Cobrar todo»." },
+      { status: 400 },
+    );
   }
 
   let data: Prisma.RaffleNumberUpdateInput;
@@ -165,6 +174,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const current = await tx.raffleNumber.findUnique({ where: { id }, select: { status: true } });
         if (current?.status !== "available") throw new TakenError();
       }
+      // A freed number loses its installments with its buyer.
+      if (status === "available") await tx.numberQuota.deleteMany({ where: { numberId: id } });
       return tx.raffleNumber.update({ where: { id }, data, include: numberInclude });
     });
   } catch (err) {

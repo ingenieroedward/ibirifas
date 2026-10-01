@@ -1,3 +1,4 @@
+import { amountRemaining, collectedOn, type StageSettings } from "@/lib/stages";
 import type { RaffleNumberDTO } from "@/lib/types";
 
 export interface SellerSales {
@@ -24,6 +25,8 @@ export interface SellerSales {
 export function salesBySeller(
   numbers: RaffleNumberDTO[],
   priceOf: (subset: RaffleNumberDTO[]) => number,
+  /** A raffle by stages: what is collected is what its installments add up to. */
+  stages: StageSettings | null = null,
 ): SellerSales[] {
   const buckets = new Map<string, { id: string | null; name: string; rows: RaffleNumberDTO[] }>();
   for (const n of numbers) {
@@ -42,14 +45,16 @@ export function salesBySeller(
   const out: SellerSales[] = [...buckets.values()].map(({ id, name, rows }) => {
     const paid = rows.filter((n) => n.status === "paid");
     const owed = rows.filter((n) => n.status !== "paid");
+    const collected = stages ? rows.reduce((sum, n) => sum + collectedOn(n.quotas), 0) : priceOf(paid);
+    const pending = stages ? rows.reduce((sum, n) => sum + amountRemaining(n.quotas, stages.stages), 0) : priceOf(owed);
     return {
       id,
       name,
       numbers: rows.length,
       sets: new Set(rows.map((n) => n.groupId).filter((g): g is string => g !== null)).size,
-      sold: priceOf(rows),
-      collected: priceOf(paid),
-      pending: priceOf(owed),
+      sold: stages ? collected + pending : priceOf(rows),
+      collected,
+      pending,
     };
   });
 

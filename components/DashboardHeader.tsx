@@ -2,9 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
+import { collectedOn, currentStage, installmentPrices, stagesPrizeSummary } from "@/lib/stages";
 import type { RaffleDTO, Role } from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
 import { describeHolder } from "@/components/CloseRaffleSheet";
@@ -88,12 +89,32 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const closed = raffle.status === "closed";
-  const plan = drawPlanFromNumbers(raffle);
+  const basePlan = drawPlanFromNumbers(raffle);
+  // A raffle by stages: the line about when it's played is about the next stage.
+  const nextStage = raffle.stages.length > 0 ? currentStage(raffle.stages) : null;
+  const plan = nextStage
+    ? {
+        ...basePlan,
+        line: `Próximo: ${nextStage.label} (${nextStage.prize})${nextStage.drawDate ? ` el ${formatDrawDate(nextStage.drawDate)}` : ""}`,
+      }
+    : basePlan;
+  const lotteryText = nextStage?.lottery || raffle.lottery;
   const available = raffle.numbers.filter((n) => n.status === "available").length;
   const paid = raffle.numbers.filter((n) => n.status === "paid").length;
   const occupied = raffle.numbers.filter((n) => n.status === "occupied").length + paid;
   const pricer = makePricer(raffle);
-  const collected = pricer(raffle.numbers.filter((n) => n.status === "paid"));
+  const byStages = raffle.stages.length > 0;
+  // A raffle by stages collects installment by installment.
+  const collected = byStages
+    ? raffle.numbers.reduce((sum, n) => sum + collectedOn(n.quotas), 0)
+    : pricer(raffle.numbers.filter((n) => n.status === "paid"));
+  const installments = byStages ? installmentPrices(raffle.stages) : [];
+  const installmentText =
+    installments.length > 0
+      ? new Set(installments).size === 1
+        ? `${installments.length} cuotas de ${formatCurrency(installments[0]!)}`
+        : `Cuotas: ${installments.map(formatCurrency).join(" + ")}`
+      : null;
   const hasGroups = raffle.groups.length > 0;
   const looseCount = raffle.numbers.filter((n) => n.groupId === null).length;
   const setPrices = raffle.groups.map((g) => g.price);
@@ -132,7 +153,9 @@ export function DashboardHeader({
         {closed && (
           <div className="mb-3 rounded-2xl border border-gold-600/50 bg-gold-400/10 p-4" role="status">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Rifa cerrada</p>
-            {raffle.winnerValue !== null ? (
+            {byStages ? (
+              <p className="mt-1 text-sm text-text-muted">Se jugaron todas las etapas: los resultados están abajo.</p>
+            ) : raffle.winnerValue !== null ? (
               <>
                 <p className="mt-1 font-[family-name:var(--font-heading)] text-lg font-extrabold text-text">
                   Ganó el{" "}
@@ -281,7 +304,7 @@ export function DashboardHeader({
                   Premio
                 </p>
                 <p className="mt-0.5 truncate font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                  {raffle.prizeLabel || "Por definir"}
+                  {raffle.prizeLabel || stagesPrizeSummary(raffle.stages) || "Por definir"}
                 </p>
               </div>
               <div className="flex-1 px-4 py-3">
@@ -294,17 +317,18 @@ export function DashboardHeader({
                 {hasGroups && looseCount > 0 && (
                   <p className="truncate text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
                 )}
+                {installmentText && <p className="truncate text-xs text-text-muted">{installmentText}</p>}
               </div>
             </div>
-            {(plan.line || raffle.lottery) && (
+            {(plan.line || lotteryText) && (
               <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
                 <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />
                 <span>
                   {plan.line ?? "Sorteo"}
-                  {raffle.lottery && (
+                  {lotteryText && (
                     <>
                       {plan.line && " · "}
-                      {raffle.lottery}
+                      {lotteryText}
                     </>
                   )}
                 </span>

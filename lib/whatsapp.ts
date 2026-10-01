@@ -64,14 +64,18 @@ export interface ReminderContext extends MessageContext {
   lottery: string | null;
   /** For a raffle played when it fills up and with no date yet: "cuando se vendan todos los números". */
   drawCondition?: string | null;
+  /** A raffle by stages: what the payment is for, replacing the "pendiente de pago" sentence and the draw line. */
+  stageNote?: string | null;
 }
 
 export function buildReminderMessage(c: ReminderContext): string {
   const lines = [
     `Hola ${firstName(c.buyerName)} 👋`,
     "",
-    `Te escribo por tu participación en la rifa *${c.raffleName}*: tienes ${describeHoldings(c.sets, c.looseValues)} pendiente${c.sets.length + c.looseValues.length > 1 ? "s" : ""} de pago.`,
-    `Total: *${money(c.amount)}*`,
+    c.stageNote
+      ? `Te escribo por tu participación en la rifa *${c.raffleName}* con ${describeHoldings(c.sets, c.looseValues)}. ${c.stageNote}`
+      : `Te escribo por tu participación en la rifa *${c.raffleName}*: tienes ${describeHoldings(c.sets, c.looseValues)} pendiente${c.sets.length + c.looseValues.length > 1 ? "s" : ""} de pago.`,
+    `${c.stageNote ? "Valor" : "Total"}: *${money(c.amount)}*`,
   ];
 
   if (c.accounts.length > 0) {
@@ -82,7 +86,7 @@ export function buildReminderMessage(c: ReminderContext): string {
     lines.push("", "Cuando pagues, envíame el comprobante por aquí.");
   }
 
-  if (c.drawDate || c.lottery || c.drawCondition) {
+  if (!c.stageNote && (c.drawDate || c.lottery || c.drawCondition)) {
     const when = c.drawDate ? `el ${formatDrawDate(c.drawDate)}` : (c.drawCondition ?? "");
     const lottery = c.lottery ? `con la lotería ${c.lottery}` : "";
     lines.push("", `El sorteo es ${[when, lottery].filter(Boolean).join(" ")}.`);
@@ -92,11 +96,19 @@ export function buildReminderMessage(c: ReminderContext): string {
   return lines.join("\n");
 }
 
-export function buildReceiptMessage(c: MessageContext & { paymentMethodLabel?: string | null }): string {
+export function buildReceiptMessage(
+  c: MessageContext & {
+    paymentMethodLabel?: string | null;
+    /** A raffle by stages: how far along the installments are ("Llevas 2 de 3 cuotas."). */
+    progress?: string | null;
+  },
+): string {
   return [
     `Hola ${firstName(c.buyerName)} 👋`,
     "",
-    `Recibimos tu pago de *${money(c.amount)}* por ${describeHoldings(c.sets, c.looseValues)} de la rifa *${c.raffleName}*${c.paymentMethodLabel ? ` (${c.paymentMethodLabel})` : ""}. ✅`,
+    c.progress
+      ? `Tus pagos por ${describeHoldings(c.sets, c.looseValues)} de la rifa *${c.raffleName}* suman *${money(c.amount)}*. ${c.progress} ✅`
+      : `Recibimos tu pago de *${money(c.amount)}* por ${describeHoldings(c.sets, c.looseValues)} de la rifa *${c.raffleName}*${c.paymentMethodLabel ? ` (${c.paymentMethodLabel})` : ""}. ✅`,
     "",
     "¡Gracias y mucha suerte! 🍀",
   ].join("\n");

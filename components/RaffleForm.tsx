@@ -7,9 +7,17 @@ import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { contrastRatio, lighten, luminance } from "@/lib/color";
 import { GROUP_LABELS, drawRandomSets, setsThatFit } from "@/lib/groups";
 import { DEFAULT_THEME, tileTextColor } from "@/lib/theme";
-import type { DrawTrigger, RaffleAccountInput, RaffleDTO, RaffleGroupInput, ReservationSetting } from "@/lib/types";
+import type {
+  DrawTrigger,
+  RaffleAccountInput,
+  RaffleDTO,
+  RaffleGroupInput,
+  RaffleStageInput,
+  ReservationSetting,
+} from "@/lib/types";
 import { DRAW_TRIGGER_LABEL } from "@/lib/drawPlan";
 import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
+import { StagePlanner, initialStagePlan, type StagePlan } from "@/components/StagePlanner";
 import { Spinner } from "@/components/Spinner";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
@@ -76,6 +84,15 @@ function buildSets(
   }));
 }
 
+/** The stage fields sent when creating or editing a raffle by stages. */
+interface StagesPayload {
+  stages: RaffleStageInput[];
+  stageDeadlineDays: number;
+  fullPayPerk: StagePlan["perk"];
+  fullPayDiscount: number | null;
+  bonusStage: RaffleStageInput | null;
+}
+
 interface RaffleFormProps {
   mode: "create" | "edit";
   /** Required for "edit" — the raffle being edited, as loaded from getRaffleById. */
@@ -129,6 +146,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [setMode, setSetMode] = useState<"random" | "manual">("random");
   const [sets, setSets] = useState<PlannerSet[]>([]);
   const existingSets = raffle?.groups ?? [];
+
+  // A raffle by stages (several draws, paid in installments) is chosen when the raffle is created.
+  const existingStages = (raffle?.stages.length ?? 0) > 0;
+  const [useStages, setUseStages] = useState(existingStages);
+  const [stagePlan, setStagePlan] = useState<StagePlan>(() => initialStagePlan(raffle));
 
   const [accounts, setAccounts] = useState<AccountRow[]>(() =>
     raffle?.accounts && raffle.accounts.length > 0
@@ -223,7 +245,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       return;
     }
     const creatingSets = !isEdit && useSets;
-    const needsNumberPrice = !creatingSets || looseCount > 0;
+    const needsNumberPrice = !useStages && (!creatingSets || looseCount > 0);
     if (needsNumberPrice && (!Number.isFinite(price) || price <= 0)) {
       setError(creatingSets ? "El valor de cada número suelto debe ser mayor a cero." : "El valor del número debe ser mayor a cero.");
       return;
@@ -252,12 +274,70 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       }
       groupsPayload = filled.map((set, i) => ({ label: GROUP_LABELS[i]!, price: Number(set.price), values: set.values }));
     }
+    // A raffle by stages: every stage needs a prize and its installment; the perk needs its amount or prize.
+    let stagesPayload: StagesPayload | null = null;
+    if (useStages) {
+      const plan = stagePlan;
+      const missingPrize = plan.rows.findIndex((r) => !r.prize.trim());
+      if (missingPrize >= 0) {
+        setError(`Escribe el premio de ${plan.rows[missingPrize]!.label.trim() || `la etapa ${missingPrize + 1}`}.`);
+        return;
+      }
+      const badPrice = plan.rows.findIndex((r) => !(Number.isInteger(Number(r.price)) && Number(r.price) > 0));
+      if (badPrice >= 0) {
+        setError(`La cuota ${badPrice + 1} debe ser mayor a cero.`);
+        return;
+      }
+      const dates = plan.rows.map((r) => r.drawDate).filter(Boolean);
+      if (dates.some((d, i) => i > 0 && d < dates[i - 1]!)) {
+        setError("Las fechas de las etapas deben ir en orden.");
+        return;
+      }
+      const days = Number(plan.deadlineDays);
+      if (!(Number.isInteger(days) && days >= 0 && days <= 30)) {
+        setError("Los días para estar al día deben ser un número entre 0 y 30.");
+        return;
+      }
+      const stagesTotal = plan.rows.reduce((sum, r) => sum + Number(r.price), 0);
+      const discount = Number(plan.discount);
+      if (plan.perk === "discount" && !(Number.isInteger(discount) && discount > 0 && discount < stagesTotal)) {
+        setError("El descuento por pagar todo debe ser mayor a cero y menor que el total.");
+        return;
+      }
+      if (plan.perk === "draw" && !plan.bonus.prize.trim()) {
+        setError("Escribe el premio del sorteo extra por pagar todo.");
+        return;
+      }
+      const iso = (d: string) => (d ? new Date(d).toISOString() : null);
+      stagesPayload = {
+        stages: plan.rows
+          .filter((r) => !(isEdit && r.drawn))
+          .map((r) => ({
+            ...(r.id ? { id: r.id } : {}),
+            label: r.label.trim() || undefined,
+            prize: r.prize.trim(),
+            ...(isEdit ? {} : { price: Number(r.price) }),
+            lottery: r.lottery.trim() || null,
+            drawDate: iso(r.drawDate),
+          })),
+        stageDeadlineDays: days,
+        fullPayPerk: plan.perk,
+        fullPayDiscount: plan.perk === "discount" ? discount : null,
+        bonusStage:
+          plan.perk === "draw" && !plan.bonus.drawn
+            ? { prize: plan.bonus.prize.trim(), lottery: plan.bonus.lottery.trim() || null, drawDate: iso(plan.bonus.drawDate) }
+            : null,
+      };
+    }
+
     // Every number in a set: there is no loose price to ask for, so keep something sensible on record.
-    const looseNumberPrice = needsNumberPrice
-      ? Math.round(price)
-      : Number.isFinite(price) && price > 0
+    const looseNumberPrice = useStages
+      ? stagePlan.rows.reduce((sum, r) => sum + Number(r.price), 0)
+      : needsNumberPrice
         ? Math.round(price)
-        : Math.max(1, Math.round(groupsPayload![0]!.price / groupsPayload![0]!.values.length));
+        : Number.isFinite(price) && price > 0
+          ? Math.round(price)
+          : Math.max(1, Math.round(groupsPayload![0]!.price / groupsPayload![0]!.values.length));
 
     // Blank rows (never filled in) are dropped silently; a row with only one
     // of label/number filled in is a real mistake, so we ask for it to be fixed.
@@ -272,7 +352,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       setError("Los días para pagar deben ser un número entre 1 y 365.");
       return;
     }
-    const holdPayload = { holdDays: holdOn ? holdValue : null, autoRelease: holdOn && autoRelease, publicReservations: reservations };
+    const holdPayload = {
+      holdDays: holdOn ? holdValue : null,
+      autoRelease: (holdOn || useStages) && autoRelease,
+      publicReservations: reservations,
+    };
     const accountsPayload: RaffleAccountInput[] = nonEmptyAccounts.map((a) => ({
       label: a.label.trim(),
       number: a.number.trim(),
@@ -293,9 +377,9 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
           lottery: lottery.trim() || null,
-          numberPrice: Math.round(price),
-          drawDate: drawDate ? new Date(drawDate).toISOString() : null,
-          drawTrigger,
+          ...(useStages
+            ? stagesPayload!
+            : { numberPrice: Math.round(price), drawDate: drawDate ? new Date(drawDate).toISOString() : null, drawTrigger }),
           accounts: accountsPayload,
           ...holdPayload,
           ...themePayload,
@@ -308,8 +392,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           lottery: lottery.trim() || null,
           numberPrice: looseNumberPrice,
           totalNumbers: total,
-          drawDate: drawDate ? new Date(drawDate).toISOString() : null,
-          drawTrigger,
+          ...(useStages ? stagesPayload! : { drawDate: drawDate ? new Date(drawDate).toISOString() : null, drawTrigger }),
           accounts: accountsPayload,
           ...holdPayload,
           ...(groupsPayload ? { groups: groupsPayload } : {}),
@@ -373,7 +456,11 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         />
       </Field>
 
-      <Field label="Premio (opcional)" htmlFor="prizeLabel">
+      <Field
+        label={useStages ? "Premio mayor (opcional)" : "Premio (opcional)"}
+        htmlFor="prizeLabel"
+        hint={useStages ? "Un resumen para la portada, ej. «$8.000.000 en premios». Cada etapa lleva su premio abajo." : undefined}
+      >
         <input
           id="prizeLabel"
           type="text"
@@ -414,7 +501,9 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           <span>
             <span className="block text-sm font-semibold text-text">Los apartados sin pagar vencen</span>
             <span className="mt-0.5 block text-xs text-text-muted">
-              Un número vendido que sigue sin pagarse pasado el plazo se marca como vencido y avisamos al equipo.
+              {useStages
+                ? "Un número apartado que no paga ni la primera cuota en ese plazo se marca como vencido y avisamos al equipo."
+                : "Un número vendido que sigue sin pagarse pasado el plazo se marca como vencido y avisamos al equipo."}
             </span>
           </span>
         </label>
@@ -435,22 +524,24 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
                 className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
               />
             </Field>
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                id="autoRelease"
-                type="checkbox"
-                checked={autoRelease}
-                onChange={(e) => setAutoRelease(e.target.checked)}
-                disabled={submitting}
-                className="mt-1 h-5 w-5 accent-[#f5c542]"
-              />
-              <span>
-                <span className="block text-sm font-semibold text-text">Liberarlos automáticamente</span>
-                <span className="mt-0.5 block text-xs text-text-muted">
-                  Vuelven a estar disponibles solos (los conjuntos, completos). Si no, solo se avisa una vez al día y tú decides.
+            {!useStages && (
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  id="autoRelease"
+                  type="checkbox"
+                  checked={autoRelease}
+                  onChange={(e) => setAutoRelease(e.target.checked)}
+                  disabled={submitting}
+                  className="mt-1 h-5 w-5 accent-[#f5c542]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-text">Liberarlos automáticamente</span>
+                  <span className="mt-0.5 block text-xs text-text-muted">
+                    Vuelven a estar disponibles solos (los conjuntos, completos). Si no, solo se avisa una vez al día y tú decides.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            )}
           </div>
         )}
       </div>
@@ -502,7 +593,64 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         )}
       </div>
 
-      {isEdit && existingSets.length > 0 ? (
+      {(!isEdit || existingStages) && !(isEdit && existingSets.length > 0) && (
+        <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
+          {isEdit ? (
+            <p className="text-sm font-semibold text-text">Rifa por etapas</p>
+          ) : (
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                id="useStages"
+                type="checkbox"
+                checked={useStages}
+                onChange={(e) => {
+                  setUseStages(e.target.checked);
+                  if (e.target.checked) handleToggleSets(false);
+                }}
+                disabled={submitting}
+                className="mt-1 h-5 w-5 accent-[#f5c542]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-text">Rifa por etapas (varios sorteos, pago por cuotas)</span>
+                <span className="mt-0.5 block text-xs text-text-muted">
+                  El número se paga en cuotas y cada cuota juega un sorteo, siempre con el mismo número. Puede pagar todo de una
+                  vez. Si sale un número que no está al día, el premio queda en la casa.
+                </span>
+              </span>
+            </label>
+          )}
+          {useStages && (
+            <>
+              <StagePlanner
+                plan={stagePlan}
+                onChange={setStagePlan}
+                totalNumbers={totalOk ? totalValue : DEFAULT_TOTAL_NUMBERS}
+                fixedPrices={isEdit}
+                disabled={submitting}
+              />
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  id="autoReleaseStages"
+                  type="checkbox"
+                  checked={autoRelease}
+                  onChange={(e) => setAutoRelease(e.target.checked)}
+                  disabled={submitting}
+                  className="mt-1 h-5 w-5 accent-[#f5c542]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-text">Liberar los números atrasados</span>
+                  <span className="mt-0.5 block text-xs text-text-muted">
+                    Pasada la fecha límite de una etapa, el número que no está al día vuelve a estar disponible (sus cuotas se
+                    pierden). Si no, solo se avisa una vez al día y tú decides.
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
+        </div>
+      )}
+
+      {useStages ? null : isEdit && existingSets.length > 0 ? (
         <div className="space-y-1 rounded-2xl border border-line bg-surface-2/60 p-4">
           <p className="text-sm font-semibold text-text">Se vende por conjuntos</p>
           <p className="text-xs text-text-muted">
@@ -613,45 +761,49 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         )
       )}
 
-      {!useSets && individualPriceField}
+      {!useSets && !useStages && individualPriceField}
 
-      <fieldset className="space-y-2 rounded-2xl border border-line bg-surface-2/60 p-4">
-        <legend className="px-1 text-sm font-semibold text-text">¿Cuándo se juega?</legend>
-        {(Object.keys(DRAW_TRIGGER_LABEL) as DrawTrigger[]).map((value) => (
-          <label key={value} className="flex cursor-pointer items-center gap-3 py-1">
+      {!useStages && (
+        <>
+          <fieldset className="space-y-2 rounded-2xl border border-line bg-surface-2/60 p-4">
+            <legend className="px-1 text-sm font-semibold text-text">¿Cuándo se juega?</legend>
+            {(Object.keys(DRAW_TRIGGER_LABEL) as DrawTrigger[]).map((value) => (
+              <label key={value} className="flex cursor-pointer items-center gap-3 py-1">
+                <input
+                  type="radio"
+                  name="drawTrigger"
+                  value={value}
+                  checked={drawTrigger === value}
+                  onChange={() => setDrawTrigger(value)}
+                  disabled={submitting}
+                  className="h-5 w-5 accent-[#f5c542]"
+                />
+                <span className="text-sm text-text">{DRAW_TRIGGER_LABEL[value]}</span>
+              </label>
+            ))}
+            {drawTrigger !== "date" && (
+              <p className="text-xs text-text-muted">
+                El sorteo se juega cuando {drawTrigger === "sold" ? "no quede ningún número disponible" : "todos los números estén pagados"}. Te
+                avisamos en ese momento para que pongas la fecha; si ya la sabes, puedes ponerla desde ahora.
+              </p>
+            )}
+          </fieldset>
+
+          <Field
+            label={drawTrigger === "date" ? "Fecha del sorteo (opcional)" : "Fecha del sorteo (opcional por ahora)"}
+            htmlFor="drawDate"
+          >
             <input
-              type="radio"
-              name="drawTrigger"
-              value={value}
-              checked={drawTrigger === value}
-              onChange={() => setDrawTrigger(value)}
+              id="drawDate"
+              type="date"
+              value={drawDate}
+              onChange={(e) => setDrawDate(e.target.value)}
               disabled={submitting}
-              className="h-5 w-5 accent-[#f5c542]"
+              className="h-12 w-full min-w-0 max-w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
             />
-            <span className="text-sm text-text">{DRAW_TRIGGER_LABEL[value]}</span>
-          </label>
-        ))}
-        {drawTrigger !== "date" && (
-          <p className="text-xs text-text-muted">
-            El sorteo se juega cuando {drawTrigger === "sold" ? "no quede ningún número disponible" : "todos los números estén pagados"}. Te
-            avisamos en ese momento para que pongas la fecha; si ya la sabes, puedes ponerla desde ahora.
-          </p>
-        )}
-      </fieldset>
-
-      <Field
-        label={drawTrigger === "date" ? "Fecha del sorteo (opcional)" : "Fecha del sorteo (opcional por ahora)"}
-        htmlFor="drawDate"
-      >
-        <input
-          id="drawDate"
-          type="date"
-          value={drawDate}
-          onChange={(e) => setDrawDate(e.target.value)}
-          disabled={submitting}
-          className="h-12 w-full min-w-0 max-w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
-        />
-      </Field>
+          </Field>
+        </>
+      )}
 
       <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
         <div>

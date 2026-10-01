@@ -1,6 +1,7 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
-import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
+import { currentStage, stagesPrizeSummary } from "@/lib/stages";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
@@ -511,9 +512,19 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   // the reference poster's two-column banner instead of treating every fact
   // as an equal-weight column. Fecha/lotería fold into one slim meta line
   // below it, omitted entirely when neither is set.
-  const hasPrize = Boolean(raffle.prizeLabel);
-  const drawPlan = drawPlanFromNumbers(raffle);
-  const hasMeta = Boolean(drawPlan.line || raffle.lottery);
+  const prizeText = raffle.prizeLabel || stagesPrizeSummary(raffle.stages);
+  const hasPrize = Boolean(prizeText);
+  // A raffle by stages announces its next draw (prize and date) instead of the last one.
+  const nextStage = raffle.stages.length > 0 ? currentStage(raffle.stages) : null;
+  const basePlan = drawPlanFromNumbers(raffle);
+  const drawPlan = nextStage
+    ? {
+        ...basePlan,
+        line: `${nextStage.label}: ${nextStage.prize}${nextStage.drawDate ? ` · ${formatDrawDate(nextStage.drawDate)}` : ""}`,
+      }
+    : basePlan;
+  const lottery = nextStage?.lottery || raffle.lottery;
+  const hasMeta = Boolean(drawPlan.line || lottery);
   const heroHeight = HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
 
   const accountsCount = raffle.accounts.length;
@@ -641,7 +652,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   ctx.stroke();
 
   const setPrices = raffle.groups.map((g) => g.price);
-  const valorLabel = hasSets ? "VALOR DEL CONJUNTO" : "VALOR DEL NÚMERO";
+  const quotaCount = raffle.stages.filter((st) => !st.bonus).length;
+  const valorLabel = hasSets ? "VALOR DEL CONJUNTO" : quotaCount > 0 ? `VALOR · ${quotaCount} CUOTAS` : "VALOR DEL NÚMERO";
   const valorText = hasSets
     ? Math.min(...setPrices) === Math.max(...setPrices)
       ? formatCurrency(setPrices[0]!)
@@ -678,14 +690,14 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     let premioLines: string[] = [];
     for (let size = 96; size >= 56; size -= 2) {
       ctx.font = `800 ${size}px ${headingFont}`;
-      if (ctx.measureText(raffle.prizeLabel!).width <= premioMaxWidth) {
+      if (ctx.measureText(prizeText!).width <= premioMaxWidth) {
         premioSize = size;
-        premioLines = [raffle.prizeLabel!];
+        premioLines = [prizeText!];
         break;
       }
     }
     if (premioLines.length === 0) {
-      const wrapped = fitHeadline(ctx, raffle.prizeLabel!, premioMaxWidth, 2, 48, 30, "800", headingFont);
+      const wrapped = fitHeadline(ctx, prizeText!, premioMaxWidth, 2, 48, 30, "800", headingFont);
       premioSize = wrapped.fontSize;
       premioLines = wrapped.lines;
     }
@@ -749,8 +761,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     ctx.stroke();
 
     const metaText = drawPlan.line
-      ? `${drawPlan.line}${raffle.lottery ? ` · ${raffle.lottery}` : ""}`
-      : `Lotería: ${raffle.lottery}`;
+      ? `${drawPlan.line}${lottery ? ` · ${lottery}` : ""}`
+      : `Lotería: ${lottery}`;
     const metaIconSize = 26;
     const metaIconGap = 10;
     ctx.font = `600 24px ${bodyFont}`;

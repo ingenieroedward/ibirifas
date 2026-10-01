@@ -14,6 +14,9 @@ interface NumberGridProps {
   selectedIds?: Set<string>;
   /** The winning number of a closed raffle, highlighted on the board. */
   winnerValue?: number | null;
+  /** A raffle by stages: the numbers that won a stage, and how many installments a number has. */
+  stageWinners?: Set<number>;
+  installments?: number;
 }
 
 export function NumberGrid({
@@ -24,6 +27,8 @@ export function NumberGrid({
   themeTextColor,
   selectedIds,
   winnerValue,
+  stageWinners,
+  installments,
 }: NumberGridProps) {
   const sorted = useMemo(
     () => [...numbers].sort((a, b) => a.value - b.value),
@@ -42,7 +47,8 @@ export function NumberGrid({
           themeTextColor={themeTextColor}
           selected={selectedIds ? selectedIds.has(number.id) : undefined}
           dimmed={selectedIds ? number.status !== "available" : undefined}
-          winner={winnerValue === number.value}
+          winner={winnerValue === number.value || Boolean(stageWinners?.has(number.value))}
+          installments={installments}
         />
       ))}
     </div>

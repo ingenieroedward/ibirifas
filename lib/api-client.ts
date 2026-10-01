@@ -5,9 +5,12 @@ import type {
   ManagedUserDTO,
   MeDTO,
   OrgSettingsDTO,
+  PaymentMethod,
   PublicLinkAction,
+  QuotaAction,
   RaffleDTO,
   RaffleNumberDTO,
+  RaffleStageDTO,
   RaffleSummaryDTO,
   UpdateNumberInput,
   UpdateRaffleInput,
@@ -227,7 +230,36 @@ export async function getNumbersSince(raffleId: string, since: string): Promise<
 export interface NumbersSince {
   numbers: RaffleNumberDTO[];
   /** Whether the raffle is still selling, and who won once it's closed. */
-  raffle: { status: "active" | "closed"; winnerValue: number | null };
+  raffle: { status: "active" | "closed"; winnerValue: number | null; stages: RaffleStageDTO[] };
+}
+
+/** Collect or undo installments of a raffle by stages; returns the numbers as they are now. */
+export async function payQuotas(
+  ids: string[],
+  action: QuotaAction,
+  paymentMethod: PaymentMethod = "cash",
+): Promise<RaffleNumberDTO[]> {
+  return request<RaffleNumberDTO[]>("/api/numbers/quotas", {
+    method: "POST",
+    body: JSON.stringify(action === "undo" ? { ids, action } : { ids, action, paymentMethod }),
+  });
+}
+
+/** Record the number that came out in a stage's draw. `closed` once it was the last stage. */
+export async function drawStage(
+  raffleId: string,
+  stageId: string,
+  winnerValue: number,
+): Promise<{ stage: RaffleStageDTO; closed: boolean }> {
+  return request(`/api/raffles/${raffleId}/stages/${stageId}/draw`, {
+    method: "POST",
+    body: JSON.stringify({ winnerValue }),
+  });
+}
+
+/** Undo the last recorded stage result. */
+export async function undoStage(raffleId: string, stageId: string): Promise<{ stage: RaffleStageDTO }> {
+  return request(`/api/raffles/${raffleId}/stages/${stageId}/draw`, { method: "DELETE" });
 }
 
 /** Close a raffle (optionally with the winning number) or reopen it. */
