@@ -226,6 +226,11 @@ producción. El superadmin entra **sin** código de organización.
     WhatsApp, el texto para copiar, la imagen, la página pública (con resultados,
     sin nombres) y la vista previa del enlace entienden las etapas. El formulario
     hace las cuentas: lo que entra si se venden todos contra los premios en dinero.
+  - La imagen para compartir y la página pública no muestran un solo "Premio /
+    Valor" (parecería que se juega por el premio mayor con un solo pago): muestran
+    "1 número · N sorteos" con cada etapa en su fila (premio, fecha, lotería,
+    cuota, "Se juega ahora" o el resultado), la gran final destacada y abajo
+    "N cuotas de $X · todo de una $Y" con el beneficio.
   - Al editar se pueden cambiar premio, nombre, fecha y lotería de las etapas que
     no se han jugado, los días de plazo y el beneficio; las cuotas no.
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,

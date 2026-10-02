@@ -1,7 +1,7 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
 import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
-import { currentStage, stagesPrizeSummary } from "@/lib/stages";
+import { currentStage, installmentPrices, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
@@ -416,6 +416,152 @@ function drawBackgroundArt(
   }
 }
 
+const LADDER_HEAD = 92;
+const LADDER_ROW = 108;
+const LADDER_ROW_GAP = 12;
+const LADDER_FOOT = 78;
+const LADDER_PAD = 20;
+
+function stagesLadderHeight(count: number): number {
+  return LADDER_HEAD + count * LADDER_ROW + Math.max(0, count - 1) * LADDER_ROW_GAP + LADDER_FOOT;
+}
+
+/**
+ * The hero of a raffle by stages: "1 NÚMERO · 3 SORTEOS", one row per draw (badge, name, date and lottery, prize and
+ * its installment) with the final draw highlighted and the next one marked, and the price rule at the bottom.
+ */
+function drawStagesLadder(
+  ctx: CanvasRenderingContext2D,
+  raffle: RaffleDTO,
+  o: { x: number; y: number; width: number; dark: boolean; color: string; mutedText: string; headingFont: string; bodyFont: string },
+): void {
+  const stages = sortedStages(raffle.stages);
+  const paid = paidStages(stages);
+  const finalPos = paid.at(-1)?.position;
+  const now = raffle.status === "closed" ? null : currentStage(stages);
+  const strong = o.dark ? "#f5f3ff" : "#131218";
+  const centerX = o.x + o.width / 2;
+
+  ctx.textAlign = "center";
+  ctx.font = `800 24px ${o.headingFont}`;
+  ctx.fillStyle = o.color;
+  ctx.fillText(`1 NÚMERO · ${paid.length} ${paid.length === 1 ? "SORTEO" : "SORTEOS"}`, centerX, o.y + 44);
+  ctx.font = `500 20px ${o.bodyFont}`;
+  ctx.fillStyle = o.mutedText;
+  ctx.fillText("Pagas por etapas y juegas con el mismo número en cada sorteo", centerX, o.y + 74);
+
+  const rowX = o.x + LADDER_PAD;
+  const rowW = o.width - LADDER_PAD * 2;
+  stages.forEach((st, i) => {
+    const top = o.y + LADDER_HEAD + i * (LADDER_ROW + LADDER_ROW_GAP);
+    const cy = top + LADDER_ROW / 2;
+    const isFinal = st.position === finalPos;
+    const isNow = now?.position === st.position;
+    ctx.save();
+    if (st.outcome) ctx.globalAlpha = 0.6;
+
+    drawRoundedRect(ctx, rowX, top, rowW, LADDER_ROW, 20);
+    if (isFinal) {
+      ctx.shadowColor = withAlpha(o.color, o.dark ? 0.45 : 0.25);
+      ctx.shadowBlur = 24;
+    }
+    ctx.fillStyle = isFinal ? withAlpha(o.color, o.dark ? 0.2 : 0.12) : o.dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.035)";
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = withAlpha(o.color, isFinal ? 0.7 : 0.22);
+    ctx.lineWidth = isFinal ? 2.5 : 1.5;
+    drawRoundedRect(ctx, rowX, top, rowW, LADDER_ROW, 20);
+    ctx.stroke();
+
+    // Badge: the step number, a crown for the final draw, a star for the bonus draw.
+    const bx = rowX + 52;
+    ctx.beginPath();
+    ctx.arc(bx, cy, 30, 0, Math.PI * 2);
+    if (isFinal) {
+      ctx.fillStyle = o.color;
+      ctx.fill();
+      drawCrown(ctx, bx, cy - 11, 34, luminance(o.color) > 0.55 ? "#131218" : "#ffffff");
+    } else {
+      ctx.strokeStyle = withAlpha(o.color, 0.7);
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.fillStyle = o.color;
+      ctx.textAlign = "center";
+      ctx.font = `800 28px ${o.headingFont}`;
+      ctx.fillText(st.bonus ? "★" : String(paid.findIndex((p) => p.position === st.position) + 1), bx, cy + 10);
+    }
+
+    // Right: the prize (bigger for the final draw) and what that step costs.
+    const rightX = rowX + rowW - 26;
+    const prizeMax = rowW * 0.42;
+    const prize = fitFontSize(ctx, st.prize, prizeMax, isFinal ? 52 : 38, 22, "800", o.headingFont);
+    ctx.textAlign = "right";
+    ctx.font = `800 ${prize.fontSize}px ${o.headingFont}`;
+    ctx.fillStyle = o.color;
+    ctx.fillText(prize.text, rightX, cy + (isFinal ? 8 : 4));
+    const prizeWidth = ctx.measureText(prize.text).width;
+    ctx.font = `600 19px ${o.bodyFont}`;
+    ctx.fillStyle = o.mutedText;
+    ctx.fillText(st.bonus ? "pagando todo de una" : `cuota ${formatCurrency(st.price)}`, rightX, cy + 38);
+
+    // Left: name (+ "SE JUEGA AHORA") and date · lottery, or the result once played.
+    const textX = bx + 50;
+    const textMax = rightX - Math.max(prizeWidth, 160) - 28 - textX;
+    const label = fitFontSize(ctx, st.label, Math.max(120, textMax - (isNow ? 170 : 0)), 30, 20, "800", o.headingFont);
+    ctx.textAlign = "left";
+    ctx.font = `800 ${label.fontSize}px ${o.headingFont}`;
+    ctx.fillStyle = strong;
+    ctx.fillText(label.text, textX, cy - 6);
+    if (isNow) {
+      const chipX = textX + ctx.measureText(label.text).width + 12;
+      ctx.font = `800 15px ${o.headingFont}`;
+      const chipText = "SE JUEGA AHORA";
+      const chipW = ctx.measureText(chipText).width + 20;
+      drawRoundedRect(ctx, chipX, cy - 30, chipW, 28, 14);
+      ctx.fillStyle = withAlpha(o.color, o.dark ? 0.24 : 0.16);
+      ctx.fill();
+      ctx.fillStyle = o.color;
+      ctx.fillText(chipText, chipX + 10, cy - 11);
+    }
+    const lottery = st.lottery || raffle.lottery;
+    const meta =
+      st.winnerValue !== null
+        ? `${st.outcome === "won" ? "Ganó el" : "Salió el"} ${formatNumberValue(st.winnerValue)}${st.outcome === "house" ? " · quedó en la casa" : ""}`
+        : `${st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}${lottery ? ` · ${lottery}` : ""}`;
+    const metaFit = fitFontSize(ctx, meta, Math.max(120, textMax), 21, 15, "600", o.bodyFont);
+    ctx.font = `600 ${metaFit.fontSize}px ${o.bodyFont}`;
+    ctx.fillStyle = o.mutedText;
+    ctx.fillText(metaFit.text, textX, cy + 28);
+    ctx.restore();
+  });
+
+  // Price rule.
+  const footTop = o.y + LADDER_HEAD + stages.length * LADDER_ROW + Math.max(0, stages.length - 1) * LADDER_ROW_GAP + 16;
+  ctx.strokeStyle = withAlpha(o.dark ? "#ffffff" : "#000000", 0.12);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(o.x + 24, footTop);
+  ctx.lineTo(o.x + o.width - 24, footTop);
+  ctx.stroke();
+  const prices = installmentPrices(stages);
+  const total = totalPrice(stages);
+  const bonus = stages.find((st) => st.bonus);
+  const quotas = new Set(prices).size === 1 ? `${prices.length} cuotas de ${formatCurrency(prices[0]!)}` : `Cuotas ${prices.map(formatCurrency).join(" + ")}`;
+  const full =
+    raffle.fullPayPerk === "discount" && raffle.fullPayDiscount
+      ? `Todo de una ${formatCurrency(total - raffle.fullPayDiscount)} (antes ${formatCurrency(total)})`
+      : raffle.fullPayPerk === "draw" && bonus
+        ? `Todo de una ${formatCurrency(total)} + ${bonus.label}`
+        : `Todo de una ${formatCurrency(total)}`;
+  const footText = `${quotas}  ·  ${full}`;
+  const footFit = fitFontSize(ctx, footText, o.width - 48, 25, 16, "700", o.headingFont);
+  ctx.textAlign = "center";
+  ctx.font = `700 ${footFit.fontSize}px ${o.headingFont}`;
+  ctx.fillStyle = strong;
+  ctx.fillText(footFit.text, centerX, footTop + 40);
+}
+
 export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob> {
   await ensureFontsReady();
 
@@ -525,7 +671,11 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     : basePlan;
   const lottery = nextStage?.lottery || raffle.lottery;
   const hasMeta = Boolean(drawPlan.line || lottery);
-  const heroHeight = HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
+  // A raffle by stages shows its draws as a ladder instead of one big prize next to the total price
+  // (which read as "7 millones por 150 mil").
+  const byStages = raffle.stages.length > 0;
+  const ladderHeight = byStages ? stagesLadderHeight(raffle.stages.length) : 0;
+  const heroHeight = byStages ? ladderHeight : HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
 
   const accountsCount = raffle.accounts.length;
   const accountsHeight =
@@ -660,125 +810,129 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       : `${formatCurrency(Math.min(...setPrices))} – ${formatCurrency(Math.max(...setPrices))}`
     : formatCurrency(raffle.numberPrice);
 
-  if (hasPrize) {
-    const splitX = gridStartX + gridWidth * 0.62;
-
-    ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.14);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(splitX, cursorY + 20);
-    ctx.lineTo(splitX, cursorY + HERO_TOP_HEIGHT - 20);
-    ctx.stroke();
-
-    const premioCenterX = gridStartX + (splitX - gridStartX) / 2;
-    const valorCenterX = splitX + (gridStartX + gridWidth - splitX) / 2;
-
-    // Both values share one baseline so the two columns read as a single row.
-    const labelBaseline = cursorY + 44;
-    const valueBaseline = cursorY + HERO_TOP_HEIGHT - 34;
-
-    ctx.textAlign = "center";
-    ctx.font = `800 22px ${headingFont}`;
-    ctx.fillStyle = mutedText;
-    ctx.fillText("PREMIO", premioCenterX, labelBaseline);
-
-    // Short prizes ("$500.000") stay on one big line; long ones ("Moto AKT
-    // 125 + casco") wrap to two lines rather than shrinking below the valor.
-    // The 48px two-line cap keeps the first line clear of the label.
-    const premioMaxWidth = splitX - gridStartX - 40;
-    let premioSize = 0;
-    let premioLines: string[] = [];
-    for (let size = 96; size >= 56; size -= 2) {
-      ctx.font = `800 ${size}px ${headingFont}`;
-      if (ctx.measureText(prizeText!).width <= premioMaxWidth) {
-        premioSize = size;
-        premioLines = [prizeText!];
-        break;
-      }
-    }
-    if (premioLines.length === 0) {
-      const wrapped = fitHeadline(ctx, prizeText!, premioMaxWidth, 2, 48, 30, "800", headingFont);
-      premioSize = wrapped.fontSize;
-      premioLines = wrapped.lines;
-    }
-    const premioLineHeight = premioSize * 1.05;
-    ctx.font = `800 ${premioSize}px ${headingFont}`;
-    ctx.fillStyle = theme.numberColor;
-    ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
-    ctx.shadowBlur = premioSize * 0.3;
-    premioLines.forEach((line, i) => {
-      const y = valueBaseline - (premioLines.length - 1 - i) * premioLineHeight;
-      ctx.fillText(line, premioCenterX, y);
-    });
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-
-    ctx.font = `800 20px ${headingFont}`;
-    ctx.fillStyle = mutedText;
-    ctx.fillText(valorLabel, valorCenterX, labelBaseline);
-
-    // Valor always stays visibly smaller than premio.
-    const valorMaxWidth = gridStartX + gridWidth - splitX - 32;
-    const { fontSize: valorSize, text: valorFitText } = fitFontSize(
-      ctx,
-      valorText,
-      valorMaxWidth,
-      Math.max(24, Math.min(58, Math.round(premioSize * 0.72))),
-      24,
-      "800",
-      headingFont,
-    );
-    ctx.font = `800 ${valorSize}px ${headingFont}`;
-    ctx.fillStyle = theme.numberColor;
-    ctx.fillText(valorFitText, valorCenterX, valueBaseline);
+  if (byStages) {
+    drawStagesLadder(ctx, raffle, { x: gridStartX, y: cursorY, width: gridWidth, dark, color: theme.numberColor, mutedText, headingFont, bodyFont });
   } else {
-    // No prize set: valor is the only fact, so it gets the spotlight instead
-    // of sitting small in a corner.
-    const centerX = gridStartX + gridWidth / 2;
-    ctx.textAlign = "center";
-    ctx.font = `800 22px ${headingFont}`;
-    ctx.fillStyle = mutedText;
-    ctx.fillText(valorLabel, centerX, cursorY + 44);
+    if (hasPrize) {
+      const splitX = gridStartX + gridWidth * 0.62;
 
-    const maxWidth = gridWidth - 80;
-    const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 88, 32, "800", headingFont);
-    ctx.font = `800 ${fontSize}px ${headingFont}`;
-    ctx.fillStyle = theme.numberColor;
-    ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
-    ctx.shadowBlur = fontSize * 0.3;
-    ctx.fillText(text, centerX, cursorY + HERO_TOP_HEIGHT - 34);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-  }
+      ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.14);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(splitX, cursorY + 20);
+      ctx.lineTo(splitX, cursorY + HERO_TOP_HEIGHT - 20);
+      ctx.stroke();
 
-  if (hasMeta) {
-    const metaY = cursorY + HERO_TOP_HEIGHT;
-    ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(gridStartX + 24, metaY);
-    ctx.lineTo(gridStartX + gridWidth - 24, metaY);
-    ctx.stroke();
+      const premioCenterX = gridStartX + (splitX - gridStartX) / 2;
+      const valorCenterX = splitX + (gridStartX + gridWidth - splitX) / 2;
 
-    const metaText = drawPlan.line
-      ? `${drawPlan.line}${lottery ? ` · ${lottery}` : ""}`
-      : `Lotería: ${lottery}`;
-    const metaIconSize = 26;
-    const metaIconGap = 10;
-    ctx.font = `600 24px ${bodyFont}`;
-    const metaTextWidth = ctx.measureText(metaText).width;
-    const metaBlockWidth = metaIconSize + metaIconGap + metaTextWidth;
-    const metaBlockStartX = gridStartX + gridWidth / 2 - metaBlockWidth / 2;
-    const metaCenterY = metaY + HERO_META_HEIGHT / 2;
+      // Both values share one baseline so the two columns read as a single row.
+      const labelBaseline = cursorY + 44;
+      const valueBaseline = cursorY + HERO_TOP_HEIGHT - 34;
 
-    if (drawPlan.line) {
-      drawCalendarIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+      ctx.textAlign = "center";
+      ctx.font = `800 22px ${headingFont}`;
+      ctx.fillStyle = mutedText;
+      ctx.fillText("PREMIO", premioCenterX, labelBaseline);
+
+      // Short prizes ("$500.000") stay on one big line; long ones ("Moto AKT
+      // 125 + casco") wrap to two lines rather than shrinking below the valor.
+      // The 48px two-line cap keeps the first line clear of the label.
+      const premioMaxWidth = splitX - gridStartX - 40;
+      let premioSize = 0;
+      let premioLines: string[] = [];
+      for (let size = 96; size >= 56; size -= 2) {
+        ctx.font = `800 ${size}px ${headingFont}`;
+        if (ctx.measureText(prizeText!).width <= premioMaxWidth) {
+          premioSize = size;
+          premioLines = [prizeText!];
+          break;
+        }
+      }
+      if (premioLines.length === 0) {
+        const wrapped = fitHeadline(ctx, prizeText!, premioMaxWidth, 2, 48, 30, "800", headingFont);
+        premioSize = wrapped.fontSize;
+        premioLines = wrapped.lines;
+      }
+      const premioLineHeight = premioSize * 1.05;
+      ctx.font = `800 ${premioSize}px ${headingFont}`;
+      ctx.fillStyle = theme.numberColor;
+      ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
+      ctx.shadowBlur = premioSize * 0.3;
+      premioLines.forEach((line, i) => {
+        const y = valueBaseline - (premioLines.length - 1 - i) * premioLineHeight;
+        ctx.fillText(line, premioCenterX, y);
+      });
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+
+      ctx.font = `800 20px ${headingFont}`;
+      ctx.fillStyle = mutedText;
+      ctx.fillText(valorLabel, valorCenterX, labelBaseline);
+
+      // Valor always stays visibly smaller than premio.
+      const valorMaxWidth = gridStartX + gridWidth - splitX - 32;
+      const { fontSize: valorSize, text: valorFitText } = fitFontSize(
+        ctx,
+        valorText,
+        valorMaxWidth,
+        Math.max(24, Math.min(58, Math.round(premioSize * 0.72))),
+        24,
+        "800",
+        headingFont,
+      );
+      ctx.font = `800 ${valorSize}px ${headingFont}`;
+      ctx.fillStyle = theme.numberColor;
+      ctx.fillText(valorFitText, valorCenterX, valueBaseline);
     } else {
-      drawDiceIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+      // No prize set: valor is the only fact, so it gets the spotlight instead
+      // of sitting small in a corner.
+      const centerX = gridStartX + gridWidth / 2;
+      ctx.textAlign = "center";
+      ctx.font = `800 22px ${headingFont}`;
+      ctx.fillStyle = mutedText;
+      ctx.fillText(valorLabel, centerX, cursorY + 44);
+
+      const maxWidth = gridWidth - 80;
+      const { fontSize, text } = fitFontSize(ctx, valorText, maxWidth, 88, 32, "800", headingFont);
+      ctx.font = `800 ${fontSize}px ${headingFont}`;
+      ctx.fillStyle = theme.numberColor;
+      ctx.shadowColor = withAlpha(theme.numberColor, dark ? 0.5 : 0.25);
+      ctx.shadowBlur = fontSize * 0.3;
+      ctx.fillText(text, centerX, cursorY + HERO_TOP_HEIGHT - 34);
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
     }
-    ctx.textAlign = "left";
-    ctx.fillStyle = mutedText;
-    ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 8);
+
+    if (hasMeta) {
+      const metaY = cursorY + HERO_TOP_HEIGHT;
+      ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(gridStartX + 24, metaY);
+      ctx.lineTo(gridStartX + gridWidth - 24, metaY);
+      ctx.stroke();
+
+      const metaText = drawPlan.line
+        ? `${drawPlan.line}${lottery ? ` · ${lottery}` : ""}`
+        : `Lotería: ${lottery}`;
+      const metaIconSize = 26;
+      const metaIconGap = 10;
+      ctx.font = `600 24px ${bodyFont}`;
+      const metaTextWidth = ctx.measureText(metaText).width;
+      const metaBlockWidth = metaIconSize + metaIconGap + metaTextWidth;
+      const metaBlockStartX = gridStartX + gridWidth / 2 - metaBlockWidth / 2;
+      const metaCenterY = metaY + HERO_META_HEIGHT / 2;
+
+      if (drawPlan.line) {
+        drawCalendarIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+      } else {
+        drawDiceIcon(ctx, metaBlockStartX + metaIconSize / 2, metaCenterY, metaIconSize, theme.numberColor);
+      }
+      ctx.textAlign = "left";
+      ctx.fillStyle = mutedText;
+      ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 8);
+    }
   }
 
   cursorY += heroHeight;
