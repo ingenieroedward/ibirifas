@@ -67,6 +67,7 @@ export function stageChatLines(raffle: StagesInfo): string[] {
  */
 export function buildAvailabilityText(raffle: RaffleDTO, link?: string | null): string {
   const lines: string[] = [`*${raffle.name}*`];
+  if (raffle.permit) lines.push(`Permiso: ${raffle.permit}`);
   const hasSets = raffle.groups.length > 0;
   const free = raffle.numbers.filter((n) => n.status === "available").sort((a, b) => a.value - b.value);
 

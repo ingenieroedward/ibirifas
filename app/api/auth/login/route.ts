@@ -14,6 +14,7 @@ import { isValidOrgCode, normalizeOrgCode } from "@/lib/orgCode";
 import type { MeDTO, Role } from "@/lib/types";
 import type { AdminUser } from "@prisma/client";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { needsTerms } from "@/lib/terms";
 
 // A valid bcrypt hash of a throwaway string, only used to spend equal time.
 const DUMMY_HASH = "$2b$10$vkDrIDdD6LbjAmMKy2KMleMnOq5l0lR197e./.s1QbzT8mKEqOnEC";
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
     role: matchedUser.role as Role,
     plan: matchedUser.plan,
     orgCode: matchedUser.orgCode ?? (matchedUser.ownerId ? orgCode : null),
+    needsTerms: needsTerms(matchedUser.role, matchedUser.termsAcceptedAt),
   };
 
   const res = NextResponse.json({ user });

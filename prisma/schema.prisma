@@ -48,6 +48,9 @@ model AdminUser {
   // Only meaningful for ORGANIZER: their receiving account in pagoradar (the bank inbox that forwards the
   // payment notices of their own account). Null = not connected.
   pagoradarAccountId String? @unique
+  // Only meaningful for ORGANIZER: when they accepted the platform's terms of use (they, not Ibirifas, answer
+  // for their raffles: permits, prizes, buyers' data). Asked again when the terms change (lib/terms.ts).
+  termsAcceptedAt DateTime?
 
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]
@@ -99,6 +102,9 @@ model Raffle {
   // winner: the last digits of that lottery's real result on drawDate.
   // Optional free text; null when the raffle runs its own independent draw.
   lottery      String?
+  // The raffle's permit as the organizer wants it shown (e.g. "Resolución 123 de 2026 · Alcaldía de Montería").
+  // Optional free text: displayed on the public page and the share image when set.
+  permit       String?
   numberPrice  Int
   totalNumbers Int            @default(100)
   drawDate     DateTime?

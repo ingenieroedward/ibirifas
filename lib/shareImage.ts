@@ -639,6 +639,9 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const GRID_TOP_GAP = 30;
   const GRID_BOTTOM_GAP = 46;
   const FOOTER_HEIGHT = 92;
+  // The raffle's permit, when the organizer gave one, closes the poster under the brand mark.
+  const permitText = raffle.permit?.trim() ? `Permiso: ${raffle.permit.trim()}` : null;
+  const PERMIT_HEIGHT = permitText ? 44 : 0;
 
   const titleMaxWidth = CANVAS_WIDTH - SIDE_PADDING * 2;
   const { fontSize: titleSize, lines: titleLines } = fitHeadline(
@@ -704,7 +707,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
     return head + sectionRows * cellSize + (sectionRows - 1) * GRID_GAP;
   });
   const gridHeight = sectionHeights.reduce((sum, h) => sum + h, 0) + (sections.length - 1) * SECTION_GAP;
-  const canvasHeight = headerHeight + GRID_TOP_GAP + gridHeight + GRID_BOTTOM_GAP + FOOTER_HEIGHT;
+  const canvasHeight = headerHeight + GRID_TOP_GAP + gridHeight + GRID_BOTTOM_GAP + FOOTER_HEIGHT + PERMIT_HEIGHT;
 
   const canvas = document.createElement("canvas");
   canvas.width = CANVAS_WIDTH;
@@ -1214,6 +1217,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   ctx.fillText("Ibirifas", CANVAS_WIDTH / 2, cursorY + 62);
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
+
+  if (permitText) {
+    const permit = fitFontSize(ctx, permitText, CANVAS_WIDTH - SIDE_PADDING * 2, 22, 16, "600", bodyFont);
+    ctx.font = `600 ${permit.fontSize}px ${bodyFont}`;
+    ctx.fillStyle = mutedText;
+    ctx.fillText(permit.text, CANVAS_WIDTH / 2, cursorY + 62 + PERMIT_HEIGHT);
+  }
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

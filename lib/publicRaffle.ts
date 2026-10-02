@@ -29,6 +29,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     select: {
       name: true,
       prizeLabel: true,
+      permit: true,
       lottery: true,
       numberPrice: true,
       drawDate: true,
@@ -66,6 +67,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
   return {
     name: raffle.name,
     prizeLabel: raffle.prizeLabel,
+    permit: raffle.permit,
     lottery: raffle.lottery,
     numberPrice: raffle.numberPrice,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,

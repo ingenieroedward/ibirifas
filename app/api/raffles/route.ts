@@ -29,6 +29,7 @@ const groupSchema = z.object({
 const createRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
+  permit: z.string().trim().max(120).nullable().optional(),
   lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive(),
   totalNumbers: z.number().int().min(10).max(1000).optional(),
@@ -159,6 +160,9 @@ export async function POST(req: NextRequest) {
   if (user.role !== "ORGANIZER") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
+  if (user.needsTerms) {
+    return NextResponse.json({ error: "Acepta los términos de uso antes de crear una rifa." }, { status: 403 });
+  }
 
   const rawBodyBody = await readJsonBody(req, BODY_LIMITS.medium);
   if (!rawBodyBody.ok) return rawBodyBody.response;
@@ -221,6 +225,7 @@ export async function POST(req: NextRequest) {
         ownerId: user.id,
         name: input.name,
         prizeLabel: input.prizeLabel ?? null,
+        permit: input.permit || null,
         lottery: input.lottery ?? null,
         numberPrice: byStages ? stagesTotal : input.numberPrice,
         totalNumbers,
