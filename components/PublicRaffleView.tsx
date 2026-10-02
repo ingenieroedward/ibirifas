@@ -177,6 +177,10 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           )}
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-gold-600/30 bg-bg-elevated shadow-card">
+            {byStages ? (
+              <StagesLadder raffle={raffle} closed={closed} />
+            ) : (
+            <>
             <div className="flex divide-x divide-line">
               <div className="flex-1 px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Premio</p>
@@ -211,6 +215,8 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 {plan.line ?? "Sorteo"}
                 {lotteryText && ` · ${lotteryText}`}
               </p>
+            )}
+            </>
             )}
             {plan.progress && (
               <div className="border-t border-line px-4 py-2.5" aria-label="Avance para jugar">
@@ -464,37 +470,13 @@ function PublicStages({ raffle }: { raffle: PublicRaffleDTO }) {
   const bonus = stages.find((st) => st.bonus);
   const days = raffle.stageDeadlineDays;
   return (
-    <section aria-label="Sorteos" className="space-y-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
-      <div>
-        <h2 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">Sorteos</h2>
-        <p className="text-xs text-text-muted">Juegas con el mismo número en todos.</p>
-      </div>
-      <ol className="space-y-2">
-        {stages.map((st) => (
-          <li key={st.position} className="flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-text">
-                {st.bonus ? "🎁 " : ""}
-                {st.label} · <span className="text-gold-400">{st.prize}</span>
-              </p>
-              <p className="text-xs text-text-muted">
-                {st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}
-                {st.lottery || raffle.lottery ? ` · ${st.lottery || raffle.lottery}` : ""}
-                {!st.bonus && !st.outcome && lastPayDay(st, days) ? ` · paga hasta el ${lastPayDay(st, days)}` : ""}
-              </p>
-            </div>
-            {st.winnerValue !== null && (
-              <span className="shrink-0 text-right">
-                <span className="block font-[family-name:var(--font-heading)] text-xl font-extrabold text-gold-400">
-                  {formatNumberValue(st.winnerValue)}
-                </span>
-                <span className="block text-[11px] text-text-muted">{st.outcome === "won" ? "Ganador" : "Quedó en la casa"}</span>
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-      <ul className="space-y-1 text-xs text-text-muted">
+    <section aria-label="Cómo funciona" className="space-y-2 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
+      <h2 className="font-[family-name:var(--font-heading)] text-lg font-bold text-text">Cómo funciona</h2>
+      <ul className="space-y-1.5 text-sm text-text-muted">
+        <li>
+          Eliges un número y juegas con <b className="text-text">ese mismo número en todos los sorteos</b>. Cada cuota te da la entrada al
+          sorteo siguiente.
+        </li>
         <li>
           Cada cuota debe estar paga {days === 0 ? "a más tardar el día del sorteo" : `${days} ${days === 1 ? "día" : "días"} antes de su sorteo`}. Si sale
           un número que no está al día, el premio queda en la casa.
@@ -511,5 +493,94 @@ function PublicStages({ raffle }: { raffle: PublicRaffleDTO }) {
         ) : null}
       </ul>
     </section>
+  );
+}
+
+/**
+ * The hero of a raffle by stages: its draws as a ladder (each with its prize, date and installment, the final one
+ * highlighted), so nobody reads the top prize as the price of a single ticket.
+ */
+function StagesLadder({ raffle, closed }: { raffle: PublicRaffleDTO; closed: boolean }) {
+  const stages = sortedStages(raffle.stages);
+  const paid = paidStages(stages);
+  const finalPos = paid.at(-1)?.position;
+  const now = closed ? null : currentStage(stages);
+  const prices = installmentPrices(stages);
+  const total = totalPrice(stages);
+  const bonus = stages.find((st) => st.bonus);
+  const discounted = raffle.fullPayPerk === "discount" && raffle.fullPayDiscount ? total - raffle.fullPayDiscount : null;
+  return (
+    <div>
+      <div className="px-4 pt-3.5 text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold-400">
+          1 número · {paid.length} {paid.length === 1 ? "sorteo" : "sorteos"}
+        </p>
+        <p className="mt-0.5 text-xs text-text-muted">Pagas por etapas y juegas con el mismo número en cada sorteo</p>
+      </div>
+      <ol className="space-y-2 p-3" aria-label="Sorteos">
+        {stages.map((st) => {
+          const isFinal = st.position === finalPos;
+          const isNow = now?.position === st.position;
+          const step = paid.findIndex((p) => p.position === st.position) + 1;
+          return (
+            <li
+              key={st.position}
+              className={`flex items-center gap-3 rounded-xl border p-3 ${
+                isFinal ? "border-gold-500/70 bg-gold-400/10 shadow-gold" : "border-line bg-surface-2"
+              } ${st.outcome ? "opacity-75" : ""}`}
+            >
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
+                  isFinal ? "bg-gradient-to-b from-gold-300 to-gold-500 text-[#241a02]" : "border border-gold-600/50 text-gold-400"
+                }`}
+                aria-hidden="true"
+              >
+                {st.bonus ? "🎁" : isFinal ? <CrownIcon className="h-4 w-5" /> : step}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-text">
+                  {st.label}
+                  {isNow && (
+                    <span className="rounded-full bg-gold-400/15 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-gold-400">
+                      Se juega ahora
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}
+                  {st.lottery || raffle.lottery ? ` · ${st.lottery || raffle.lottery}` : ""}
+                </p>
+                {st.winnerValue !== null && (
+                  <p className="text-xs font-semibold text-text">
+                    {st.outcome === "won" ? "Ganó el " : "Salió el "}
+                    <span className="text-gold-400">{formatNumberValue(st.winnerValue)}</span>
+                    {st.outcome === "house" ? " · quedó en la casa" : ""}
+                  </p>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                <p
+                  className={`font-[family-name:var(--font-heading)] font-extrabold leading-tight text-gold-400 ${
+                    isFinal ? "text-2xl" : "text-lg"
+                  }`}
+                >
+                  {st.prize}
+                </p>
+                <p className="text-[11px] text-text-muted">{st.bonus ? "si pagas todo de una" : `cuota ${formatCurrency(st.price)}`}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="border-t border-line px-4 py-2.5 text-center text-sm text-text-muted">
+        {new Set(prices).size === 1 ? `${prices.length} cuotas de ${formatCurrency(prices[0]!)}` : `Cuotas: ${prices.map(formatCurrency).join(" + ")}`}
+        {" · "}
+        <span className="font-semibold text-text">
+          todo de una {formatCurrency(discounted ?? total)}
+          {discounted !== null && <span className="font-normal text-text-muted line-through"> {formatCurrency(total)}</span>}
+        </span>
+        {raffle.fullPayPerk === "draw" && bonus && <span className="block text-xs text-gold-400">Pagando todo de una juegas también {bonus.label}</span>}
+      </div>
+    </div>
   );
 }
