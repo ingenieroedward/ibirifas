@@ -1,7 +1,7 @@
 # Cambiar el dominio de Ibirifas
 
 Guía para pasar la app a un dominio nuevo (por ejemplo de `rifas.edwsystem.com` a
-`ibirifas.co`). El código no tiene el dominio escrito en ningún lado: todo sale de
+`ibirifas.com`). El código no tiene el dominio escrito en ningún lado: todo sale de
 `APP_URL` y de la dirección con la que llega cada visita, así que el cambio es solo
 de configuración. Sigue el orden; cada paso dice cómo comprobarlo.
 
@@ -11,8 +11,9 @@ de configuración. Sigue el orden; cada paso dice cómo comprobarlo.
 
 ## 1. Dominio y DNS (Cloudflare)
 
-1. Compra el dominio y agrégalo a Cloudflare (cambia los *nameservers* donde lo
-   compraste por los que te da Cloudflare).
+1. Compra el dominio en Cloudflare (*Domain Registration*): queda en Cloudflare de
+   una vez, sin cambiar *nameservers*. Si lo compraste en otro lado, agrégalo a
+   Cloudflare y cambia allá los *nameservers* por los que te da Cloudflare.
 2. Crea el registro `A` (o `CNAME`) hacia la IP del servidor de Dokploy, con la
    **nube naranja** (proxy) activada.
 3. SSL/TLS → modo **Full (strict)**.
@@ -81,13 +82,12 @@ filtros de Gmail. Si igual la cambias:
 1. Cloudflare → *Email Routing* en el dominio nuevo, con la ruta hacia el Worker.
 2. En cada Gmail, editar el filtro de reenvío con la dirección nueva (Gmail pide
    confirmarla con un código).
-3. En la configuración del lector, actualizar la URL del aviso hacia la app
-   (`https://<nuevo-dominio>/api/pagoradar/webhook`), y su secreto si se regenera.
+3. En el panel de pagoradar, actualizar la URL del aviso hacia la app (ver abajo).
 
 Aunque la dirección de recepción no cambie, **la URL a la que el lector avisa a la
-app sí** cambia con el dominio de la app: en Dokploy, en la app **pagoradar**, edita
-`PAGORADAR_SOURCES` y cambia la `url` del webhook a
-`https://<nuevo-dominio>/api/pagoradar/webhook`; redespliega pagoradar. Si además
+app sí** cambia con el dominio de la app: en el panel de pagoradar → **Apps** →
+Ibirifas, cambia la URL del webhook a `https://<nuevo-dominio>/api/pagoradar/webhook`
+y usa "Enviar evento de prueba" para comprobarla (mira el resultado en Entregas) (no hace falta redesplegar). Si además
 cambias el dominio de pagoradar, actualiza `PAGORADAR_URL` en Ibirifas y la variable
 `PAGORADAR_URL` del Worker de Cloudflare.
 
