@@ -86,6 +86,10 @@ model PushSubscription {
   p256dh    String
   auth      String
   userAgent String?
+  // The site the browser subscribed on (https://ibirifas.com). A subscription belongs to that site's service
+  // worker, so after a domain change the old one would keep showing every notification a second time: when
+  // someone subscribes on the current site, their subscriptions from any other site (or unknown, older rows) go.
+  origin    String?
   createdAt DateTime  @default(now())
 
   @@index([userId])
