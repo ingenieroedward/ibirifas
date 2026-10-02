@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const dto: MeDTO = { id: user.id, name: user.name, role: user.role, plan: user.plan, orgCode: user.orgCode };
+  const dto: MeDTO = { id: user.id, name: user.name, role: user.role, plan: user.plan, orgCode: user.orgCode, needsTerms: user.needsTerms };
   return NextResponse.json(dto);
 }
 
@@ -28,6 +28,6 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Escribe un nombre de 2 a 80 caracteres." }, { status: 400 });
 
   const row = await prisma.adminUser.update({ where: { id: user.id }, data: { name: parsed.data.name }, select: { name: true } });
-  const dto: MeDTO = { id: user.id, name: row.name, role: user.role, plan: user.plan, orgCode: user.orgCode };
+  const dto: MeDTO = { id: user.id, name: row.name, role: user.role, plan: user.plan, orgCode: user.orgCode, needsTerms: user.needsTerms };
   return NextResponse.json(dto);
 }

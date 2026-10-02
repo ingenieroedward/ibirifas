@@ -172,6 +172,9 @@ export default function LoginPage() {
           Usa el código de organización y el de 6 dígitos que te compartió tu organizador. El celular
           recuerda la organización. ¿Eres el administrador de la plataforma? Déjalo vacío.
         </p>
+        <a href="/terminos" className="mt-3 text-xs text-text-muted underline-offset-2 hover:underline">
+          Términos de uso
+        </a>
       </div>
     </div>
   );

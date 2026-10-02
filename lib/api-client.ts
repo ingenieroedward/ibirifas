@@ -394,3 +394,8 @@ export async function updatePaymentsAccount(ownerEmail: string, banks: string[])
 export async function disconnectPaymentsAccount(): Promise<PaymentsAccountDTO> {
   return request<PaymentsAccountDTO>("/api/org/payments-account", { method: "DELETE" });
 }
+
+/** The organizer accepts the current terms of use (/terminos). */
+export async function acceptTerms(): Promise<MeDTO> {
+  return request<MeDTO>("/api/auth/terms", { method: "POST" });
+}

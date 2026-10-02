@@ -27,7 +27,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   // The public raffle pages (/p/<token>) are for people without an account:
   // don't ask the server who they are (a guaranteed 401 plus a refresh attempt).
-  const isPublicPage = usePathname().startsWith("/p/");
+  // Same for the terms of use, which visitors of those pages can open too.
+  const pathname = usePathname();
+  const isPublicPage = pathname.startsWith("/p/") || pathname === "/terminos";
   const [user, setUser] = useState<MeDTO | null>(null);
   const [loading, setLoading] = useState(!isPublicPage);
 

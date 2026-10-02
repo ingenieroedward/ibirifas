@@ -156,6 +156,17 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           <h1 className="text-center font-[family-name:var(--font-heading)] text-3xl font-extrabold leading-tight text-text">
             {raffle.name}
           </h1>
+          {raffle.permit && (
+            <p className="mt-2 flex justify-center">
+              <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+                <span className="min-w-0 break-words">Permiso: {raffle.permit}</span>
+              </span>
+            </p>
+          )}
 
           {gone && (
             <p role="status" className="mt-3 rounded-xl border border-gold-600/50 bg-gold-400/10 px-4 py-2 text-center text-sm text-gold-400">
@@ -400,11 +411,21 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               <span className="h-3 w-3 rounded border border-line bg-surface-2" /> Vendido / apartado
             </span>
           </div>
-          <p className="text-center text-xs text-text-muted">
-            <a href={`/p/${token}/privacidad`} className="underline-offset-2 hover:underline">
-              Aviso de privacidad
-            </a>
-          </p>
+          <footer className="space-y-1.5 text-center text-xs text-text-muted">
+            <p className="mx-auto max-w-md leading-relaxed">
+              Ibirifas es una herramienta de gestión: no organiza, vende ni recibe el dinero de esta rifa. La rifa, su
+              premio y sus permisos son responsabilidad de quien la organiza.
+            </p>
+            <p className="flex items-center justify-center gap-3">
+              <a href={`/p/${token}/privacidad`} className="underline-offset-2 hover:underline">
+                Aviso de privacidad
+              </a>
+              <span aria-hidden="true">·</span>
+              <a href="/terminos" className="underline-offset-2 hover:underline">
+                Términos de uso
+              </a>
+            </p>
+          </footer>
         </div>
       </main>
 

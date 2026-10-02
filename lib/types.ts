@@ -79,6 +79,8 @@ export interface MeDTO {
   plan: string;
   /** The organization this person belongs to (an organizer's own, a seller's organizer's). Null for the superadmin. */
   orgCode: string | null;
+  /** An organizer who hasn't accepted the current terms of use yet (the app asks before anything else). */
+  needsTerms?: boolean;
 }
 
 export interface RaffleNumberDTO {
@@ -163,6 +165,7 @@ export interface RaffleAccountDTO {
 export interface PublicRaffleDTO {
   name: string;
   prizeLabel: string | null;
+  permit: string | null;
   lottery: string | null;
   numberPrice: number;
   drawDate: string | null;
@@ -278,6 +281,8 @@ export interface RaffleDTO {
   id: string;
   name: string;
   prizeLabel: string | null;
+  /** The raffle's permit as the organizer wrote it (shown on the public page and the image); null = none given. */
+  permit: string | null;
   lottery: string | null;
   numberPrice: number;
   totalNumbers: number;
@@ -343,6 +348,7 @@ export interface RaffleGroupInput {
 export interface CreateRaffleInput {
   name: string;
   prizeLabel?: string | null;
+  permit?: string | null;
   lottery?: string | null;
   numberPrice: number;
   totalNumbers?: number; // defaults to 100
@@ -377,6 +383,7 @@ export interface UpdateRaffleInput {
   winnerValue?: number | null;
   name?: string;
   prizeLabel?: string | null;
+  permit?: string | null;
   lottery?: string | null;
   numberPrice?: number;
   drawDate?: string | null;

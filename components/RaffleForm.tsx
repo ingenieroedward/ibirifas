@@ -148,6 +148,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [name, setName] = useState(raffle?.name ?? "");
   const [prizeLabel, setPrizeLabel] = useState(raffle?.prizeLabel ?? "");
   const [lottery, setLottery] = useState(raffle?.lottery ?? "");
+  const [permit, setPermit] = useState(raffle?.permit ?? "");
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
@@ -420,6 +421,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         await updateRaffle(raffle.id, {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
+          permit: permit.trim() || null,
           lottery: lottery.trim() || null,
           ...(useStages
             ? stagesPayload!
@@ -433,6 +435,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
         const created = await createRaffle({
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
+          permit: permit.trim() || null,
           lottery: lottery.trim() || null,
           numberPrice: looseNumberPrice,
           totalNumbers: total,
@@ -527,6 +530,23 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           value={lottery}
           onChange={(e) => setLottery(e.target.value)}
           placeholder="Ej. Sinuano Noche"
+          disabled={submitting}
+          className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+        />
+      </Field>
+
+      <Field
+        label="Permiso (opcional)"
+        htmlFor="permit"
+        hint="Si la rifa tiene permiso, escríbelo y se mostrará en la página pública y la imagen. Una rifa de un solo municipio se tramita en la alcaldía."
+      >
+        <input
+          id="permit"
+          type="text"
+          value={permit}
+          onChange={(e) => setPermit(e.target.value)}
+          placeholder="Ej. Resolución 045 de 2026 · Alcaldía de Montería"
+          maxLength={120}
           disabled={submitting}
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />

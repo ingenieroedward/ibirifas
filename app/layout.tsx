@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Baloo_2, Inter } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/Toast";
+import { TermsGate } from "@/components/TermsGate";
 import "./globals.css";
 
 const headingFont = Baloo_2({
@@ -58,7 +59,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-bg text-text">
         <ToastProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            {children}
+            <TermsGate />
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>

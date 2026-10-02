@@ -233,6 +233,15 @@ producción. El superadmin entra **sin** código de organización.
     "N cuotas de $X · todo de una $Y" con el beneficio.
   - Al editar se pueden cambiar premio, nombre, fecha y lotería de las etapas que
     no se han jugado, los días de plazo y el beneficio; las cuotas no.
+- **Términos de uso y permiso**: Ibirifas es una herramienta de gestión; cada
+  organizador responde por sus rifas. La primera vez que un organizador entra
+  (y cada vez que cambien los términos, `TERMS_UPDATED_AT` en `lib/terms.ts`)
+  debe aceptar los términos de uso (`/terminos`, página pública) antes de
+  seguir; se guarda la fecha (`termsAcceptedAt`) y sin aceptarlos no puede crear
+  rifas. Sus vendedores no ven esa pantalla. Cada rifa tiene un campo opcional
+  **Permiso** (ej. «Resolución 045 de 2026 · Alcaldía de Montería») que se
+  muestra en la página pública, la imagen y el texto para WhatsApp. El pie de la
+  página pública aclara que la rifa es responsabilidad de quien la organiza.
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación

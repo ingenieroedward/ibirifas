@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { needsTerms } from "@/lib/terms";
 import type { Role } from "@/lib/types";
 
 /**
@@ -31,6 +32,8 @@ export interface SessionUser {
   plan: string;
   /** The organization code this person logs in under (see lib/orgCode.ts). */
   orgCode: string | null;
+  /** The organizer still has to accept the current terms of use (lib/terms.ts). */
+  needsTerms: boolean;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -94,6 +97,7 @@ export async function getCurrentUser(req: NextRequest): Promise<SessionUser | nu
     plan: user.plan,
     // Organizers carry their own code; sellers belong to their organizer's.
     orgCode: user.orgCode ?? user.owner?.orgCode ?? null,
+    needsTerms: needsTerms(user.role, user.termsAcceptedAt),
   };
 }
 
