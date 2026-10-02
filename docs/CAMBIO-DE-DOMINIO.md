@@ -63,6 +63,10 @@ Comprobar: reservar un número desde el enlace público del dominio nuevo.
 - **Iniciar sesión de nuevo**: la sesión está guardada por dominio.
 - **Notificaciones push**: cada suscripción pertenece al dominio; cada persona
   debe volver a activar la campana en cada celular (las llaves VAPID no cambian).
+  Mientras no lo haga, el *service worker* del dominio viejo sigue mostrando los
+  avisos (al tocarlos, la redirección lleva al nuevo). Al activarla en el nuevo,
+  sus suscripciones del dominio viejo se borran solas, para que no lleguen
+  duplicados; si tiene otro celular, también debe activarla allí.
 - **App instalada** (PWA): borrar el ícono viejo e instalarla desde el dominio nuevo.
 
 ## 7. Servicios externos
