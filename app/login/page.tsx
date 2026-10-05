@@ -173,7 +173,7 @@ export default function LoginPage() {
           recuerda la organización. ¿Eres el administrador de la plataforma? Déjalo vacío.
         </p>
         <a href="/terminos" className="mt-3 text-xs text-text-muted underline-offset-2 hover:underline">
-          Términos de uso
+          Términos y condiciones
         </a>
       </div>
     </div>
