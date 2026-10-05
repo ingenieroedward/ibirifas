@@ -2,10 +2,19 @@
  * The platform's terms of use, shared by /terminos and the acceptance screen organizers see (TermsGate). When the
  * text changes in substance, bump TERMS_UPDATED_AT in lib/terms.ts so everyone accepts it again.
  */
+export const TERMS_SECTIONS = [
+  { id: "que-es", title: "Qué es Ibirifas" },
+  { id: "organizador", title: "Lo que le corresponde al organizador" },
+  { id: "datos", title: "Datos de los compradores" },
+  { id: "uso", title: "Uso no permitido" },
+  { id: "servicio", title: "El servicio" },
+  { id: "cambios", title: "Cambios" },
+];
+
 export function TermsContent() {
   return (
     <div className="space-y-4 text-sm leading-relaxed text-text">
-      <section className="space-y-1">
+      <section id="que-es" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">1. Qué es Ibirifas</h2>
         <p>
           Ibirifas es una herramienta para que un organizador gestione sus rifas: el tablero de números, las ventas y
@@ -15,7 +24,7 @@ export function TermsContent() {
         </p>
       </section>
 
-      <section className="space-y-1">
+      <section id="organizador" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">2. Lo que le corresponde al organizador</h2>
         <p>Quien crea una organización y sus rifas responde por ellas. En particular:</p>
         <ul className="list-disc space-y-0.5 pl-5">
@@ -30,7 +39,7 @@ export function TermsContent() {
         </ul>
       </section>
 
-      <section className="space-y-1">
+      <section id="datos" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">3. Datos de los compradores</h2>
         <p>
           El organizador es el responsable de los datos de sus compradores (Ley 1581 de 2012) y debe usarlos solo para
@@ -39,7 +48,7 @@ export function TermsContent() {
         </p>
       </section>
 
-      <section className="space-y-1">
+      <section id="uso" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">4. Uso no permitido</h2>
         <p>
           No se permiten rifas engañosas o con premios inexistentes, cobros a nombre de otros, suplantación ni ningún uso
@@ -48,7 +57,7 @@ export function TermsContent() {
         </p>
       </section>
 
-      <section className="space-y-1">
+      <section id="servicio" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">5. El servicio</h2>
         <p>
           Se presta tal como está, con un esfuerzo razonable para que funcione y esté disponible. Ibirifas no responde
@@ -56,7 +65,7 @@ export function TermsContent() {
         </p>
       </section>
 
-      <section className="space-y-1">
+      <section id="cambios" className="scroll-mt-24 space-y-1">
         <h2 className="font-semibold">6. Cambios</h2>
         <p>Estos términos pueden actualizarse. Si cambian en algo importante, te pediremos aceptarlos de nuevo al entrar.</p>
       </section>

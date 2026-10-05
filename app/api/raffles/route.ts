@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
   if (user.needsTerms) {
-    return NextResponse.json({ error: "Acepta los términos de uso antes de crear una rifa." }, { status: 403 });
+    return NextResponse.json({ error: "Acepta los términos y condiciones antes de crear una rifa." }, { status: 403 });
   }
 
   const rawBodyBody = await readJsonBody(req, BODY_LIMITS.medium);

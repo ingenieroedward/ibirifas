@@ -449,7 +449,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               </a>
               <span aria-hidden="true">·</span>
               <a href="/terminos" className="underline-offset-2 hover:underline">
-                Términos de uso
+                Términos y condiciones
               </a>
             </p>
           </footer>

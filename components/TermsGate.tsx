@@ -51,7 +51,7 @@ export function TermsGate() {
             Antes de seguir
           </h1>
           <p className="mb-4 mt-1 text-sm text-text-muted">
-            Lee y acepta los términos de uso. En resumen: Ibirifas es tu herramienta y tú respondes por tus rifas.
+            Lee y acepta los términos y condiciones. En resumen: Ibirifas es tu herramienta y tú respondes por tus rifas.
           </p>
           <TermsContent />
         </div>
@@ -64,7 +64,7 @@ export function TermsGate() {
               disabled={saving}
               className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-gold-400)]"
             />
-            <span>Leí y acepto los términos de uso, y entiendo que soy responsable de mis rifas.</span>
+            <span>Leí y acepto los términos y condiciones, y entiendo que soy responsable de mis rifas.</span>
           </label>
           {error && (
             <p role="alert" className="text-sm font-medium text-red-400">

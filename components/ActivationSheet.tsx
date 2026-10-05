@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Spinner } from "@/components/Spinner";
+import { TrophyIcon } from "@/components/icons/LineIcons";
 import { activateRaffle, ApiError, getActivation } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/format";
 import type { ActivationStateDTO } from "@/lib/types";
@@ -92,9 +93,9 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
 
       {state?.active && (
         <div className="space-y-3 text-center">
-          <p className="text-4xl" aria-hidden="true">
-            🎉
-          </p>
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-gold-600/40 bg-gold-400/10 text-gold-400">
+            <TrophyIcon className="h-7 w-7" />
+          </span>
           <p className="text-sm text-text">Ya puedes vender números y compartir el enlace de la rifa.</p>
           <button type="button" onClick={onClose} className={PRIMARY}>
             Empezar a vender
