@@ -5,6 +5,7 @@ import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import { formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
+import { emailDrawResult, mailOrigin } from "@/lib/buyerMail";
 import { publishRaffleChange } from "@/lib/realtime";
 import { sweepRaffle } from "@/lib/expiry";
 import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
@@ -364,6 +365,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       body = `Ganó el ${formatNumberValue(updated.winnerValue)}: nadie lo compró`;
     }
     void notifyTeam(tenantId, user.id, { title: `${updated.name} · rifa cerrada`, body, url: `/rifas/${id}` });
+    // The buyers hear the result by email: "¡Ganaste!" to the winner, the result to everyone else.
+    if (updated.winnerValue !== null && updated.stages.length === 0) {
+      void emailDrawResult(
+        id,
+        {
+          winnerValue: updated.winnerValue,
+          outcome: winnerNumber && winnerNumber.status !== "available" ? "won" : "nobody",
+          prize: updated.prizeLabel,
+        },
+        await mailOrigin(),
+      );
+    }
   }
 
   return NextResponse.json(toRaffleDTO(updated));

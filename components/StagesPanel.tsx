@@ -6,6 +6,7 @@ import { currentStage, installmentsNeeded, lastPayDay, playsStage, standingOf, t
 import type { RaffleDTO, RaffleStageDTO } from "@/lib/types";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Spinner } from "@/components/Spinner";
+import { WinnerWhatsApp } from "@/components/WinnerWhatsApp";
 
 /** What a stage's result means, in words. */
 function resultLine(stage: RaffleStageDTO): string {
@@ -89,6 +90,17 @@ export function StagesPanel({
               </div>
 
               {stage.outcome && <p className="mt-2 text-sm font-medium text-text">{resultLine(stage)}</p>}
+              {stage.outcome && stage.winnerValue !== null && (
+                <WinnerWhatsApp
+                  raffle={raffle}
+                  winnerValue={stage.winnerValue}
+                  prize={stage.prize}
+                  stageLabel={stage.label}
+                  drawDate={stage.drawDate}
+                  lottery={stage.lottery || raffle.lottery}
+                  outcome={stage.outcome}
+                />
+              )}
 
               {isNext && active && !stage.bonus && (
                 <p className="mt-2 text-xs text-text-muted">

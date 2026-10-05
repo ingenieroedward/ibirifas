@@ -5,6 +5,7 @@ import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
 import { formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
+import { emailDrawResult, mailOrigin } from "@/lib/buyerMail";
 import { publishRaffleChange } from "@/lib/realtime";
 import { currentStage, playsStage } from "@/lib/stages";
 import { toStageDTO } from "@/lib/stageDto";
@@ -106,6 +107,18 @@ export async function POST(req: NextRequest, ctx: Params) {
         : `Salió el ${formatNumberValue(winnerValue)}, que nadie tenía: el premio queda en la casa`,
     url: `/rifas/${raffle.id}`,
   });
+
+  void emailDrawResult(
+    raffle.id,
+    {
+      winnerValue,
+      outcome: plays ? "won" : number && number.status !== "available" ? "house" : "nobody",
+      prize: stage.prize,
+      stageLabel: stage.label,
+      more: remainingAfter > 0,
+    },
+    await mailOrigin(),
+  );
 
   const updated = await prisma.raffleStage.findUniqueOrThrow({ where: { id: stage.id } });
   return NextResponse.json({ stage: toStageDTO(updated), closed: remainingAfter === 0 });

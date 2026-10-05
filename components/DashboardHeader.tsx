@@ -14,6 +14,7 @@ import { NotificationsButton } from "@/components/NotificationsButton";
 import { PaymentsLink } from "@/components/PaymentsLink";
 import { UserMenu } from "@/components/UserMenu";
 import { Spinner } from "@/components/Spinner";
+import { WinnerWhatsApp } from "@/components/WinnerWhatsApp";
 
 // Whether the folding part of the header is hidden. Remembered on the device (localStorage),
 // with an in-memory fallback for browsers that refuse storage.
@@ -155,6 +156,14 @@ export function DashboardHeader({
                   <span className="text-2xl text-gold-400">{formatNumberValue(raffle.winnerValue)}</span>
                 </p>
                 <p className="text-sm text-text-muted">{describeHolder(raffle, raffle.winnerValue)}</p>
+                <WinnerWhatsApp
+                  raffle={raffle}
+                  winnerValue={raffle.winnerValue}
+                  prize={raffle.prizeLabel}
+                  stageLabel={null}
+                  drawDate={raffle.drawDate}
+                  lottery={raffle.lottery}
+                />
               </>
             ) : (
               <p className="mt-1 text-sm text-text-muted">Se cerró sin registrar un número ganador.</p>
