@@ -2,7 +2,7 @@
   "name": "Ibirifas · Gestión de Rifas",
   "short_name": "Ibirifas",
   "description": "Gestiona tu rifa en vivo: vende números, registra compradores y adjunta el comprobante desde el celular.",
-  "start_url": "/",
+  "start_url": "/rifas",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

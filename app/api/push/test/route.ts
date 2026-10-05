@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const result = await sendPush([user.id], {
     title: "Ibirifas",
     body: "Las notificaciones funcionan. Te avisaremos de ventas y pagos.",
-    url: "/",
+    url: "/rifas",
   });
 
   if (result.sent === 0) {

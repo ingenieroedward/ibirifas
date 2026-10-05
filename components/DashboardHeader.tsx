@@ -202,7 +202,7 @@ export function DashboardHeader({
           {/* The way home stays in reach even with the details folded. */}
           {(showBackToPicker || role === "ORGANIZER") && (
             <Link
-              href="/"
+              href="/rifas"
               aria-label="Mis rifas"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-text-muted transition active:scale-90"
             >
@@ -267,7 +267,7 @@ export function DashboardHeader({
             <div className="flex items-center gap-1.5 sm:gap-2">
               {/* An organizer always needs the way home: it is where "Crear rifa" lives. */}
               <Link
-                href="/"
+                href="/rifas"
                 className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted transition active:scale-95 min-[360px]:px-3 sm:px-3.5"
               >
                 <BackIcon className="hidden h-3.5 w-3.5 min-[360px]:block" />

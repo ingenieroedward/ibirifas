@@ -28,7 +28,7 @@ export default function EditRafflePage() {
   // Only an ORGANIZER can edit a raffle — SELLER and SUPERADMIN never see this form.
   useEffect(() => {
     if (!authLoading && user && user.role !== "ORGANIZER") {
-      router.replace(user.role === "SUPERADMIN" ? "/usuarios" : "/");
+      router.replace(user.role === "SUPERADMIN" ? "/usuarios" : "/rifas");
     }
   }, [authLoading, user, router]);
 

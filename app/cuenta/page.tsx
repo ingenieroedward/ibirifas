@@ -62,7 +62,7 @@ export default function AccountPage() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col pb-10">
-      <AppHeader userName={user.name} onLogout={handleLogout} title="Mi cuenta" backHref="/" backLabel="Volver" />
+      <AppHeader userName={user.name} onLogout={handleLogout} title="Mi cuenta" backHref="/rifas" backLabel="Volver" />
       <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-md space-y-4">
           <section className="space-y-1 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">

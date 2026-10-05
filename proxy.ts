@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/authCookies";
 
 export function proxy(req: NextRequest) {
+  // The home page (/) is public: it presents Ibirifas to visitors (and sends a signed-in team to /rifas itself).
+  if (req.nextUrl.pathname === "/") return NextResponse.next();
   const hasSession =
     req.cookies.has(ACCESS_TOKEN_COOKIE) || req.cookies.has(REFRESH_TOKEN_COOKIE);
 

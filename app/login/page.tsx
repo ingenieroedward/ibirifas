@@ -65,7 +65,7 @@ export default function LoginPage() {
           // Not remembering is fine.
         }
         await refresh();
-        router.push(user.role === "SUPERADMIN" ? "/usuarios" : "/");
+        router.push(user.role === "SUPERADMIN" ? "/usuarios" : "/rifas");
       } catch (err) {
         const message =
           err instanceof ApiError
