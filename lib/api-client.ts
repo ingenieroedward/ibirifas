@@ -270,7 +270,7 @@ export async function undoStage(raffleId: string, stageId: string): Promise<{ st
 /** Close a raffle (optionally with the winning number) or reopen it. */
 export async function setRaffleStatus(
   id: string,
-  input: { status: "active" } | { status: "closed"; winnerValue: number | null },
+  input: { status: "active" } | { status: "closed"; winnerValue: number | null } | { status: "closed"; lotteryResult: string },
 ): Promise<RaffleDTO> {
   return request<RaffleDTO>(`/api/raffles/${id}`, { method: "PATCH", body: JSON.stringify(input) });
 }

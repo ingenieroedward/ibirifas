@@ -14,7 +14,8 @@ import { NotificationsButton } from "@/components/NotificationsButton";
 import { PaymentsLink } from "@/components/PaymentsLink";
 import { UserMenu } from "@/components/UserMenu";
 import { Spinner } from "@/components/Spinner";
-import { WinnerWhatsApp } from "@/components/WinnerWhatsApp";
+import { PrizeWinners, WinnerWhatsApp } from "@/components/WinnerWhatsApp";
+import { extraPrizesLine } from "@/lib/prizes";
 
 // Whether the folding part of the header is hidden. Remembered on the device (localStorage),
 // with an in-memory fallback for browsers that refuse storage.
@@ -149,6 +150,13 @@ export function DashboardHeader({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Rifa cerrada</p>
             {byStages ? (
               <p className="mt-1 text-sm text-text-muted">Se jugaron todas las etapas: los resultados están abajo.</p>
+            ) : raffle.prizeResults.length > 1 ? (
+              <>
+                <p className="mt-1 font-[family-name:var(--font-heading)] text-lg font-extrabold text-text">
+                  Salió el <span className="text-2xl text-gold-400">{raffle.lotteryResult ?? formatNumberValue(raffle.winnerValue ?? 0)}</span>
+                </p>
+                <PrizeWinners raffle={raffle} />
+              </>
             ) : raffle.winnerValue !== null ? (
               <>
                 <p className="mt-1 font-[family-name:var(--font-heading)] text-lg font-extrabold text-text">
@@ -322,6 +330,11 @@ export function DashboardHeader({
                 {installmentText && <p className="truncate text-xs text-text-muted">{installmentText}</p>}
               </div>
             </div>
+            {raffle.extraPrizes.length > 0 && (
+              <p className="border-t border-line px-4 py-2.5 text-sm text-text-muted">
+                <span className="font-semibold text-gold-400">Gana Más:</span> {extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}
+              </p>
+            )}
             {(plan.line || lotteryText) && (
               <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm text-text-muted">
                 <CalendarIcon className="h-4 w-4 shrink-0 text-gold-400" />

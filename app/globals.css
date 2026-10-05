@@ -150,11 +150,14 @@ button {
 /* iOS Safari auto-zooms the page when a focused form control renders text
    under 16px — this is a floor, not a design size; every input in the app
    already uses text-base (16px) or larger, this just guards against a future
-   field being added without one. */
-input,
-select,
-textarea {
-  font-size: max(16px, 1em);
+   field being added without one. In the base layer, so a field's own size
+   utility (text-3xl for the winning number) still wins over it. */
+@layer base {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 /* Safe-area aware spacing utilities for notches / home indicators. */

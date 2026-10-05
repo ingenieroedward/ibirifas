@@ -3,6 +3,7 @@ import { accountLine } from "@/lib/accountText";
 import { formatCurrency, formatNumberValue, formatDrawWhen } from "@/lib/format";
 import { installmentPrices, lastPayDay, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { numbersOfGroup } from "@/lib/groups";
+import { extraPrizesLine } from "@/lib/prizes";
 import type { FullPayPerk, RaffleDTO, RaffleStageDTO } from "@/lib/types";
 
 /** Intl puts a non-breaking space after "$"; plain spaces paste better into a chat. */
@@ -74,6 +75,7 @@ export function buildAvailabilityText(raffle: RaffleDTO, link?: string | null): 
 
   const prize = raffle.prizeLabel || stagesPrizeSummary(raffle.stages);
   if (prize) lines.push(`Premio: ${prize}`);
+  if (raffle.extraPrizes.length > 0) lines.push(`Gana Más: ${extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}`);
   const byStages = raffle.stages.length > 0;
   const plan = drawPlanFromNumbers(raffle);
   if (byStages) {

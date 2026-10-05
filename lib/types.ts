@@ -1,3 +1,4 @@
+import type { ExtraPrize, PrizeKind, PrizeWin } from "@/lib/prizes";
 export type NumberStatus = "available" | "occupied" | "paid";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 /** When a raffle is played: on its date, or once every number is sold / paid. */
@@ -166,6 +167,9 @@ export interface RaffleAccountDTO {
  */
 export interface PublicRaffleDTO {
   name: string;
+  extraPrizes: ExtraPrize[];
+  /** Once closed with the lottery result: the winning numbers of every prize (never who has them). */
+  prizeResults: { kind: PrizeKind; value: number; prize: string | null; won: boolean }[];
   prizeLabel: string | null;
   permit: string | null;
   lottery: string | null;
@@ -317,6 +321,11 @@ export interface RaffleDTO {
   /** Whether reservations are open right now (the setting is on, there is a payment deadline, the raffle is active). */
   reservationsOpen: boolean;
   /** Secret of the public read-only page (/p/<token>); null when there is none. */
+  /** "Gana Más": extra prizes decided by the same lottery result (lib/prizes.ts). */
+  extraPrizes: ExtraPrize[];
+  /** The lottery result it was closed with ("3847"), and the prizes it gave. */
+  lotteryResult: string | null;
+  prizeResults: PrizeWin[];
   /** It can sell (activated, or its organization doesn't pay). See lib/billing.ts. */
   active: boolean;
   publicToken: string | null;
@@ -363,6 +372,7 @@ export interface RaffleGroupInput {
 
 export interface CreateRaffleInput {
   name: string;
+  extraPrizes?: ExtraPrize[];
   prizeLabel?: string | null;
   permit?: string | null;
   lottery?: string | null;
@@ -394,6 +404,9 @@ export interface CreateRaffleInput {
 // `accounts`, when present, fully replaces the raffle's payment accounts —
 // omit the field entirely to leave existing accounts untouched.
 export interface UpdateRaffleInput {
+  extraPrizes?: ExtraPrize[];
+  /** With status "closed": the lottery's full result; the winner and the extra prizes come out of it. */
+  lotteryResult?: string | null;
   /** "closed" ends the sales; "active" reopens the raffle (and forgets the winner). */
   status?: "active" | "closed";
   /** Only with status "closed": the number that won, or null for a raffle closed without a draw. */

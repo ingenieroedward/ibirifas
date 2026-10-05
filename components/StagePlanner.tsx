@@ -124,7 +124,7 @@ export function StagePlanner({
                 disabled={disabled || row.drawn}
                 aria-label={`Nombre de la etapa ${index + 1}`}
                 maxLength={40}
-                className="h-9 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 text-sm font-semibold text-text outline-none focus:border-gold-400"
+                className="h-9 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 text-base font-semibold text-text outline-none focus:border-gold-400"
               />
               {row.drawn ? (
                 <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-text-muted">Ya se jugó</span>

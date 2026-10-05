@@ -15,6 +15,7 @@ import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
 import { raffleActive } from "@/lib/billing";
+import { computeDraw, parseExtraPrizes, parsePrizeWins, prizeDigits, prizeKindLabel, supportsExtraPrizes } from "@/lib/prizes";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { accountInputSchema, accountRows, accountSelect, toAccountDTO } from "@/lib/accounts";
 
@@ -71,6 +72,9 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
       status: raffle.status,
     }),
     publicToken: raffle.publicToken,
+    extraPrizes: parseExtraPrizes(raffle.extraPrizes),
+    lotteryResult: raffle.lotteryResult,
+    prizeResults: parsePrizeWins(raffle.prizeResults),
     active: raffleActive(raffle, raffle.owner),
     numbers,
     accounts,
@@ -92,9 +96,17 @@ const hexColorSchema = z
   .optional();
 
 
+const extraPrizeSchema = z.object({
+  kind: z.enum(["reverse", "first", "neighbors"]),
+  prize: z.string().trim().min(1).max(80),
+});
+
 const updateRaffleSchema = z.object({
   status: z.enum(["active", "closed"]).optional(),
   winnerValue: z.number().int().min(0).nullable().optional(),
+  // Closing with the lottery's result: the winner and every "Gana Más" prize come out of it (lib/prizes.ts).
+  lotteryResult: z.string().trim().max(12).nullable().optional(),
+  extraPrizes: z.array(extraPrizeSchema).max(3).optional(),
   name: z.string().trim().min(1).max(120).optional(),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   permit: z.string().trim().max(120).nullable().optional(),
@@ -223,17 +235,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.status = "active";
       data.winnerValue = null;
       data.closedAt = null;
+      data.lotteryResult = null;
+      data.prizeResults = null;
     }
   } else {
     if (input.winnerValue !== undefined && input.winnerValue !== null && input.winnerValue >= existing.totalNumbers) {
       return NextResponse.json({ error: `El número ${input.winnerValue} no existe en esta rifa` }, { status: 400 });
     }
+    const extras = parseExtraPrizes(existing.extraPrizes);
+    let winnerValue = input.winnerValue;
+    if (input.lotteryResult) {
+      // The lottery's result decides the winner and every extra prize, from the numbers as they are now.
+      const numbers = await prisma.raffleNumber.findMany({ where: { raffleId: id }, select: { value: true, status: true } });
+      const statusByValue = new Map(numbers.map((n) => [n.value, n.status]));
+      const draw = computeDraw(input.lotteryResult, existing.totalNumbers, input.prizeLabel ?? existing.prizeLabel, extras, (v) => statusByValue.get(v));
+      if (!draw) {
+        const digits = prizeDigits(existing.totalNumbers);
+        return NextResponse.json(
+          { error: digits ? `Escribe el resultado de la lotería con al menos ${digits} cifras.` : "Esta rifa no se cierra con el resultado de la lotería." },
+          { status: 400 },
+        );
+      }
+      winnerValue = draw.winnerValue;
+      data.lotteryResult = input.lotteryResult.replace(/\D/g, "");
+      data.prizeResults = JSON.stringify(draw.wins);
+    } else if (winnerValue !== undefined && winnerValue !== null && extras.length > 0) {
+      return NextResponse.json({ error: "Esta rifa tiene premios adicionales: escribe el resultado completo de la lotería." }, { status: 400 });
+    } else if (winnerValue !== undefined) {
+      // A winner typed by hand (or none): no lottery result behind it any more.
+      data.lotteryResult = null;
+      data.prizeResults = null;
+    }
     if (!wasClosed) {
       data.status = "closed";
       data.closedAt = new Date();
-      data.winnerValue = input.winnerValue ?? null;
-    } else if (input.winnerValue !== undefined) {
-      data.winnerValue = input.winnerValue;
+      data.winnerValue = winnerValue ?? null;
+    } else if (winnerValue !== undefined) {
+      data.winnerValue = winnerValue;
     }
   }
   const justClosed = !wasClosed && nextStatus === "closed";
@@ -242,6 +280,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // stay fixed once the raffle exists, since people may have paid them); the perk for paying up front can change.
   const existingStages = await prisma.raffleStage.findMany({ where: { raffleId: id }, orderBy: { position: "asc" } });
   const byStages = existingStages.length > 0;
+  if (input.extraPrizes !== undefined) {
+    if (input.extraPrizes.length > 0 && (byStages || !supportsExtraPrizes(existing.totalNumbers))) {
+      return NextResponse.json({ error: "Los premios adicionales son para rifas de 10, 100 o 1.000 números, sin etapas." }, { status: 400 });
+    }
+    if (new Set(input.extraPrizes.map((p) => p.kind)).size !== input.extraPrizes.length) {
+      return NextResponse.json({ error: "Cada premio adicional va una sola vez." }, { status: 400 });
+    }
+    data.extraPrizes = input.extraPrizes.length > 0 ? JSON.stringify(input.extraPrizes) : null;
+  }
   if (!byStages && (input.stages || input.fullPayPerk || input.bonusStage)) {
     return NextResponse.json({ error: "Esta rifa no es por etapas." }, { status: 400 });
   }
@@ -364,15 +411,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else {
       body = `Ganó el ${formatNumberValue(updated.winnerValue)}: nadie lo compró`;
     }
+    const extraWon = parsePrizeWins(updated.prizeResults).filter((w) => w.kind !== "main" && w.won).length;
+    if (extraWon > 0) body += ` · ${extraWon} ${extraWon === 1 ? "premio adicional" : "premios adicionales"} más`;
     void notifyTeam(tenantId, user.id, { title: `${updated.name} · rifa cerrada`, body, url: `/rifas/${id}` });
     // The buyers hear the result by email: "¡Ganaste!" to the winner, the result to everyone else.
     if (updated.winnerValue !== null && updated.stages.length === 0) {
+      const digits = prizeDigits(updated.totalNumbers);
+      const extras = parsePrizeWins(updated.prizeResults)
+        .filter((w) => w.kind !== "main")
+        .map((w) => ({ label: prizeKindLabel(w.kind, digits), value: w.value, prize: w.prize, won: w.won }));
       void emailDrawResult(
         id,
         {
           winnerValue: updated.winnerValue,
           outcome: winnerNumber && winnerNumber.status !== "available" ? "won" : "nobody",
           prize: updated.prizeLabel,
+          extras,
         },
         await mailOrigin(),
       );

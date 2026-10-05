@@ -23,6 +23,7 @@ import { DRAW_TRIGGER_LABEL } from "@/lib/drawPlan";
 import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { StagePlanner, initialStagePlan, type StagePlan } from "@/components/StagePlanner";
 import { Spinner } from "@/components/Spinner";
+import { ExtraPrizesEditor, draftFromPrizes, prizesFromDraft, type ExtraPrizeDraft } from "@/components/ExtraPrizesEditor";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 const DEFAULT_HOLD_DAYS = 3;
@@ -147,6 +148,8 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
 
   const [name, setName] = useState(raffle?.name ?? "");
   const [prizeLabel, setPrizeLabel] = useState(raffle?.prizeLabel ?? "");
+  // "Gana Más": extra prizes from the same lottery result (lib/prizes.ts).
+  const [extraDraft, setExtraDraft] = useState<ExtraPrizeDraft>(() => draftFromPrizes(raffle?.extraPrizes));
   const [lottery, setLottery] = useState(raffle?.lottery ?? "");
   const [permit, setPermit] = useState(raffle?.permit ?? "");
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
@@ -424,6 +427,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           prizeLabel: prizeLabel.trim() || null,
           permit: permit.trim() || null,
           drawTime: drawTime || null,
+          extraPrizes: useStages ? [] : prizesFromDraft(extraDraft),
           lottery: lottery.trim() || null,
           ...(useStages
             ? stagesPayload!
@@ -439,6 +443,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           prizeLabel: prizeLabel.trim() || null,
           permit: permit.trim() || null,
           drawTime: drawTime || null,
+          extraPrizes: useStages ? [] : prizesFromDraft(extraDraft),
           lottery: lottery.trim() || null,
           numberPrice: looseNumberPrice,
           totalNumbers: total,
@@ -521,6 +526,17 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
         />
       </Field>
+
+      {!useStages && (
+        <ExtraPrizesEditor
+          totalNumbers={Number(totalNumbers) || DEFAULT_TOTAL_NUMBERS}
+          numberPrice={Number(numberPrice)}
+          mainPrize={prizeLabel}
+          value={extraDraft}
+          onChange={setExtraDraft}
+          disabled={submitting}
+        />
+      )}
 
       <Field
         label="Lotería (opcional)"
