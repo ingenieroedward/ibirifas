@@ -114,3 +114,27 @@ export function buildReceiptMessage(
     "¡Gracias y mucha suerte! 🍀",
   ].join("\n");
 }
+
+export interface WinnerContext {
+  buyerName: string | null;
+  raffleName: string;
+  winnerValue: number;
+  prize: string | null;
+  /** A raffle by stages: which draw it was. */
+  stageLabel?: string | null;
+  lottery: string | null;
+  drawDate: string | null;
+}
+
+/** "¡Felicitaciones! Tu número ganó…" — what the organizer sends the winner after registering the result. */
+export function buildWinnerMessage(c: WinnerContext): string {
+  const when = [c.lottery, c.drawDate ? formatDrawDate(c.drawDate) : null].filter(Boolean).join(" · ");
+  return [
+    `Hola${c.buyerName ? ` ${firstName(c.buyerName)}` : ""} 🎉`,
+    "",
+    `¡Felicitaciones! En el sorteo${c.stageLabel ? ` de *${c.stageLabel}*` : ""} de la rifa *${c.raffleName}* salió el *${formatNumberValue(c.winnerValue)}* y es tuyo: ganaste${c.prize ? ` *${c.prize}*` : " el premio"} 🏆`,
+    ...(when ? [`(${when})`] : []),
+    "",
+    "Escríbeme para coordinar la entrega del premio.",
+  ].join("\n");
+}

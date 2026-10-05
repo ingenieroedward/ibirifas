@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { accountLine, accountQrPath, accountSelect, toAccountDTO } from "@/lib/accounts";
 import { ensureContrast, luminance, mix } from "@/lib/color";
 import { resolvedTheme, type RaffleTheme } from "@/lib/theme";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatNumberValue } from "@/lib/format";
 import { mailEnabled, sendMail } from "@/lib/mail";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { amountRemaining, installmentCount, standingOf, stageSettingsOf } from "@/lib/stages";
@@ -22,7 +22,14 @@ export type BuyerEvent =
   | { kind: "approved"; method?: PaymentMethod | null }
   | { kind: "installment" }
   | { kind: "rejected"; reason: string | null }
-  | { kind: "released"; why: "expired" | "manual" | "stage" };
+  | { kind: "released"; why: "expired" | "manual" | "stage" }
+  /** Their number won the draw (the raffle's, or a stage's). */
+  | { kind: "won"; winnerValue: number; prize: string | null; stageLabel?: string | null }
+  /**
+   * The result, for everyone else: someone won, the number wasn't up to date with its installments ("house"), or
+   * nobody had it. `more`: a raffle by stages with draws still to come.
+   */
+  | { kind: "result"; winnerValue: number; outcome: "won" | "house" | "nobody"; stageLabel?: string | null; more?: boolean };
 
 /** A number as it was when the event happened (for a release, read before the buyer was cleared). */
 export interface BuyerRow {
@@ -318,11 +325,73 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
             ],
           };
           break;
+        case "won":
+          c = {
+            subject: `¡Ganaste! 🎉 · ${raffle.name}`,
+            paragraphs: [
+              hi,
+              `En el sorteo${event.stageLabel ? ` de **${event.stageLabel}**` : ""} salió el **${formatNumberValue(event.winnerValue)}**: ¡es tuyo! Ganaste${event.prize ? ` **${event.prize}**` : " el premio"}.`,
+              "El organizador se comunicará contigo para coordinar la entrega. Si no te escribe, responde este correo.",
+            ],
+            button,
+          };
+          break;
+        case "result":
+          c = {
+            subject: `Resultado del sorteo${event.stageLabel ? ` · ${event.stageLabel}` : ""} · ${raffle.name}`,
+            paragraphs: [
+              hi,
+              `En el sorteo${event.stageLabel ? ` de **${event.stageLabel}**` : ""} salió el **${formatNumberValue(event.winnerValue)}**.`,
+              event.outcome === "won"
+                ? "Esta vez no fue tu número."
+                : event.outcome === "house"
+                  ? "Ese número no estaba al día con sus cuotas, así que el premio queda en la casa."
+                  : "Nadie tenía ese número, así que el premio queda en la casa.",
+              event.more ? "Sigues participando en los próximos sorteos con el mismo número. ¡Mucha suerte!" : "¡Gracias por participar!",
+            ],
+          };
+          break;
       }
       const { text, html } = render(c, raffle.name, emailColors(raffle));
       await sendMail({ to, subject: c.subject, text, html, replyTo: raffle.owner.contactEmail });
     }
   } catch (err) {
     console.error("[mail] buyer email failed:", err instanceof Error ? err.message : err);
+  }
+}
+
+/**
+ * After a draw (closing a raffle with its winner, or a stage's result): "¡Ganaste!" to the winner and the result
+ * to every other buyer who left an email. Fire-and-forget, like the rest.
+ */
+export async function emailDrawResult(
+  raffleId: string,
+  draw: { winnerValue: number; outcome: "won" | "house" | "nobody"; prize: string | null; stageLabel?: string | null; more?: boolean },
+  origin: string | null,
+): Promise<void> {
+  try {
+    if (!mailEnabled()) return;
+    const rows = await prisma.raffleNumber.findMany({
+      where: { raffleId, status: { not: "available" }, buyerEmail: { not: null } },
+      select: buyerRowSelect,
+    });
+    const winnerRow = draw.outcome === "won" ? rows.find((r) => r.value === draw.winnerValue) : undefined;
+    const winnerEmail = winnerRow?.buyerEmail?.trim().toLowerCase() ?? null;
+    const isWinner = (r: BuyerRow) => winnerEmail !== null && r.buyerEmail?.trim().toLowerCase() === winnerEmail;
+    const winners = rows.filter(isWinner);
+    const others = rows.filter((r) => !isWinner(r));
+    if (winners.length > 0) {
+      await emailBuyers(raffleId, winners, { kind: "won", winnerValue: draw.winnerValue, prize: draw.prize, stageLabel: draw.stageLabel }, origin);
+    }
+    if (others.length > 0) {
+      await emailBuyers(
+        raffleId,
+        others,
+        { kind: "result", winnerValue: draw.winnerValue, outcome: draw.outcome, stageLabel: draw.stageLabel, more: draw.more },
+        origin,
+      );
+    }
+  } catch (err) {
+    console.error("[mail] draw result email failed:", err instanceof Error ? err.message : err);
   }
 }

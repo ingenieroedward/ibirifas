@@ -1234,6 +1234,185 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
 }
 
 /** Triggers a browser download of the given blob via a temporary `<a download>` link. */
+export interface WinnerImageInput {
+  raffleName: string;
+  themeBackground?: string | null;
+  themeNumberColor?: string | null;
+  themeTextColor?: string | null;
+  winnerValue: number;
+  /** Who won; null when nobody did (the prize stays with the organizer). */
+  winnerName: string | null;
+  /** Why nobody won: nobody had the number, or (by stages) it wasn't up to date with its installments. */
+  noWinnerReason?: "nobody" | "notUpToDate";
+  prize: string | null;
+  /** A raffle by stages: which draw it was. */
+  stageLabel?: string | null;
+  lottery: string | null;
+  drawDate: string | null;
+}
+
+/** "Ana Pérez Gómez" → "Ana P." — enough to recognize the winner in a public status, without the full name. */
+export function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  return parts.length === 1 ? parts[0]! : `${parts[0]} ${parts[1]!.charAt(0).toUpperCase()}.`;
+}
+
+/**
+ * The winner's announcement for a WhatsApp/Instagram status (1080×1920): "¡Tenemos ganador!", the number on a big
+ * golden ball, who won and what, and a thank-you to everyone who played. In the raffle's own colors.
+ */
+export async function generateWinnerImage(input: WinnerImageInput): Promise<Blob> {
+  await ensureFontsReady();
+  const W = 1080;
+  const H = 1920;
+  const theme = resolvedTheme(input);
+  const headingFont = getBrandFontFamily("--font-heading", FALLBACK_HEADING_FONT);
+  const bodyFont = getBrandFontFamily("--font-body", FALLBACK_BODY_FONT);
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo crear el lienzo para la imagen.");
+  const dark = luminance(theme.background) < 0.5;
+  const accent = theme.numberColor;
+  const muted = dark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.58)";
+  // Plain text sits on the background (the theme's text color is for the number tiles).
+  const onBg = dark ? "#ffffff" : "#1b1405";
+  const won = input.winnerName !== null;
+
+  drawBackgroundArt(ctx, W, H, theme.background, accent, dark);
+
+  // Confetti around the top (fixed positions, so the same raffle always looks the same).
+  const confettiColors = [accent, lighten(accent, 0.35), dark ? "#ffffff" : darken(accent, 0.25)];
+  for (let i = 0; i < 46; i++) {
+    const x = ((i * 233) % 1000) + 40;
+    const y = ((i * 149) % 620) + 30 + (i % 3) * 18;
+    if (x > 300 && x < 780 && y > 120 && y < 560) continue; // keep the headline area clear
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(((i * 47) % 180) * (Math.PI / 180));
+    ctx.globalAlpha = 0.55 + (i % 4) * 0.1;
+    ctx.fillStyle = confettiColors[i % confettiColors.length]!;
+    if (i % 3 === 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 7 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(-11, -4, 22, 8);
+    }
+    ctx.restore();
+  }
+
+  const center = W / 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  drawCrown(ctx, center, 150, 150, accent);
+
+  // Headline
+  const headline = won ? (input.stageLabel ? `¡GANADOR DE ${input.stageLabel.toUpperCase()}!` : "¡TENEMOS GANADOR!") : "RESULTADO DEL SORTEO";
+  const head = fitFontSize(ctx, headline, W - 120, 100, 54, "800", headingFont);
+  ctx.font = `800 ${head.fontSize}px ${headingFont}`;
+  ctx.fillStyle = accent;
+  ctx.shadowColor = withAlpha(accent, dark ? 0.55 : 0.25);
+  ctx.shadowBlur = 30;
+  ctx.fillText(head.text, center, 380);
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+
+  const name = fitFontSize(ctx, input.raffleName, W - 160, 52, 30, "700", headingFont);
+  ctx.font = `700 ${name.fontSize}px ${headingFont}`;
+  ctx.fillStyle = onBg;
+  ctx.fillText(name.text, center, 460);
+
+  // The golden ball with the number
+  const ballY = 800;
+  const R = 250;
+  const halo = ctx.createRadialGradient(center, ballY, R * 0.6, center, ballY, R * 1.55);
+  halo.addColorStop(0, withAlpha(accent, dark ? 0.45 : 0.25));
+  halo.addColorStop(1, withAlpha(accent, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(center, ballY, R * 1.55, 0, Math.PI * 2);
+  ctx.fill();
+  const ball = ctx.createRadialGradient(center - R * 0.35, ballY - R * 0.4, R * 0.1, center, ballY, R);
+  ball.addColorStop(0, lighten(accent, 0.55));
+  ball.addColorStop(0.55, accent);
+  ball.addColorStop(1, darken(accent, 0.3));
+  ctx.fillStyle = ball;
+  ctx.beginPath();
+  ctx.arc(center, ballY, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = withAlpha(lighten(accent, 0.6), 0.7);
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(center, ballY, R - 18, 0, Math.PI * 2);
+  ctx.stroke();
+  const onBall = luminance(accent) > 0.5 ? "#2a1d03" : "#ffffff";
+  const digits = formatNumberValue(input.winnerValue);
+  ctx.font = `800 ${digits.length > 3 ? 190 : digits.length > 2 ? 230 : 280}px ${headingFont}`;
+  ctx.fillStyle = onBall;
+  ctx.textBaseline = "middle";
+  ctx.fillText(digits, center, ballY + 14);
+  ctx.textBaseline = "alphabetic";
+
+  // Who won and what
+  let y = ballY + R + 120;
+  if (won) {
+    const who = fitFontSize(ctx, shortName(input.winnerName!), W - 140, 84, 44, "800", headingFont);
+    ctx.font = `800 ${who.fontSize}px ${headingFont}`;
+    ctx.fillStyle = onBg;
+    ctx.fillText(who.text, center, y);
+    y += 78;
+    if (input.prize) {
+      const prize = fitFontSize(ctx, `se llevó ${input.prize}`, W - 140, 56, 32, "700", headingFont);
+      ctx.font = `700 ${prize.fontSize}px ${headingFont}`;
+      ctx.fillStyle = accent;
+      ctx.fillText(prize.text, center, y);
+      y += 64;
+    }
+  } else {
+    ctx.font = `800 64px ${headingFont}`;
+    ctx.fillStyle = onBg;
+    ctx.fillText(input.noWinnerReason === "notUpToDate" ? "No estaba al día" : "Nadie tenía este número", center, y);
+    y += 66;
+    ctx.font = `600 40px ${bodyFont}`;
+    ctx.fillStyle = accent;
+    ctx.fillText("El premio queda en la casa", center, y);
+    y += 60;
+  }
+  const when = [input.lottery, input.drawDate ? formatDrawDate(input.drawDate) : null].filter(Boolean).join(" · ");
+  if (when) {
+    const w = fitFontSize(ctx, when, W - 160, 34, 24, "600", bodyFont);
+    ctx.font = `600 ${w.fontSize}px ${bodyFont}`;
+    ctx.fillStyle = muted;
+    ctx.fillText(w.text, center, y + 6);
+  }
+
+  // Thanks
+  const thanksY = 1580;
+  ctx.fillStyle = withAlpha(accent, 0.45);
+  ctx.fillRect(center - 160, thanksY - 110, 320, 3);
+  ctx.font = `800 62px ${headingFont}`;
+  ctx.fillStyle = onBg;
+  ctx.fillText("¡Gracias a todos", center, thanksY - 20);
+  ctx.fillText("por participar!", center, thanksY + 54);
+  ctx.font = `600 36px ${bodyFont}`;
+  ctx.fillStyle = muted;
+  ctx.fillText(won ? "¡Felicitaciones al ganador!" : "Nos vemos en la próxima rifa.", center, thanksY + 124);
+
+  // Brand
+  drawCrown(ctx, center, H - 150, 34, accent, 0, 0.9);
+  ctx.font = `800 34px ${headingFont}`;
+  ctx.fillStyle = accent;
+  ctx.fillText("Ibirifas", center, H - 70);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("No se pudo generar la imagen."))), "image/png");
+  });
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

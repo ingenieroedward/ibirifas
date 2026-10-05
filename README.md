@@ -246,7 +246,17 @@ producción. El superadmin entra **sin** código de organización.
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación
   ("Ganó el 47: María Pérez") y el ganador queda marcado en el tablero, en las
-  letras, en Participantes y en el listado. Una rifa cerrada **no vende ni
+  letras, en Participantes y en el listado. **Avisos del resultado**: a los
+  compradores que dejaron correo les llega "¡Ganaste! 🎉" (al ganador) o
+  "Resultado del sorteo" (a los demás, con "esta vez no fue tu número" o "el
+  premio queda en la casa"); en el aviso de rifa cerrada aparecen **"Avisar a
+  Ana por WhatsApp"** (abre WhatsApp con la felicitación lista, al teléfono del
+  ganador) e **"Imagen para el estado"**: una imagen 1080×1920 con el número en
+  una balota dorada, el nombre corto del ganador ("Ana P."), el premio, la
+  lotería y la fecha, y "¡Gracias a todos por participar!", en los colores de la
+  rifa (`generateWinnerImage`). En una rifa por etapas, lo mismo con cada
+  resultado del panel Etapas ("Sigues participando en los próximos sorteos").
+  Una rifa cerrada **no vende ni
   libera** números (el servidor responde 409), pero sí deja registrar,
   deshacer o corregir pagos y datos del comprador. "Reabrir rifa" la vuelve a
   abrir y olvida al ganador. "Eliminar rifa" solo existe para rifas cerradas,
