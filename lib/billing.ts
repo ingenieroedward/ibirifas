@@ -41,13 +41,15 @@ export function raffleActive(raffle: { activatedAt: Date | null }, owner: { bill
 
 const BLOCKED = "Esta rifa aún no está activa. El organizador debe activarla para empezar a vender.";
 
-/** For the routes that sell: a 402 response while the raffle isn't active, null when it can sell. */
+/** For the routes that sell: a 402 response while the raffle isn't active (404 once in the trash), null when it can sell. */
 export async function activationBlock(raffleId: string): Promise<NextResponse | null> {
-  if (!billingEnabled()) return null;
   const raffle = await prisma.raffle.findUnique({
     where: { id: raffleId },
-    select: { activatedAt: true, owner: { select: { billingExempt: true } } },
+    select: { activatedAt: true, deletedAt: true, owner: { select: { billingExempt: true } } },
   });
+  // Also the guard of every route that sells: a raffle in the trash (lib/trash.ts) is gone until restored.
+  if (raffle?.deletedAt) return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
+  if (!billingEnabled()) return null;
   if (!raffle || raffleActive(raffle, raffle.owner)) return null;
   return NextResponse.json({ error: BLOCKED, code: "activation_required" }, { status: 402 });
 }

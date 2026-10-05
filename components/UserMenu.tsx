@@ -72,6 +72,16 @@ export function UserMenu({ userName, onLogout }: { userName: string; onLogout: (
               Mi equipo
             </Link>
           )}
+          {role === "ORGANIZER" && (
+            <Link role="menuitem" href="/rifas/papelera" onClick={() => setOpen(false)} className="block px-4 py-3 text-sm text-text hover:bg-surface-2">
+              Papelera
+            </Link>
+          )}
+          {(role === "ORGANIZER" || role === "SUPERADMIN") && (
+            <Link role="menuitem" href="/actividad" onClick={() => setOpen(false)} className="block px-4 py-3 text-sm text-text hover:bg-surface-2">
+              Actividad
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"

@@ -15,6 +15,7 @@ import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
 import { raffleActive } from "@/lib/billing";
+import { TRASH_DAYS, trashRaffle } from "@/lib/trash";
 import { computeDraw, parseExtraPrizes, parsePrizeWins, prizeDigits, prizeKindLabel, supportsExtraPrizes } from "@/lib/prizes";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { accountInputSchema, accountRows, accountSelect, toAccountDTO } from "@/lib/accounts";
@@ -153,7 +154,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
   let raffle = await load();
 
-  if (!raffle) {
+  // A raffle in the trash is gone from everywhere until it is restored (lib/trash.ts).
+  if (!raffle || raffle.deletedAt) {
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
 
@@ -184,7 +186,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
 
   const existing = await prisma.raffle.findUnique({ where: { id } });
-  if (!existing) {
+  if (!existing || existing.deletedAt) {
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
 
@@ -451,15 +453,23 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
-  const existing = await prisma.raffle.findUnique({ where: { id }, select: { ownerId: true, status: true } });
+  const existing = await prisma.raffle.findUnique({ where: { id }, select: { ownerId: true, status: true, deletedAt: true } });
   const tenantId = tenantIdFor(user);
-  if (!existing || !tenantId || existing.ownerId !== tenantId) {
+  if (!existing || existing.deletedAt || !tenantId || existing.ownerId !== tenantId) {
     return NextResponse.json({ error: "Rifa no encontrada" }, { status: 404 });
   }
   if (existing.status !== "closed") {
     return NextResponse.json({ error: "Cierra la rifa antes de eliminarla." }, { status: 409 });
   }
 
-  await prisma.raffle.delete({ where: { id } });
+  // To the trash, not gone: it can be restored for TRASH_DAYS, and the record keeps who and when.
+  const trashed = await trashRaffle(id, { name: user.name });
+  if (trashed) {
+    void notifyTeam(tenantId, user.id, {
+      title: "Rifa eliminada",
+      body: `${user.name} eliminó «${trashed.name}». Se puede restaurar durante ${TRASH_DAYS} días desde Mis rifas → Papelera.`,
+      url: "/rifas",
+    });
+  }
   return new NextResponse(null, { status: 204 });
 }

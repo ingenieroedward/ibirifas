@@ -1,4 +1,6 @@
 import type {
+  TrashedRaffleDTO,
+  ActivityDTO,
   ActivationStateDTO,
   PaymentsAccountDTO,
   PaymentCandidateDTO,
@@ -409,4 +411,19 @@ export async function getActivation(raffleId: string): Promise<ActivationStateDT
 /** "allowance": activate with the free raffle or a credit; "pay": get (or reuse) the page where to pay. */
 export async function activateRaffle(raffleId: string, action: "allowance" | "pay"): Promise<ActivationStateDTO> {
   return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, { method: "POST", body: JSON.stringify({ action }) });
+}
+
+/** The organization's trash: raffles deleted in the last 30 days. */
+export async function getTrash(): Promise<TrashedRaffleDTO[]> {
+  return request<TrashedRaffleDTO[]>("/api/raffles/trash");
+}
+
+/** Brings a raffle back from the trash. */
+export async function restoreRaffle(id: string): Promise<void> {
+  await request<{ ok: true }>(`/api/raffles/${id}/restore`, { method: "POST" });
+}
+
+/** The activity record (the platform owner sees every organization's). */
+export async function getActivity(): Promise<ActivityDTO[]> {
+  return request<ActivityDTO[]>("/api/activity");
 }

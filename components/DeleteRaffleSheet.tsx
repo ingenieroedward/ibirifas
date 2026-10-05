@@ -32,8 +32,11 @@ export function DeleteRaffleSheet({ raffleName, onClose, onConfirm, onExport, ex
   return (
     <BottomSheet title="Eliminar la rifa" subtitle={raffleName} onClose={deleting ? () => {} : onClose}>
       <div className="space-y-1 rounded-2xl border border-red-500/40 bg-red-950/30 p-4 text-sm text-red-200">
-        <p className="font-semibold">Esto no se puede deshacer.</p>
-        <p>Se borran la rifa, todos sus números, los compradores, los pagos y los comprobantes.</p>
+        <p className="font-semibold">La rifa va a la papelera.</p>
+        <p>
+          Desaparece de tus rifas y su enlace público deja de funcionar. Puedes restaurarla durante 30 días desde el menú →
+          Papelera; después se borra para siempre con sus números, compradores, pagos y comprobantes. Tu equipo recibe un aviso.
+        </p>
       </div>
 
       {onExport && (
@@ -77,7 +80,7 @@ export function DeleteRaffleSheet({ raffleName, onClose, onConfirm, onExport, ex
             Eliminando…
           </>
         ) : (
-          "Eliminar para siempre"
+          "Enviar a la papelera"
         )}
       </button>
     </BottomSheet>
