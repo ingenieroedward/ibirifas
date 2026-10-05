@@ -129,6 +129,9 @@ export const pagoradarPaymentSchema = z.object({
   receivedAt: z.string().datetime({ offset: true }),
   accountId: z.string().max(60).nullable().optional(),
   account: z.object({ id: z.string().max(60) }).passthrough().nullable().optional(),
+  // The pagoradar charge it paid, if any: in the webhook as `charge`, from GET /v1/payments as `chargeId`.
+  charge: z.object({ id: z.string().max(60), reference: z.string().max(120).nullable().optional() }).passthrough().nullable().optional(),
+  chargeId: z.string().max(60).nullable().optional(),
 });
 export type PagoradarPayment = z.infer<typeof pagoradarPaymentSchema>;
 
@@ -546,7 +549,20 @@ export function rematchPayments(tenantId: string, fresh?: string): Promise<void>
 }
 
 /** Stores a payment from pagoradar (once) and matches it. Returns "duplicate" when it was already here. */
-export async function ingestPayment(tenantId: string, data: PagoradarPayment): Promise<"stored" | "duplicate"> {
+/**
+ * A payment for a raffle's activation (billing, lib/billing.ts) — the organization paying Ibirifas, not a buyer
+ * paying a raffle — when the platform owner's billing account is also their organization's receiving account.
+ */
+export async function isBillingPayment(data: PagoradarPayment): Promise<boolean> {
+  if (data.charge?.reference?.startsWith("rifa:")) return true;
+  const chargeId = data.charge?.id ?? data.chargeId;
+  if (!chargeId) return false;
+  return (await prisma.raffle.count({ where: { activationChargeId: chargeId } })) > 0;
+}
+
+export async function ingestPayment(tenantId: string, data: PagoradarPayment): Promise<"stored" | "duplicate" | "billing"> {
+  // It pays Ibirifas for a raffle's activation: never a buyer's payment to cross with reservations.
+  if (await isBillingPayment(data)) return "billing";
   const exists = await prisma.receivedPayment.findUnique({ where: { id: data.id }, select: { id: true } });
   if (exists) return "duplicate";
   try {

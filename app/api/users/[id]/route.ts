@@ -17,10 +17,24 @@ const updateUserSchema = z.object({
   active: z.boolean().optional(),
   code: z.string().optional(),
   plan: z.string().trim().min(1).max(40).optional(),
+  // Billing, set by the platform owner on an organizer (lib/billing.ts).
+  billingExempt: z.boolean().optional(),
+  raffleCredits: z.number().int().min(0).max(1000).optional(),
 });
 
 function toManagedUserDTO(
-  user: { id: string; name: string; role: string; active: boolean; plan: string; orgCode: string | null; createdAt: Date },
+  user: {
+    id: string;
+    name: string;
+    role: string;
+    active: boolean;
+    plan: string;
+    orgCode: string | null;
+    createdAt: Date;
+    billingExempt?: boolean;
+    raffleCredits?: number;
+    freeRaffleUsedAt?: Date | null;
+  },
   /** Sellers have no code of their own; they log in under their organizer's. */
   inheritedOrgCode: string | null = null,
 ): ManagedUserDTO {
@@ -32,6 +46,9 @@ function toManagedUserDTO(
     plan: user.plan,
     orgCode: user.orgCode ?? inheritedOrgCode,
     createdAt: user.createdAt.toISOString(),
+    ...(user.role === "ORGANIZER"
+      ? { billing: { exempt: user.billingExempt ?? false, credits: user.raffleCredits ?? 0, freeUsed: Boolean(user.freeRaffleUsedAt) } }
+      : {}),
   };
 }
 
@@ -75,7 +92,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const input = parsed.data;
-  const data: { name?: string; orgCode?: string; active?: boolean; codeHash?: string; plan?: string } = {};
+  const data: {
+    name?: string;
+    orgCode?: string;
+    active?: boolean;
+    codeHash?: string;
+    plan?: string;
+    billingExempt?: boolean;
+    raffleCredits?: number;
+  } = {};
+
+  if (input.billingExempt !== undefined || input.raffleCredits !== undefined) {
+    if (user.role !== "SUPERADMIN" || target.role !== "ORGANIZER") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    if (input.billingExempt !== undefined) data.billingExempt = input.billingExempt;
+    if (input.raffleCredits !== undefined) data.raffleCredits = input.raffleCredits;
+  }
 
   if (input.name !== undefined) {
     data.name = input.name;
@@ -123,6 +156,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const [updated] = await prisma.$transaction([
     prisma.adminUser.update({ where: { id: target.id }, data }),
+    // Exempting an organization activates the raffles it has waiting, so they keep selling if that changes.
+    ...(data.billingExempt
+      ? [prisma.raffle.updateMany({ where: { ownerId: target.id, activatedAt: null }, data: { activatedAt: new Date(), activationKind: "exempt" } })]
+      : []),
     // A new code is usually a reset (lost phone, someone who shouldn't have it):
     // end the sessions opened with the old one instead of letting them live on.
     ...(data.codeHash

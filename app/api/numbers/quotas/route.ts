@@ -1,3 +1,4 @@
+import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +67,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Los números deben ser de la misma rifa" }, { status: 400 });
   }
   const raffleId = found[0]!.raffleId;
+  const blocked = await activationBlock(raffleId);
+  if (blocked) return blocked;
   const raffle = await prisma.raffle.findUniqueOrThrow({
     where: { id: raffleId },
     select: { name: true, fullPayPerk: true, fullPayDiscount: true, stageDeadlineDays: true, stages: true },

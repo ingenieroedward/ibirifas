@@ -51,6 +51,13 @@ model AdminUser {
   // Only meaningful for ORGANIZER: when they accepted the platform's terms of use (they, not Ibirifas, answer
   // for their raffles: permits, prizes, buyers' data). Asked again when the terms change (lib/terms.ts).
   termsAcceptedAt DateTime?
+  // Only meaningful for ORGANIZER — billing (lib/billing.ts). Each raffle is activated before it sells:
+  // `billingExempt` organizations never pay (the platform owner's own, friends); the first raffle of up to
+  // 100 numbers is free (`freeRaffleUsedAt` marks it used); `raffleCredits` are raffles the platform owner
+  // gave or sold by hand, any size; otherwise the activation is paid (pagoradar charge).
+  billingExempt    Boolean   @default(false)
+  freeRaffleUsedAt DateTime?
+  raffleCredits    Int       @default(0)
 
   refreshTokens RefreshToken[]
   pushSubscriptions PushSubscription[]
@@ -118,6 +125,13 @@ model Raffle {
   drawTrigger  String         @default("date")
   completedAt  DateTime?
   status       String         @default("active")
+  // Billing (lib/billing.ts): a raffle sells only once activated (or while its organization is exempt).
+  // `activationKind`: "legacy" (existed before billing), "exempt", "free", "credit" or "paid";
+  // `activationAmount` what was paid. `activationChargeId` is the pagoradar charge of a payment under way.
+  activatedAt        DateTime?
+  activationKind     String?
+  activationAmount   Int?
+  activationChargeId String?
   createdAt    DateTime       @default(now())
   numbers      RaffleNumber[]
 

@@ -139,6 +139,8 @@ export interface RaffleSummaryDTO {
   themeBackground?: string | null;
   themeNumberColor?: string | null;
   themeTextColor?: string | null;
+  /** It can sell (activated, or its organization doesn't pay). See lib/billing.ts. */
+  active: boolean;
 }
 
 // A payment account the organizer publishes on the raffle (Nequi, Bancolombia,
@@ -303,6 +305,8 @@ export interface RaffleDTO {
   /** Whether reservations are open right now (the setting is on, there is a payment deadline, the raffle is active). */
   reservationsOpen: boolean;
   /** Secret of the public read-only page (/p/<token>); null when there is none. */
+  /** It can sell (activated, or its organization doesn't pay). See lib/billing.ts. */
+  active: boolean;
   publicToken: string | null;
   numbers: RaffleNumberDTO[];
   accounts: RaffleAccountDTO[];
@@ -452,6 +456,8 @@ export interface ManagedUserDTO {
   /** The organization code this account logs in under. */
   orgCode: string | null;
   createdAt: string;
+  /** Organizers only, for the platform owner: billing (lib/billing.ts). */
+  billing?: { exempt: boolean; credits: number; freeUsed: boolean };
 }
 
 export interface CreateUserInput {
@@ -468,6 +474,10 @@ export interface UpdateUserInput {
   active?: boolean;
   code?: string; // reset to a new 6-digit code
   plan?: string; // SUPERADMIN only, only meaningful when target role is ORGANIZER
+  /** SUPERADMIN only, on an organizer: never pays for raffles. */
+  billingExempt?: boolean;
+  /** SUPERADMIN only, on an organizer: raffles it can activate without paying (any size). */
+  raffleCredits?: number;
 }
 
 export interface ApiErrorBody {
@@ -544,4 +554,20 @@ export interface PaymentsAccountDTO {
     lastPaymentAt: string | null;
     gmailFilterFrom: string;
   };
+}
+
+/** A raffle's activation (GET /api/raffles/<id>/activation). */
+export interface ActivationStateDTO {
+  active: boolean;
+  kind: "legacy" | "exempt" | "free" | "credit" | "paid" | null;
+  /** How it would be activated now: the free raffle, a credit, or paying (null when active). */
+  option: "free" | "credit" | "pay" | null;
+  price: number;
+  credits: number;
+  /** A payment under way: the page where to pay. */
+  checkoutUrl: string | null;
+  /** Paying online is set up (pagoradar); otherwise it's by hand, through WhatsApp. */
+  payOnline: boolean;
+  /** The platform owner's WhatsApp for paying by hand (digits), when configured. */
+  whatsapp: string | null;
 }

@@ -61,6 +61,7 @@ import { SellersReport } from "@/components/SellersReport";
 import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
 import { StagesPanel } from "@/components/StagesPanel";
+import { ActivationSheet } from "@/components/ActivationSheet";
 
 /** For useSyncExternalStore values that never change while the page is open (browser capabilities). */
 const subscribeNever = () => () => {};
@@ -105,6 +106,8 @@ export default function RaffleDashboardPage() {
   // The lettered set whose sheet is open (raffles sold in sets).
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [publicLinkOpen, setPublicLinkOpen] = useState(false);
+  // Billing: a raffle sells only once activated (lib/billing.ts).
+  const [activationOpen, setActivationOpen] = useState(false);
   const [settingDrawDate, setSettingDrawDate] = useState(false);
   const [closingRaffle, setClosingRaffle] = useState(false);
   const [deletingRaffle, setDeletingRaffle] = useState(false);
@@ -190,6 +193,17 @@ export default function RaffleDashboardPage() {
       cancelled = true;
     };
   }, [user, raffleId, applyFullLoad]);
+
+  // Back from paying the activation (pagoradar's page sends people here with ?activacion=1).
+  const returnHandled = useRef(false);
+  useEffect(() => {
+    if (!raffle || returnHandled.current) return;
+    returnHandled.current = true;
+    if (!raffle.active && new URLSearchParams(window.location.search).get("activacion") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time reaction to the return URL
+      setActivationOpen(true);
+    }
+  }, [raffle]);
 
   const loadRaffle = useCallback(async () => {
     setRaffleLoading(true);
@@ -437,6 +451,10 @@ export default function RaffleDashboardPage() {
 
   const handleGridSelect = useCallback(
     (n: RaffleNumberDTO) => {
+      if (raffleRef.current && !raffleRef.current.active) {
+        setActivationOpen(true);
+        return;
+      }
       if (!selecting) {
         openNumber(n);
         return;
@@ -454,6 +472,10 @@ export default function RaffleDashboardPage() {
 
   const handleLongPress = useCallback((n: RaffleNumberDTO) => {
     if (n.status !== "available" || raffleRef.current?.status === "closed") return;
+    if (raffleRef.current && !raffleRef.current.active) {
+      setActivationOpen(true);
+      return;
+    }
     setSelecting(true);
     setPickedIds(new Set([n.id]));
   }, []);
@@ -797,7 +819,7 @@ export default function RaffleDashboardPage() {
           onSetDrawDate={() => setSettingDrawDate(true)}
           downloadingImage={downloadingImage}
           canShareImage={canShareImage}
-          onOpenPublicLink={() => setPublicLinkOpen(true)}
+          onOpenPublicLink={() => (raffle.active ? setPublicLinkOpen(true) : setActivationOpen(true))}
           onCloseRaffle={() => setClosingRaffle(true)}
           onReopenRaffle={handleReopenRaffle}
           onDeleteRaffle={() => setDeletingRaffle(true)}
@@ -863,6 +885,28 @@ export default function RaffleDashboardPage() {
                   />
                 </button>
               </div>
+
+              {!raffle.active && (
+                <button
+                  type="button"
+                  onClick={() => setActivationOpen(true)}
+                  className="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-gold-600/50 bg-gold-400/10 px-4 py-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="min-w-0 text-sm font-semibold text-gold-400">
+                    Esta rifa aún no está activa
+                    <span className="block text-xs font-normal text-text-muted">
+                      {isOrganizer
+                        ? "Actívala para empezar a vender y compartir el enlace."
+                        : "El organizador debe activarla para empezar a vender."}
+                    </span>
+                  </span>
+                  {isOrganizer && (
+                    <span className="shrink-0 rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-3 py-2 text-xs font-bold text-[#241a02]">
+                      Activar
+                    </span>
+                  )}
+                </button>
+              )}
 
               {overdueHolds.length > 0 && (
                 <button
@@ -1050,6 +1094,18 @@ export default function RaffleDashboardPage() {
           return n ? handleEditPhone([n], phone) : Promise.resolve();
         }}
       />
+
+      {activationOpen && raffle && (
+        <ActivationSheet
+          raffleId={raffle.id}
+          raffleName={raffle.name}
+          totalNumbers={raffle.totalNumbers}
+          orgCode={user.orgCode}
+          isOrganizer={isOrganizer}
+          onClose={() => setActivationOpen(false)}
+          onActivated={() => setRaffle((current) => (current && !current.active ? { ...current, active: true } : current))}
+        />
+      )}
 
       {publicLinkOpen && raffle && (
         <PublicLinkSheet

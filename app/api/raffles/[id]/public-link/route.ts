@@ -1,3 +1,4 @@
+import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -30,6 +31,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
 
   const { action } = parsed.data;
+  // Sharing the raffle is how it starts selling: only once it is active.
+  if (action !== "disable") {
+    const blocked = await activationBlock(id);
+    if (blocked) return blocked;
+  }
   let publicToken: string | null;
   if (action === "disable") publicToken = null;
   else if (action === "enable") publicToken = raffle.publicToken ?? newPublicToken();

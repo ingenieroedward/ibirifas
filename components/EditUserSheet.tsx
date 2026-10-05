@@ -30,11 +30,17 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
   const [fill, setFill] = useState({ value: "", signal: 0 });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Billing, for the platform owner editing an organizer (lib/billing.ts).
+  const billing = canEditOrgCode ? user.billing : undefined;
+  const [exempt, setExempt] = useState(billing?.exempt ?? false);
+  const [credits, setCredits] = useState(billing?.credits ?? 0);
 
   const nameChanged = name.trim() !== user.name;
   const codeChanged = code.length > 0;
   const orgCodeChanged = canEditOrgCode && normalizeOrgCode(orgCode) !== (user.orgCode ?? "");
-  const canSave = (nameChanged || codeChanged || orgCodeChanged) && name.trim().length > 0;
+  const exemptChanged = Boolean(billing) && exempt !== billing!.exempt;
+  const creditsChanged = Boolean(billing) && credits !== billing!.credits;
+  const canSave = (nameChanged || codeChanged || orgCodeChanged || exemptChanged || creditsChanged) && name.trim().length > 0;
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -56,6 +62,8 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
     if (nameChanged) input.name = trimmedName;
     if (orgCodeChanged) input.orgCode = normalizeOrgCode(orgCode);
     if (codeChanged) input.code = code;
+    if (exemptChanged) input.billingExempt = exempt;
+    if (creditsChanged) input.raffleCredits = credits;
 
     setSaving(true);
     setFormError(null);
@@ -118,6 +126,59 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
           <p className="text-xs text-text-muted">
             Si lo cambias, esta organización y sus vendedores tendrán que usar el nuevo al ingresar.
           </p>
+        </div>
+      )}
+
+      {billing && (
+        <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">
+          <p className="text-sm font-semibold text-text">Cobro de rifas</p>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={exempt}
+              onChange={(e) => setExempt(e.target.checked)}
+              disabled={saving}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[#f5c542]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-text">Sin cobro</span>
+              <span className="block text-xs text-text-muted">Sus rifas se activan solas y nunca paga (tu organización, amigos).</span>
+            </span>
+          </label>
+          {!exempt && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-text">Rifas de regalo</span>
+                <span className="block text-xs text-text-muted">
+                  Activa rifas sin pagar, de cualquier tamaño (ej. pagó en efectivo).
+                  {billing.freeUsed ? " Ya usó su rifa gratis." : " Aún tiene su primera rifa gratis."}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Quitar una rifa de regalo"
+                  onClick={() => setCredits((c) => Math.max(0, c - 1))}
+                  disabled={saving || credits === 0}
+                  className="h-9 w-9 rounded-full border border-line text-lg font-bold text-text disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span aria-label="Rifas de regalo" className="w-6 text-center text-base font-bold text-gold-400">
+                  {credits}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Dar una rifa de regalo"
+                  onClick={() => setCredits((c) => Math.min(1000, c + 1))}
+                  disabled={saving}
+                  className="h-9 w-9 rounded-full border border-line text-lg font-bold text-text disabled:opacity-40"
+                >
+                  +
+                </button>
+              </span>
+            </div>
+          )}
         </div>
       )}
 

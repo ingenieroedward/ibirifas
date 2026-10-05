@@ -1,4 +1,5 @@
 import type {
+  ActivationStateDTO,
   PaymentsAccountDTO,
   PaymentCandidateDTO,
   ReceivedPaymentsDTO,
@@ -398,4 +399,14 @@ export async function disconnectPaymentsAccount(): Promise<PaymentsAccountDTO> {
 /** The organizer accepts the current terms of use (/terminos). */
 export async function acceptTerms(): Promise<MeDTO> {
   return request<MeDTO>("/api/auth/terms", { method: "POST" });
+}
+
+/** A raffle's activation (billing): whether it sells and how it would be activated. */
+export async function getActivation(raffleId: string): Promise<ActivationStateDTO> {
+  return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`);
+}
+
+/** "allowance": activate with the free raffle or a credit; "pay": get (or reuse) the page where to pay. */
+export async function activateRaffle(raffleId: string, action: "allowance" | "pay"): Promise<ActivationStateDTO> {
+  return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, { method: "POST", body: JSON.stringify({ action }) });
 }

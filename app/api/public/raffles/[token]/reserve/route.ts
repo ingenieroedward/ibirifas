@@ -1,3 +1,4 @@
+import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
 import { payByDay } from "@/lib/holds";
 import { z } from "zod";
@@ -98,6 +99,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     },
   });
   if (!raffle) return NextResponse.json({ error: "Este enlace ya no está disponible." }, { status: 404 });
+  const blocked = await activationBlock(raffle.id);
+  if (blocked) return blocked;
   if (
     !reservationsOpen({
       raffleSetting: raffle.publicReservations,

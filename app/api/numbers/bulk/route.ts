@@ -1,3 +1,4 @@
+import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -95,6 +96,9 @@ export async function POST(req: NextRequest) {
   if (new Set(found.map((n) => n.raffleId)).size !== 1) {
     return NextResponse.json({ error: "Los números deben ser de la misma rifa" }, { status: 400 });
   }
+
+  const blocked = await activationBlock(found[0]!.raffleId);
+  if (blocked) return blocked;
 
   // A closed raffle no longer changes hands; collecting payments and fixing buyer details still works.
   if (found[0]!.raffle.status === "closed" && (input.action === "sell" || input.action === "release")) {
