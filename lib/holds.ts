@@ -17,15 +17,52 @@ export function drawCutoff(drawDate: string | Date | null | undefined): number |
   return Number.isNaN(t) ? null : t + BOGOTA_OFFSET_MS;
 }
 
+const DRAW_TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** "21:00" → minutes after midnight; null for no time (or anything that isn't HH:MM). */
+export function drawTimeMinutes(drawTime: string | null | undefined): number | null {
+  const m = DRAW_TIME.exec(drawTime ?? "");
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
 /**
- * When a hold sold at `soldAt` expires: `holdDays` later, or when the draw day starts if that comes first.
- * A hold made on the draw day itself only gets the `holdDays` rule (the cutoff already passed).
+ * The moment of the draw in Colombia: the draw day at `drawTime` ("21:00"), or the end of that day when the raffle
+ * has no time. Public reservations close then. Null without a draw date.
  */
-export function holdDeadline(soldAt: string | Date, holdDays: number, drawDate?: string | Date | null): number {
+export function drawMoment(drawDate: string | Date | null | undefined, drawTime?: string | null): number | null {
+  const start = drawCutoff(drawDate);
+  if (start === null) return null;
+  return start + (drawTimeMinutes(drawTime) ?? 24 * 60) * 60_000;
+}
+
+/**
+ * When public reservations close: at the moment of the draw — the last stage's for a raffle by stages (people can
+ * still join late between stages). Null when the raffle has no date yet.
+ */
+export function reservationsCloseAt(raffle: {
+  drawDate: string | Date | null;
+  drawTime?: string | null;
+  stages?: { drawDate: string | Date | null }[];
+}): number | null {
+  const stageDates = (raffle.stages ?? []).map((s) => s.drawDate).filter((d): d is string | Date => Boolean(d));
+  if (stageDates.length > 0) {
+    const last = stageDates.reduce((a, b) => (new Date(a).getTime() >= new Date(b).getTime() ? a : b));
+    return drawMoment(last, raffle.drawTime);
+  }
+  return drawMoment(raffle.drawDate, raffle.drawTime);
+}
+
+/**
+ * When a hold sold at `soldAt` expires: `holdDays` later, or when the draw day starts if that comes first (the last
+ * day to pay is the day before the draw). A hold made on the draw day itself is due at the moment of the draw.
+ */
+export function holdDeadline(soldAt: string | Date, holdDays: number, drawDate?: string | Date | null, drawTime?: string | null): number {
   const sold = new Date(soldAt).getTime();
   const byDays = sold + holdDays * DAY_MS;
   const cutoff = drawCutoff(drawDate);
-  return cutoff !== null && sold < cutoff ? Math.min(byDays, cutoff) : byDays;
+  if (cutoff !== null && sold < cutoff) return Math.min(byDays, cutoff);
+  const moment = drawMoment(drawDate, drawTime);
+  return moment !== null && sold < moment ? Math.min(byDays, moment) : byDays;
 }
 
 /** Whether the draw comes before `holdDays` would: then holds made now are due the day before the draw. */
@@ -49,15 +86,27 @@ export function daysWaiting(n: HoldLike, now: number = Date.now()): number {
  * Sold, unpaid, and past the raffle's deadline (`holdDays`, or the day before the draw if that's sooner — pass
  * the draw date for that; raffles by stages have their own deadlines and don't). Never overdue without `holdDays`.
  */
-export function isOverdue(n: HoldLike, holdDays: number | null, now: number = Date.now(), drawDate: string | Date | null = null): boolean {
+export function isOverdue(
+  n: HoldLike,
+  holdDays: number | null,
+  now: number = Date.now(),
+  drawDate: string | Date | null = null,
+  drawTime: string | null = null,
+): boolean {
   if (!holdDays || n.status !== "occupied" || !n.soldAt) return false;
-  return now > holdDeadline(n.soldAt, holdDays, drawDate);
+  return now > holdDeadline(n.soldAt, holdDays, drawDate, drawTime);
 }
 
 /** Whole days left before it becomes overdue (0 = it does today or already has); null without a deadline or unpaid sale. */
-export function daysLeft(n: HoldLike, holdDays: number | null, now: number = Date.now(), drawDate: string | Date | null = null): number | null {
+export function daysLeft(
+  n: HoldLike,
+  holdDays: number | null,
+  now: number = Date.now(),
+  drawDate: string | Date | null = null,
+  drawTime: string | null = null,
+): number | null {
   if (!holdDays || n.status !== "occupied" || !n.soldAt) return null;
-  const left = holdDeadline(n.soldAt, holdDays, drawDate) - now;
+  const left = holdDeadline(n.soldAt, holdDays, drawDate, drawTime) - now;
   return Math.max(0, Math.ceil(left / DAY_MS));
 }
 

@@ -54,6 +54,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     numberPrice: raffle.numberPrice,
     totalNumbers: raffle.totalNumbers,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
+    drawTime: raffle.drawTime,
     drawTrigger: raffle.drawTrigger as DrawTrigger,
     completedAt: raffle.completedAt ? raffle.completedAt.toISOString() : null,
     status: raffle.status as "active" | "closed",
@@ -99,6 +100,7 @@ const updateRaffleSchema = z.object({
   lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive().optional(),
   drawDate: z.string().datetime().nullable().optional(),
+  drawTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida").nullable().optional(),
   drawTrigger: z.enum(["date", "sold", "paid"]).optional(),
   themeBackground: hexColorSchema,
   themeNumberColor: hexColorSchema,
@@ -199,6 +201,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (input.drawDate !== undefined) {
     data.drawDate = input.drawDate ? new Date(input.drawDate) : null;
   }
+  if (input.drawTime !== undefined) data.drawTime = input.drawTime || null;
   if (input.drawTrigger !== undefined) data.drawTrigger = input.drawTrigger;
   if (input.themeBackground !== undefined) data.themeBackground = input.themeBackground;
   if (input.themeNumberColor !== undefined) data.themeNumberColor = input.themeNumberColor;

@@ -109,6 +109,7 @@ export function RaffleCard({ raffle }: { raffle: PublicRaffleDTO }) {
         : `${free} ${free === 1 ? "número disponible" : "números disponibles"}`;
   const plan = drawPlanOf({
     drawDate: raffle.drawDate,
+    drawTime: raffle.drawTime,
     drawTrigger: raffle.drawTrigger,
     soldCount: raffle.soldCount,
     paidCount: raffle.paidCount,

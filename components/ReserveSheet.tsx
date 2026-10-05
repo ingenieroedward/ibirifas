@@ -6,7 +6,7 @@ import { PayerNameInput, payerNameError } from "@/components/PayerNameInput";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue, formatTimeOfDay } from "@/lib/format";
 import { rememberReservation, reservationPath } from "@/lib/myReservations";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import type { PublicRaffleDTO, ReserveResultDTO } from "@/lib/types";
@@ -148,7 +148,12 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
         </div>
         <p className="text-sm text-text">
           Quedaron apartados a nombre de <span className="font-semibold">{name.trim()}</span>.{" "}
-          {result.payBy ? (
+          {result.dueAt ? (
+            <>
+              Hoy es el sorteo: tienes hasta las <span className="font-semibold">{formatTimeOfDay(result.dueAt)}</span> para pagar; si no,
+              se liberan para otras personas.
+            </>
+          ) : result.payBy ? (
             <>
               Tienes hasta el <span className="font-semibold">{formatDrawDate(result.payBy)}</span> (el día antes del sorteo) para
               pagar; si no, se liberan para otras personas.
@@ -333,7 +338,12 @@ export function ReserveSheet({ token, raffle, numbers, sets, total, onClose }: R
 
       <p className="text-xs text-text-muted">
         Se apartan a tu nombre y tienes{" "}
-        {raffle.reservations.payBy ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)` : daysText(holdDays)} para
+        {raffle.reservations.dueAtDraw && raffle.reservations.closesAt
+          ? `hasta hoy a las ${formatTimeOfDay(raffle.reservations.closesAt)} (hora del sorteo)`
+          : raffle.reservations.payBy
+            ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)`
+            : daysText(holdDays)}{" "}
+        para
         pagar. Si no pagas a tiempo, se liberan.
       </p>
 

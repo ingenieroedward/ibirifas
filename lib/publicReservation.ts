@@ -25,6 +25,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
       numberPrice: true,
       holdDays: true,
       drawDate: true,
+      drawTime: true,
       themeBackground: true,
       themeNumberColor: true,
       stageDeadlineDays: true,
@@ -77,7 +78,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
   // Due after `holdDays`, or the day before the draw if that's sooner (raffles by stages: their own deadlines).
   const deadline =
     nothingPaid && soldAt && raffle.holdDays
-      ? new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null)).toISOString()
+      ? new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null, raffle.drawTime)).toISOString()
       : null;
 
   let stages: ReservationDTO["stages"] = null;

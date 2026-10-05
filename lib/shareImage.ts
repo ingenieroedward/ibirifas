@@ -1,5 +1,5 @@
 import { darken, lighten, luminance, withAlpha } from "@/lib/color";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue, formatDrawTime, formatDrawWhen } from "@/lib/format";
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { currentStage, installmentPrices, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
@@ -528,7 +528,7 @@ function drawStagesLadder(
     const meta =
       st.winnerValue !== null
         ? `${st.outcome === "won" ? "Ganó el" : "Salió el"} ${formatNumberValue(st.winnerValue)}${st.outcome === "house" ? " · quedó en la casa" : ""}`
-        : `${st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}${lottery ? ` · ${lottery}` : ""}`;
+        : `${st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}${st.drawDate && raffle.drawTime ? ` · ${formatDrawTime(raffle.drawTime)}` : ""}${lottery ? ` · ${lottery}` : ""}`;
     const metaFit = fitFontSize(ctx, meta, Math.max(120, textMax), 21, 15, "600", o.bodyFont);
     ctx.font = `600 ${metaFit.fontSize}px ${o.bodyFont}`;
     ctx.fillStyle = o.mutedText;
@@ -669,7 +669,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const drawPlan = nextStage
     ? {
         ...basePlan,
-        line: `${nextStage.label}: ${nextStage.prize}${nextStage.drawDate ? ` · ${formatDrawDate(nextStage.drawDate)}` : ""}`,
+        line: `${nextStage.label}: ${nextStage.prize}${nextStage.drawDate ? ` · ${formatDrawWhen(nextStage.drawDate, raffle.drawTime)}` : ""}`,
       }
     : basePlan;
   const lottery = nextStage?.lottery || raffle.lottery;

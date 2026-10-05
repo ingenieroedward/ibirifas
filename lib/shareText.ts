@@ -1,6 +1,6 @@
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { accountLine } from "@/lib/accountText";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatNumberValue, formatDrawWhen } from "@/lib/format";
 import { installmentPrices, lastPayDay, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { numbersOfGroup } from "@/lib/groups";
 import type { FullPayPerk, RaffleDTO, RaffleStageDTO } from "@/lib/types";
@@ -22,6 +22,7 @@ type StagesInfo = {
   fullPayPerk: FullPayPerk;
   fullPayDiscount: number | null;
   lottery: string | null;
+  drawTime?: string | null;
 };
 
 /** A raffle by stages, as chat lines: each draw (with its result once played), the installments and the perk. */
@@ -32,7 +33,7 @@ export function stageChatLines(raffle: StagesInfo): string[] {
   const total = totalPrice(stages);
   const lines = ["*Sorteos* (juegas con el mismo número en todos)"];
   for (const st of stages) {
-    const when = st.drawDate ? ` · ${formatDrawDate(st.drawDate)}` : "";
+    const when = st.drawDate ? ` · ${formatDrawWhen(st.drawDate, raffle.drawTime)}` : "";
     const lottery = st.lottery || raffle.lottery;
     const result =
       st.winnerValue !== null && st.winnerValue !== undefined

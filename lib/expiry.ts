@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { DAY_MS, daysText, drawCutoff } from "@/lib/holds";
+import { DAY_MS, daysText, drawCutoff, drawMoment } from "@/lib/holds";
 import { formatCurrency } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { publishRaffleChange } from "@/lib/realtime";
@@ -40,7 +40,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
 
   const raffle = await prisma.raffle.findUnique({
     where: { id: raffleId },
-    select: { id: true, name: true, ownerId: true, status: true, holdDays: true, autoRelease: true, expiryNoticeAt: true, numberPrice: true, drawDate: true, _count: { select: { stages: true } } },
+    select: { id: true, name: true, ownerId: true, status: true, holdDays: true, autoRelease: true, expiryNoticeAt: true, numberPrice: true, drawDate: true, drawTime: true, _count: { select: { stages: true } } },
   });
   if (!raffle || raffle.status !== "active") return result;
   result.released += await sweepStageDeadline(raffleId, now);
@@ -51,13 +51,20 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
   // (Raffles by stages have their own per-stage deadlines.)
   const drawDay = raffle._count.stages === 0 ? drawCutoff(raffle.drawDate) : null;
   const pastDrawCutoff = drawDay !== null && now.getTime() >= drawDay;
+  // And at the time of the draw, so are the holds made on the draw day itself.
+  const moment = raffle._count.stages === 0 ? drawMoment(raffle.drawDate, raffle.drawTime) : null;
+  const pastDraw = moment !== null && now.getTime() >= moment;
   const late = await prisma.raffleNumber.findMany({
     // In a raffle by stages, a number with an installment paid is a paying customer, not a stale hold.
     where: {
       raffleId,
       status: "occupied",
       quotas: { none: {} },
-      OR: [{ soldAt: { lt: cutoff } }, ...(pastDrawCutoff ? [{ soldAt: { lt: new Date(drawDay) } }] : [])],
+      OR: [
+        { soldAt: { lt: cutoff } },
+        ...(pastDrawCutoff ? [{ soldAt: { lt: new Date(drawDay) } }] : []),
+        ...(pastDraw ? [{ soldAt: { lt: new Date(moment) } }] : []),
+      ],
     },
     select: { id: true, ...buyerRowSelect, group: { select: { label: true, price: true } } },
     orderBy: { value: "asc" },

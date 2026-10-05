@@ -294,7 +294,7 @@ export default function RaffleDashboardPage() {
   const overdueHolds = useMemo(
     () =>
       raffle && raffle.status === "active" && raffle.holdDays
-        ? raffle.numbers.filter((n) => isOverdue(n, raffle.holdDays, openedAt, raffle.stages.length === 0 ? raffle.drawDate : null))
+        ? raffle.numbers.filter((n) => isOverdue(n, raffle.holdDays, openedAt, raffle.stages.length === 0 ? raffle.drawDate : null, raffle.drawTime))
         : [],
     [raffle, openedAt],
   );
@@ -1032,6 +1032,7 @@ export default function RaffleDashboardPage() {
                       winnerValue={raffle.winnerValue}
                       holdDays={raffleClosed ? null : raffle.holdDays}
                       drawDate={raffle.stages.length === 0 ? raffle.drawDate : null}
+                      drawTime={raffle.drawTime}
                       autoRelease={raffle.autoRelease}
                       onSelect={openNumber}
                       onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}

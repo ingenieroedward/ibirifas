@@ -171,6 +171,8 @@ export interface PublicRaffleDTO {
   lottery: string | null;
   numberPrice: number;
   drawDate: string | null;
+  /** "21:00" in Colombia; null = no time. */
+  drawTime: string | null;
   drawTrigger: DrawTrigger;
   /** Totals only (never which numbers): progress toward a "when full" draw. */
   soldCount: number;
@@ -199,6 +201,12 @@ export interface PublicRaffleDTO {
     holdDays: number | null;
     /** When the draw comes first: the last day to pay (the day before the draw). Null when `holdDays` rules. */
     payBy: string | null;
+    /** When they close: the moment of the draw (the last stage's). Null without a date. */
+    closesAt: string | null;
+    /** They closed because the draw's time arrived (`open` is false then). */
+    closedByDraw: boolean;
+    /** It's the draw day: a reservation made now is due at the time of the draw (`closesAt`). */
+    dueAtDraw: boolean;
     maxLoose: number;
     maxSets: number;
     email: boolean;
@@ -223,6 +231,8 @@ export interface ReserveResultDTO {
   holdDays: number;
   /** The last day to pay when the draw comes before `holdDays` would (the day before the draw). */
   payBy: string | null;
+  /** Reserved on the draw day: due at the time of the draw (that moment). */
+  dueAt: string | null;
   numbers: number[];
   sets: string[];
   /** Secret that lets this visitor attach their payment receipt to the reservation afterwards. */
@@ -289,6 +299,8 @@ export interface RaffleDTO {
   numberPrice: number;
   totalNumbers: number;
   drawDate: string | null;
+  /** "21:00" in Colombia, for the draw day (and every stage's); public reservations close then. */
+  drawTime: string | null;
   drawTrigger: DrawTrigger;
   /** The moment a "when full" raffle filled up (null while it hasn't). */
   completedAt: string | null;
@@ -357,6 +369,7 @@ export interface CreateRaffleInput {
   numberPrice: number;
   totalNumbers?: number; // defaults to 100
   drawDate?: string | null;
+  drawTime?: string | null;
   drawTrigger?: DrawTrigger;
   themeBackground?: string | null;
   themeNumberColor?: string | null;
@@ -391,6 +404,7 @@ export interface UpdateRaffleInput {
   lottery?: string | null;
   numberPrice?: number;
   drawDate?: string | null;
+  drawTime?: string | null;
   drawTrigger?: DrawTrigger;
   themeBackground?: string | null;
   themeNumberColor?: string | null;

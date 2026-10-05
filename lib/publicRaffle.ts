@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { payByDay } from "@/lib/holds";
+import { drawCutoff, payByDay, reservationsCloseAt } from "@/lib/holds";
 import { prisma } from "@/lib/prisma";
 import { mailEnabled } from "@/lib/mail";
 import { accountSelect, toAccountDTO } from "@/lib/accounts";
@@ -33,6 +33,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       lottery: true,
       numberPrice: true,
       drawDate: true,
+      drawTime: true,
       drawTrigger: true,
       status: true,
       winnerValue: true,
@@ -64,6 +65,10 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     group: n.groupId ? (labelOf.get(n.groupId) ?? null) : null,
   }));
 
+  // Online reservations close at the time of the draw (the last stage's).
+  const closesAt = reservationsCloseAt(raffle);
+  const closedByDraw = closesAt !== null && Date.now() >= closesAt;
+
   return {
     name: raffle.name,
     prizeLabel: raffle.prizeLabel,
@@ -71,6 +76,7 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     lottery: raffle.lottery,
     numberPrice: raffle.numberPrice,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,
+    drawTime: raffle.drawTime,
     drawTrigger: raffle.drawTrigger as DrawTrigger,
     soldCount: numbers.filter((n) => n.sold).length,
     paidCount: raffle.numbers.filter((n) => n.status === "paid").length,
@@ -102,12 +108,17 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     fullPayPerk: (["none", "discount", "draw"].includes(raffle.fullPayPerk) ? raffle.fullPayPerk : "none") as FullPayPerk,
     fullPayDiscount: raffle.fullPayDiscount,
     reservations: {
-      open: reservationsOpen({
-        raffleSetting: raffle.publicReservations,
-        organizationDefault: raffle.owner.publicReservations,
-        holdDays: raffle.holdDays,
-        status: raffle.status,
-      }),
+      open:
+        !closedByDraw &&
+        reservationsOpen({
+          raffleSetting: raffle.publicReservations,
+          organizationDefault: raffle.owner.publicReservations,
+          holdDays: raffle.holdDays,
+          status: raffle.status,
+        }),
+      closesAt: closesAt !== null ? new Date(closesAt).toISOString() : null,
+      closedByDraw,
+      dueAtDraw: raffle.stages.length === 0 && !closedByDraw && (drawCutoff(raffle.drawDate) ?? Infinity) <= Date.now(),
       holdDays: raffle.holdDays,
       payBy: raffle.stages.length === 0 ? payByDay(raffle.holdDays, raffle.drawDate) : null,
       maxLoose: MAX_LOOSE_PER_RESERVATION,
