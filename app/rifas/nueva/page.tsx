@@ -20,7 +20,7 @@ export default function NewRafflePage() {
   // Only an ORGANIZER can create a raffle — SELLER and SUPERADMIN never see this form.
   useEffect(() => {
     if (!authLoading && user && user.role !== "ORGANIZER") {
-      router.replace(user.role === "SUPERADMIN" ? "/usuarios" : "/");
+      router.replace(user.role === "SUPERADMIN" ? "/usuarios" : "/rifas");
     }
   }, [authLoading, user, router]);
 
@@ -44,7 +44,7 @@ export default function NewRafflePage() {
         onLogout={handleLogout}
         title="Nueva rifa"
         subtitle="Define los datos y crea los números de la rifa."
-        backHref="/"
+        backHref="/rifas"
         backLabel="Volver a tus rifas"
       />
 

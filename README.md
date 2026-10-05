@@ -4,6 +4,16 @@ Plataforma móvil multi-organizador para gestionar rifas: cuadrícula de
 números disponibles/ocupados, registro del comprador con foto del
 comprobante, y acceso simple por código de 6 dígitos.
 
+## Página pública y panel
+
+- **`/`** es la página pública de Ibirifas (`app/page.tsx`): qué es, funciones,
+  modalidades, precios (salen de `RAFFLE_PRICE_SMALL`/`RAFFLE_PRICE_LARGE`),
+  preguntas frecuentes y "Quiero mi rifa" (abre WhatsApp hacia `BILLING_WHATSAPP`;
+  sin él, lleva al login). No pide sesión; quien ya inició sesión va directo a
+  `/rifas`.
+- **`/rifas`** es el panel (la lista de rifas del organizador o vendedor). El login
+  y la app instalada (`start_url`) llevan ahí.
+
 ## Roles
 
 - **Superadmin**: crea cuentas de organizador (y su plan). No administra

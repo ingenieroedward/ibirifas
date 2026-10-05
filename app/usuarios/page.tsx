@@ -33,7 +33,7 @@ export default function UsersPage() {
   // SELLER has no user-management screen (the API also 403s them).
   useEffect(() => {
     if (!authLoading && user?.role === "SELLER") {
-      router.replace("/");
+      router.replace("/rifas");
     }
   }, [authLoading, user, router]);
 
@@ -146,7 +146,7 @@ export default function UsersPage() {
         onLogout={handleLogout}
         title={title}
         subtitle={subtitle}
-        backHref={isSuperadmin ? undefined : "/"}
+        backHref={isSuperadmin ? undefined : "/rifas"}
         backLabel="Volver a tus rifas"
       />
 

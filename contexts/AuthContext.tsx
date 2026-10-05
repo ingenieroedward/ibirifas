@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // don't ask the server who they are (a guaranteed 401 plus a refresh attempt).
   // Same for the terms of use, which visitors of those pages can open too.
   const pathname = usePathname();
-  const isPublicPage = pathname.startsWith("/p/") || pathname === "/terminos";
+  const isPublicPage = pathname.startsWith("/p/") || pathname === "/terminos" || pathname === "/";
   const [user, setUser] = useState<MeDTO | null>(null);
   const [loading, setLoading] = useState(!isPublicPage);
 

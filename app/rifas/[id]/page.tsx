@@ -409,7 +409,7 @@ export default function RaffleDashboardPage() {
   const handleDeleteRaffle = useCallback(async () => {
     try {
       await deleteRaffle(raffleId);
-      router.replace("/");
+      router.replace("/rifas");
     } catch (err) {
       show(err instanceof ApiError ? err.message : "No se pudo eliminar la rifa.", "error");
       throw err;
