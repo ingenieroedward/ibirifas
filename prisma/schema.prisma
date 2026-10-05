@@ -119,6 +119,9 @@ model Raffle {
   numberPrice  Int
   totalNumbers Int            @default(100)
   drawDate     DateTime?
+  // The time of the draw in Colombia ("21:00"), for the draw day and every stage's: public reservations close
+  // then. Null = no time (they close at the end of the draw day). See lib/holds.ts.
+  drawTime     String?
   // When the draw is played: on `drawDate` ("date"), or once every number is sold ("sold") or paid ("paid").
   // With the last two, drawDate may stay empty until the raffle fills up; `completedAt` marks the moment the
   // condition became true (the team is told once, and it clears again if numbers are freed).

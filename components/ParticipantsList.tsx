@@ -32,6 +32,8 @@ interface ParticipantsListProps {
   holdDays?: number | null;
   /** The draw date when unpaid holds must be paid the day before it (raffles without stages). */
   drawDate?: string | null;
+  /** The draw's time ("21:00"): holds made on the draw day are due then. */
+  drawTime?: string | null;
   /** Overdue numbers go back on sale by themselves. */
   autoRelease?: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
@@ -112,6 +114,7 @@ export function ParticipantsList({
   winnerValue,
   holdDays = null,
   drawDate = null,
+  drawTime = null,
   autoRelease = false,
   onSelect,
   onPayAll,
@@ -129,9 +132,9 @@ export function ParticipantsList({
     const list = groupByBuyer(numbers);
     if (!holdDays) return list;
     // Whoever's payment is overdue goes to the top, longest wait first.
-    const overdueDays = (p: Participant) => Math.max(0, ...p.numbers.filter((n) => isOverdue(n, holdDays, now, drawDate)).map((n) => daysWaiting(n, now)));
+    const overdueDays = (p: Participant) => Math.max(0, ...p.numbers.filter((n) => isOverdue(n, holdDays, now, drawDate, drawTime)).map((n) => daysWaiting(n, now)));
     return list.sort((a, b) => overdueDays(b) - overdueDays(a));
-  }, [numbers, holdDays, now, drawDate]);
+  }, [numbers, holdDays, now, drawDate, drawTime]);
 
   const totals = useMemo(() => {
     let pending = 0;
@@ -249,6 +252,7 @@ export function ParticipantsList({
               raffle={raffle}
               holdDays={holdDays}
               drawDate={drawDate}
+              drawTime={drawTime}
               now={now}
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
               onSelect={onSelect}
@@ -306,6 +310,7 @@ function ParticipantCard({
   raffle,
   holdDays,
   drawDate,
+  drawTime,
   now,
   isWinner,
   onSelect,
@@ -320,6 +325,7 @@ function ParticipantCard({
   raffle: WhatsAppRaffle;
   holdDays: number | null;
   drawDate: string | null;
+  drawTime: string | null;
   now: number;
   isWinner: boolean;
   onSelect: (number: RaffleNumberDTO) => void;
@@ -352,10 +358,10 @@ function ParticipantCard({
 
   // The deadline for unpaid sales: how long the worst one has waited, or how long is left before the first expires.
   const unpaid = p.numbers.filter((n) => n.status === "occupied");
-  const overdue = holdDays ? unpaid.filter((n) => isOverdue(n, holdDays, now, drawDate)) : [];
+  const overdue = holdDays ? unpaid.filter((n) => isOverdue(n, holdDays, now, drawDate, drawTime)) : [];
   const isLate = overdue.length > 0;
   const lateDays = Math.max(0, ...overdue.map((n) => daysWaiting(n, now)));
-  const soonest = holdDays && !isLate ? Math.min(...unpaid.map((n) => daysLeft(n, holdDays, now, drawDate) ?? Infinity)) : Infinity;
+  const soonest = holdDays && !isLate ? Math.min(...unpaid.map((n) => daysLeft(n, holdDays, now, drawDate, drawTime) ?? Infinity)) : Infinity;
   const paidItems = holdings.length - pendingItems;
 
   // WhatsApp messages: one about what's still owed, one confirming what's paid.

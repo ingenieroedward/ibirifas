@@ -152,6 +152,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
   const [totalNumbers, setTotalNumbers] = useState(String(raffle?.totalNumbers ?? DEFAULT_TOTAL_NUMBERS));
   const [drawDate, setDrawDate] = useState(raffle?.drawDate ? raffle.drawDate.slice(0, 10) : "");
+  const [drawTime, setDrawTime] = useState(raffle?.drawTime ?? "");
   // The draw is played on a date, or once every number is sold / paid (then the date can wait until it fills up).
   const [drawTrigger, setDrawTrigger] = useState<DrawTrigger>(raffle?.drawTrigger ?? "date");
 
@@ -422,6 +423,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
           permit: permit.trim() || null,
+          drawTime: drawTime || null,
           lottery: lottery.trim() || null,
           ...(useStages
             ? stagesPayload!
@@ -436,6 +438,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           name: trimmedName,
           prizeLabel: prizeLabel.trim() || null,
           permit: permit.trim() || null,
+          drawTime: drawTime || null,
           lottery: lottery.trim() || null,
           numberPrice: looseNumberPrice,
           totalNumbers: total,
@@ -872,6 +875,23 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
             />
           </Field>
         </>
+      )}
+
+      {(useStages || drawTrigger === "date" || drawDate) && (
+        <Field
+          label={useStages ? "Hora de los sorteos (opcional)" : "Hora del sorteo (opcional)"}
+          htmlFor="drawTime"
+          hint="La hora en que juega la lotería. Ese día, a esa hora, se cierran las reservas en línea; sin hora, al terminar el día."
+        >
+          <input
+            id="drawTime"
+            type="time"
+            value={drawTime}
+            onChange={(e) => setDrawTime(e.target.value)}
+            disabled={submitting}
+            className="h-12 w-full min-w-0 max-w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400 disabled:opacity-60"
+          />
+        </Field>
       )}
 
       <div className="space-y-3 rounded-2xl border border-line bg-surface-2/60 p-4">

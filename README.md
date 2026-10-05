@@ -270,7 +270,8 @@ producción. El superadmin entra **sin** código de organización.
   apartado vence al terminar el día anterior al sorteo** (lo que llegue primero), para
   que nadie juegue con un número sin pagar; la página pública, la reserva en línea, el
   correo al comprador y Participantes muestran esa fecha. Un apartado hecho el mismo día
-  del sorteo solo sigue la regla de días (las rifas por etapas usan sus plazos de cuota). Pasado el plazo, un número
+  del sorteo vence **a la hora del sorteo** (abajo) o, sin hora, al terminar ese día (las
+  rifas por etapas usan sus plazos de cuota). Pasado el plazo, un número
   vendido y sin pagar está **vencido**: aparece un aviso rojo en el tablero, el
   comprador sube al inicio de Participantes con "Vencido · N días sin pagar" (los
   demás muestran "Vence en N días") y el equipo recibe una notificación push, como
@@ -282,6 +283,16 @@ producción. El superadmin entra **sin** código de organización.
   minutos, desde que arranca (`instrumentation.ts`, `lib/expirySweeper.ts`), y
   también se revisa al abrir la rifa, así una pantalla nunca muestra algo
   desactualizado. Como el resto del tiempo real, asume una sola instancia.
+- **Hora del sorteo** (`Raffle.drawTime`, "21:00", hora de Colombia, opcional): la
+  hora en que juega la lotería, para la fecha del sorteo y la de cada etapa. Se
+  muestra donde va la fecha ("Sorteo el 5 de octubre a las 9:00 p. m.": tablero,
+  página pública, imagen, texto para WhatsApp, vista previa del enlace). **A esa hora
+  del día del sorteo se cierran las reservas en línea** (en una rifa por etapas, a la
+  hora del último sorteo; sin hora, al terminar ese día): la página pública dice "Las
+  reservas en línea ya cerraron" y la API responde 409. Ese día la página avisa "Hoy es
+  el sorteo: reserva y paga antes de las 9:00 p. m.", y lo reservado ese día vence a esa
+  hora. El equipo puede seguir registrando ventas a mano (`lib/holds.ts`:
+  `drawMoment`, `reservationsCloseAt`).
 - **Reservas desde el enlace público**: quien abre `/p/<token>` puede apartar
   números o letras por su cuenta (toca lo que quiere, "Reservar", nombre y
   teléfono). Se configura por **organización** y por **rifa**: en "Mi equipo" el

@@ -1,9 +1,11 @@
-import { formatDrawDate } from "@/lib/format";
+import { formatDrawWhen } from "@/lib/format";
 import type { DrawTrigger } from "@/lib/types";
 
 /** What decides when a raffle is played. */
 export interface DrawPlanInput {
   drawDate: string | null;
+  /** "21:00" in Colombia, when the raffle has a time. */
+  drawTime?: string | null;
   drawTrigger: DrawTrigger;
   /** Numbers that are taken (sold, paid or not). */
   soldCount: number;
@@ -34,15 +36,15 @@ export interface DrawPlan {
 }
 
 export function drawPlanOf(input: DrawPlanInput): DrawPlan {
-  const { drawDate, drawTrigger, soldCount, paidCount, totalNumbers } = input;
+  const { drawDate, drawTime, drawTrigger, soldCount, paidCount, totalNumbers } = input;
   if (drawTrigger === "date") {
-    return { complete: false, progress: null, needsDate: false, line: drawDate ? `Sorteo el ${formatDrawDate(drawDate)}` : null };
+    return { complete: false, progress: null, needsDate: false, line: drawDate ? `Sorteo el ${formatDrawWhen(drawDate, drawTime)}` : null };
   }
   const done = drawTrigger === "sold" ? soldCount : paidCount;
   const complete = totalNumbers > 0 && done >= totalNumbers;
   const noun = drawTrigger === "sold" ? "vendidos" : "pagados";
   let line: string;
-  if (drawDate) line = `Sorteo el ${formatDrawDate(drawDate)}`;
+  if (drawDate) line = `Sorteo el ${formatDrawWhen(drawDate, drawTime)}`;
   else if (complete) line = "Sorteo: fecha por confirmar";
   else line = `Sorteo ${triggerCondition(drawTrigger)}`;
   return {
@@ -56,12 +58,14 @@ export function drawPlanOf(input: DrawPlanInput): DrawPlan {
 /** The same plan from a raffle's numbers. */
 export function drawPlanFromNumbers(raffle: {
   drawDate: string | null;
+  drawTime?: string | null;
   drawTrigger: DrawTrigger;
   numbers: { status: string }[];
   totalNumbers: number;
 }): DrawPlan {
   return drawPlanOf({
     drawDate: raffle.drawDate,
+    drawTime: raffle.drawTime,
     drawTrigger: raffle.drawTrigger,
     soldCount: raffle.numbers.filter((n) => n.status !== "available").length,
     paidCount: raffle.numbers.filter((n) => n.status === "paid").length,

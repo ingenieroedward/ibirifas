@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
 import { drawPlanOf } from "@/lib/drawPlan";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatNumberValue, formatDrawWhen, formatDrawTime, formatTimeOfDay } from "@/lib/format";
 import {
   amountDueNow,
   currentStage,
@@ -81,6 +81,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   const nextStage = byStages ? currentStage(raffle.stages) : null;
   const basePlan = drawPlanOf({
     drawDate: raffle.drawDate,
+    drawTime: raffle.drawTime,
     drawTrigger: raffle.drawTrigger,
     soldCount: raffle.soldCount,
     paidCount: raffle.paidCount,
@@ -88,7 +89,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   });
   // A raffle by stages talks about its next draw.
   const plan = nextStage
-    ? { ...basePlan, line: `Próximo: ${nextStage.label}${nextStage.drawDate ? ` el ${formatDrawDate(nextStage.drawDate)}` : ""}` }
+    ? { ...basePlan, line: `Próximo: ${nextStage.label}${nextStage.drawDate ? ` el ${formatDrawWhen(nextStage.drawDate, raffle.drawTime)}` : ""}` }
     : basePlan;
   const lotteryText = nextStage?.lottery || raffle.lottery;
   // What a number taken today must pay to play the next draw (its first installments).
@@ -265,8 +266,12 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
           {!closed && available > 0 && (
             <p className="mt-1 text-center text-xs text-text-muted">
               {canReserve
-                ? `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.payBy ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)` : `${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"}`} para pagar.`
-                : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
+                ? raffle.reservations.dueAtDraw && raffle.reservations.closesAt
+                  ? `Hoy es el sorteo: reserva y paga antes de las ${formatTimeOfDay(raffle.reservations.closesAt)}, cuando se cierran las reservas.`
+                  : `Toca ${hasSets ? "las letras o los números" : "los números"} que quieras y resérvalos: tienes ${raffle.reservations.payBy ? `hasta el ${formatDrawDate(raffle.reservations.payBy)} (el día antes del sorteo)` : `${raffle.reservations.holdDays} ${raffle.reservations.holdDays === 1 ? "día" : "días"}`} para pagar.`
+                : raffle.reservations.closedByDraw
+                  ? "Las reservas en línea ya cerraron: llegó la hora del sorteo."
+                  : "Para apartar los tuyos, escríbele a quien te compartió este enlace."}
             </p>
           )}
           {(canReserve || mine.length > 0) && (
@@ -569,6 +574,7 @@ function StagesLadder({ raffle, closed }: { raffle: PublicRaffleDTO; closed: boo
                 </p>
                 <p className="text-xs text-text-muted">
                   {st.drawDate ? formatDrawDate(st.drawDate) : "Fecha por definir"}
+                  {st.drawDate && raffle.drawTime ? ` · ${formatDrawTime(raffle.drawTime)}` : ""}
                   {st.lottery || raffle.lottery ? ` · ${st.lottery || raffle.lottery}` : ""}
                 </p>
                 {st.winnerValue !== null && (
@@ -605,3 +611,4 @@ function StagesLadder({ raffle, closed }: { raffle: PublicRaffleDTO; closed: boo
     </div>
   );
 }
+

@@ -1,9 +1,9 @@
 import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
-import { payByDay } from "@/lib/holds";
+import { drawCutoff, payByDay, reservationsCloseAt } from "@/lib/holds";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency, formatDrawDate } from "@/lib/format";
+import { formatCurrency, formatDrawDate, formatTimeOfDay } from "@/lib/format";
 import { describeNumbers, notifyTeam } from "@/lib/push";
 import { checkReserveRateLimit, getClientIp } from "@/lib/rateLimit";
 import { publishRaffleChange } from "@/lib/realtime";
@@ -93,6 +93,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       holdDays: true,
       drawDate: true,
       _count: { select: { stages: true } },
+      drawTime: true,
+      stages: { select: { drawDate: true } },
       publicReservations: true,
       owner: { select: { publicReservations: true } },
       groups: { select: { id: true, label: true, price: true } },
@@ -110,6 +112,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     })
   ) {
     return NextResponse.json({ error: "Las reservas no están disponibles en esta rifa." }, { status: 403 });
+  }
+  // At the time of the draw (the last one, for a raffle by stages) the online reservations close.
+  const closesAt = reservationsCloseAt(raffle);
+  if (closesAt !== null && Date.now() >= closesAt) {
+    return NextResponse.json({ error: "Las reservas ya cerraron: llegó la hora del sorteo." }, { status: 409 });
   }
 
   const chosenGroups = labels.map((label) => raffle.groups.find((g) => g.label === label));
@@ -185,9 +192,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     ...(values.length > 0 ? [values.length > 1 ? `los números ${describeNumbers(values)}` : `el ${describeNumbers(values)}`] : []),
   ].join(" y ");
   const payBy = raffle._count.stages === 0 ? payByDay(raffle.holdDays, raffle.drawDate) : null;
+  // On the draw day itself, the reservation is due at the time of the draw.
+  const nowMs = Date.now();
+  const dueAt =
+    raffle._count.stages === 0 && (drawCutoff(raffle.drawDate) ?? Infinity) <= nowMs && closesAt !== null && nowMs < closesAt
+      ? new Date(closesAt).toISOString()
+      : null;
   void notifyTeam(raffle.ownerId, "", {
     title: `${raffle.name} · reserva en línea`,
-    body: `${input.name} reservó ${what} · ${formatCurrency(total)}. ${payBy ? `Tiene hasta el ${formatDrawDate(payBy)} (día antes del sorteo) para pagar` : `Tiene ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} para pagar`}`,
+    body: `${input.name} reservó ${what} · ${formatCurrency(total)}. ${dueAt ? `Tiene hasta hoy a las ${formatTimeOfDay(dueAt)} (hora del sorteo) para pagar` : payBy ? `Tiene hasta el ${formatDrawDate(payBy)} (día antes del sorteo) para pagar` : `Tiene ${raffle.holdDays} ${raffle.holdDays === 1 ? "día" : "días"} para pagar`}`,
     url: `/rifas/${raffle.id}`,
   });
 
@@ -200,6 +213,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     total,
     holdDays: raffle.holdDays!,
     payBy,
+    dueAt,
     numbers: values.sort((a, b) => a - b),
     sets: labels.sort(),
     receiptKey,

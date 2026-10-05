@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { formatCurrency, formatDrawDate, formatNumberValue } from "@/lib/format";
+import { formatCurrency, formatNumberValue, formatDrawWhen } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { collectedOn, currentStage, installmentPrices, stagesPrizeSummary } from "@/lib/stages";
@@ -97,7 +97,7 @@ export function DashboardHeader({
   const plan = nextStage
     ? {
         ...basePlan,
-        line: `Próximo: ${nextStage.label} (${nextStage.prize})${nextStage.drawDate ? ` el ${formatDrawDate(nextStage.drawDate)}` : ""}`,
+        line: `Próximo: ${nextStage.label} (${nextStage.prize})${nextStage.drawDate ? ` el ${formatDrawWhen(nextStage.drawDate, raffle.drawTime)}` : ""}`,
       }
     : basePlan;
   const lotteryText = nextStage?.lottery || raffle.lottery;

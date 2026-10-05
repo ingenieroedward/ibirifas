@@ -155,6 +155,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
         numberPrice: true,
         holdDays: true,
         drawDate: true,
+        drawTime: true,
         publicToken: true,
         stageDeadlineDays: true,
         fullPayPerk: true,
@@ -217,7 +218,7 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
       const soldAt = mine.map((r) => r.soldAt).find(Boolean) ?? null;
       const deadline =
         soldAt && raffle.holdDays
-          ? formatDate(new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null)).toISOString())
+          ? formatDate(new Date(holdDeadline(soldAt, raffle.holdDays, raffle.stages.length === 0 ? raffle.drawDate : null, raffle.drawTime)).toISOString())
           : null;
       const button = link ? { label: "Ver mi reserva", url: link } : undefined;
 
