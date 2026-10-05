@@ -143,6 +143,11 @@ model Raffle {
   // meaningful while status is "closed".
   winnerValue  Int?
   closedAt     DateTime?
+  // "Gana Más" (lib/prizes.ts): extra prizes decided by the same lottery result (JSON [{kind, prize}]), the
+  // result the raffle was closed with ("3847") and the prizes it gave (JSON [{kind, value, prize, won}]).
+  extraPrizes   String?
+  lotteryResult String?
+  prizeResults  String?
 
   // Secret in the raffle's public, read-only page (/p/<token>): buyers see what
   // is still available without logging in. Null = no public page. Random and

@@ -343,11 +343,20 @@ export default function RaffleDashboardPage() {
   );
 
   const handleCloseRaffle = useCallback(
-    async (winnerValue: number | null) => {
+    async (close: { winnerValue: number | null } | { lotteryResult: string }) => {
       try {
-        const updated = await setRaffleStatus(raffleId, { status: "closed", winnerValue });
+        const updated = await setRaffleStatus(raffleId, { status: "closed", ...close });
         setRaffle((current) =>
-          current ? { ...current, status: updated.status, winnerValue: updated.winnerValue, closedAt: updated.closedAt } : current,
+          current
+            ? {
+                ...current,
+                status: updated.status,
+                winnerValue: updated.winnerValue,
+                closedAt: updated.closedAt,
+                lotteryResult: updated.lotteryResult,
+                prizeResults: updated.prizeResults,
+              }
+            : current,
         );
         // Nothing new can be sold any more: drop a half-made selection.
         setSelecting(false);
@@ -375,7 +384,7 @@ export default function RaffleDashboardPage() {
     try {
       const updated = await setRaffleStatus(raffleId, { status: "active" });
       setRaffle((current) =>
-        current ? { ...current, status: updated.status, winnerValue: null, closedAt: null } : current,
+        current ? { ...current, status: updated.status, winnerValue: null, closedAt: null, lotteryResult: null, prizeResults: [] } : current,
       );
       show("Rifa reabierta", "success");
     } catch (err) {

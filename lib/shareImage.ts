@@ -3,6 +3,7 @@ import { formatCurrency, formatDrawDate, formatNumberValue, formatDrawTime, form
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { currentStage, installmentPrices, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
+import { extraPrizesLine } from "@/lib/prizes";
 import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
 /**
@@ -678,7 +679,10 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   // (which read as "7 millones por 150 mil").
   const byStages = raffle.stages.length > 0;
   const ladderHeight = byStages ? stagesLadderHeight(raffle.stages.length) : 0;
-  const heroHeight = byStages ? ladderHeight : HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
+  // "Gana Más": one more line in the hero with the extra prizes.
+  const extraText = !byStages && raffle.extraPrizes.length > 0 ? `Gana Más: ${extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}` : null;
+  const HERO_EXTRA_HEIGHT = extraText ? 62 : 0;
+  const heroHeight = byStages ? ladderHeight : HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0) + HERO_EXTRA_HEIGHT;
 
   const accountsCount = raffle.accounts.length;
   const accountsHeight =
@@ -935,6 +939,20 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       ctx.textAlign = "left";
       ctx.fillStyle = mutedText;
       ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 8);
+    }
+    if (extraText) {
+      const extraY = cursorY + HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
+      ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(gridStartX + 24, extraY);
+      ctx.lineTo(gridStartX + gridWidth - 24, extraY);
+      ctx.stroke();
+      const fit = fitFontSize(ctx, extraText, gridWidth - 48, 26, 17, "700", bodyFont);
+      ctx.font = `700 ${fit.fontSize}px ${bodyFont}`;
+      ctx.textAlign = "center";
+      ctx.fillStyle = theme.numberColor;
+      ctx.fillText(fit.text, gridStartX + gridWidth / 2, extraY + HERO_EXTRA_HEIGHT / 2 + 9);
     }
   }
 
@@ -1249,6 +1267,8 @@ export interface WinnerImageInput {
   stageLabel?: string | null;
   lottery: string | null;
   drawDate: string | null;
+  /** "Gana Más": the extra prizes someone took, listed under the main one. */
+  others?: { label: string; value: number; name: string; prize: string | null }[];
 }
 
 /** "Ana Pérez Gómez" → "Ana P." — enough to recognize the winner in a public status, without the full name. */
@@ -1280,6 +1300,9 @@ export async function generateWinnerImage(input: WinnerImageInput): Promise<Blob
   // Plain text sits on the background (the theme's text color is for the number tiles).
   const onBg = dark ? "#ffffff" : "#1b1405";
   const won = input.winnerName !== null;
+  const others = input.others ?? [];
+  // With extra winners everything above them gets tighter to make room for their rows.
+  const compact = others.length > 0;
 
   drawBackgroundArt(ctx, W, H, theme.background, accent, dark);
 
@@ -1308,27 +1331,35 @@ export async function generateWinnerImage(input: WinnerImageInput): Promise<Blob
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  drawCrown(ctx, center, 150, 150, accent);
+  drawCrown(ctx, center, compact ? 110 : 150, compact ? 120 : 150, accent);
 
   // Headline
-  const headline = won ? (input.stageLabel ? `¡GANADOR DE ${input.stageLabel.toUpperCase()}!` : "¡TENEMOS GANADOR!") : "RESULTADO DEL SORTEO";
+  const winnersCount = (won ? 1 : 0) + others.length;
+  const headline =
+    winnersCount > 1
+      ? "¡TENEMOS GANADORES!"
+      : winnersCount === 1
+        ? input.stageLabel
+          ? `¡GANADOR DE ${input.stageLabel.toUpperCase()}!`
+          : "¡TENEMOS GANADOR!"
+        : "RESULTADO DEL SORTEO";
   const head = fitFontSize(ctx, headline, W - 120, 100, 54, "800", headingFont);
   ctx.font = `800 ${head.fontSize}px ${headingFont}`;
   ctx.fillStyle = accent;
   ctx.shadowColor = withAlpha(accent, dark ? 0.55 : 0.25);
   ctx.shadowBlur = 30;
-  ctx.fillText(head.text, center, 380);
+  ctx.fillText(head.text, center, compact ? 320 : 380);
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";
 
   const name = fitFontSize(ctx, input.raffleName, W - 160, 52, 30, "700", headingFont);
   ctx.font = `700 ${name.fontSize}px ${headingFont}`;
   ctx.fillStyle = onBg;
-  ctx.fillText(name.text, center, 460);
+  ctx.fillText(name.text, center, compact ? 395 : 460);
 
   // The golden ball with the number
-  const ballY = 800;
-  const R = 250;
+  const ballY = compact ? 630 : 800;
+  const R = compact ? 175 : 250;
   const halo = ctx.createRadialGradient(center, ballY, R * 0.6, center, ballY, R * 1.55);
   halo.addColorStop(0, withAlpha(accent, dark ? 0.45 : 0.25));
   halo.addColorStop(1, withAlpha(accent, 0));
@@ -1351,26 +1382,27 @@ export async function generateWinnerImage(input: WinnerImageInput): Promise<Blob
   ctx.stroke();
   const onBall = luminance(accent) > 0.5 ? "#2a1d03" : "#ffffff";
   const digits = formatNumberValue(input.winnerValue);
-  ctx.font = `800 ${digits.length > 3 ? 190 : digits.length > 2 ? 230 : 280}px ${headingFont}`;
+  const ballFont = (digits.length > 3 ? 190 : digits.length > 2 ? 230 : 280) * (R / 250);
+  ctx.font = `800 ${ballFont}px ${headingFont}`;
   ctx.fillStyle = onBall;
   ctx.textBaseline = "middle";
   ctx.fillText(digits, center, ballY + 14);
   ctx.textBaseline = "alphabetic";
 
   // Who won and what
-  let y = ballY + R + 120;
+  let y = ballY + R + (compact ? 90 : 120);
   if (won) {
-    const who = fitFontSize(ctx, shortName(input.winnerName!), W - 140, 84, 44, "800", headingFont);
+    const who = fitFontSize(ctx, shortName(input.winnerName!), W - 140, compact ? 68 : 84, 40, "800", headingFont);
     ctx.font = `800 ${who.fontSize}px ${headingFont}`;
     ctx.fillStyle = onBg;
     ctx.fillText(who.text, center, y);
-    y += 78;
+    y += compact ? 62 : 78;
     if (input.prize) {
       const prize = fitFontSize(ctx, `se llevó ${input.prize}`, W - 140, 56, 32, "700", headingFont);
       ctx.font = `700 ${prize.fontSize}px ${headingFont}`;
       ctx.fillStyle = accent;
       ctx.fillText(prize.text, center, y);
-      y += 64;
+      y += compact ? 52 : 64;
     }
   } else {
     ctx.font = `800 64px ${headingFont}`;
@@ -1388,19 +1420,82 @@ export async function generateWinnerImage(input: WinnerImageInput): Promise<Blob
     ctx.font = `600 ${w.fontSize}px ${bodyFont}`;
     ctx.fillStyle = muted;
     ctx.fillText(w.text, center, y + 6);
+    y += 40;
+  }
+
+  // The extra winners, one row each: their number on a small ball, which prize, who, and what it pays.
+  if (compact) {
+    let rowY = y + 30;
+    for (const o of others.slice(0, 5)) {
+      const left = 80;
+      const width = W - 160;
+      const h = 100;
+      drawRoundedRect(ctx, left, rowY, width, h, 26);
+      ctx.fillStyle = dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(accent, 0.35);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const cx = left + 58;
+      const cy = rowY + h / 2;
+      const small = ctx.createRadialGradient(cx - 12, cy - 14, 4, cx, cy, 38);
+      small.addColorStop(0, lighten(accent, 0.5));
+      small.addColorStop(1, darken(accent, 0.2));
+      ctx.fillStyle = small;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = onBall;
+      ctx.font = `800 ${formatNumberValue(o.value).length > 2 ? 26 : 32}px ${headingFont}`;
+      ctx.textBaseline = "middle";
+      ctx.fillText(formatNumberValue(o.value), cx, cy + 2);
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+      ctx.font = `600 26px ${bodyFont}`;
+      ctx.fillStyle = muted;
+      ctx.fillText(o.label.toUpperCase(), left + 116, rowY + 40);
+      const prizeText = o.prize ?? "";
+      ctx.font = `800 34px ${headingFont}`;
+      const prizeWidth = prizeText ? Math.min(ctx.measureText(prizeText).width, 300) : 0;
+      const nameFit = fitFontSize(ctx, shortName(o.name), width - 116 - prizeWidth - 50, 40, 26, "800", headingFont);
+      ctx.font = `800 ${nameFit.fontSize}px ${headingFont}`;
+      ctx.fillStyle = onBg;
+      ctx.fillText(nameFit.text, left + 116, rowY + 80);
+      if (prizeText) {
+        const pf = fitFontSize(ctx, prizeText, 300, 34, 22, "800", headingFont);
+        ctx.font = `800 ${pf.fontSize}px ${headingFont}`;
+        ctx.fillStyle = accent;
+        ctx.textAlign = "right";
+        ctx.fillText(pf.text, left + width - 28, cy + 12);
+      }
+      ctx.textAlign = "center";
+      rowY += h + 16;
+    }
+    y = rowY;
   }
 
   // Thanks
-  const thanksY = 1580;
-  ctx.fillStyle = withAlpha(accent, 0.45);
-  ctx.fillRect(center - 160, thanksY - 110, 320, 3);
-  ctx.font = `800 62px ${headingFont}`;
-  ctx.fillStyle = onBg;
-  ctx.fillText("¡Gracias a todos", center, thanksY - 20);
-  ctx.fillText("por participar!", center, thanksY + 54);
-  ctx.font = `600 36px ${bodyFont}`;
-  ctx.fillStyle = muted;
-  ctx.fillText(won ? "¡Felicitaciones al ganador!" : "Nos vemos en la próxima rifa.", center, thanksY + 124);
+  if (compact) {
+    const thanksY = Math.max(y + 90, 1660);
+    const t = fitFontSize(ctx, "¡Gracias a todos por participar!", W - 120, 56, 36, "800", headingFont);
+    ctx.font = `800 ${t.fontSize}px ${headingFont}`;
+    ctx.fillStyle = onBg;
+    ctx.fillText(t.text, center, thanksY);
+    ctx.font = `600 32px ${bodyFont}`;
+    ctx.fillStyle = muted;
+    ctx.fillText(winnersCount > 1 ? "¡Felicitaciones a los ganadores!" : "¡Felicitaciones!", center, thanksY + 56);
+  } else {
+    const thanksY = 1580;
+    ctx.fillStyle = withAlpha(accent, 0.45);
+    ctx.fillRect(center - 160, thanksY - 110, 320, 3);
+    ctx.font = `800 62px ${headingFont}`;
+    ctx.fillStyle = onBg;
+    ctx.fillText("¡Gracias a todos", center, thanksY - 20);
+    ctx.fillText("por participar!", center, thanksY + 54);
+    ctx.font = `600 36px ${bodyFont}`;
+    ctx.fillStyle = muted;
+    ctx.fillText(won ? "¡Felicitaciones al ganador!" : "Nos vemos en la próxima rifa.", center, thanksY + 124);
+  }
 
   // Brand
   drawCrown(ctx, center, H - 150, 34, accent, 0, 0.9);

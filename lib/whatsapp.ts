@@ -124,6 +124,9 @@ export interface WinnerContext {
   stageLabel?: string | null;
   lottery: string | null;
   drawDate: string | null;
+  /** "Gana Más": the extra prize it won ("Al revés") and the number that came out (the main one). */
+  prizeLabel?: string | null;
+  drawnValue?: number | null;
 }
 
 /** "¡Felicitaciones! Tu número ganó…" — what the organizer sends the winner after registering the result. */
@@ -132,7 +135,9 @@ export function buildWinnerMessage(c: WinnerContext): string {
   return [
     `Hola${c.buyerName ? ` ${firstName(c.buyerName)}` : ""} 🎉`,
     "",
-    `¡Felicitaciones! En el sorteo${c.stageLabel ? ` de *${c.stageLabel}*` : ""} de la rifa *${c.raffleName}* salió el *${formatNumberValue(c.winnerValue)}* y es tuyo: ganaste${c.prize ? ` *${c.prize}*` : " el premio"} 🏆`,
+    c.prizeLabel && c.drawnValue !== undefined && c.drawnValue !== null
+      ? `¡Felicitaciones! En el sorteo de la rifa *${c.raffleName}* salió el *${formatNumberValue(c.drawnValue)}* y tu número *${formatNumberValue(c.winnerValue)}* ganó el premio *${c.prizeLabel.toLowerCase()}*${c.prize ? `: *${c.prize}*` : ""} 🏆`
+      : `¡Felicitaciones! En el sorteo${c.stageLabel ? ` de *${c.stageLabel}*` : ""} de la rifa *${c.raffleName}* salió el *${formatNumberValue(c.winnerValue)}* y es tuyo: ganaste${c.prize ? ` *${c.prize}*` : " el premio"} 🏆`,
     ...(when ? [`(${when})`] : []),
     "",
     "Escríbeme para coordinar la entrega del premio.",

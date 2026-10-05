@@ -242,6 +242,21 @@ producción. El superadmin entra **sin** código de organización.
   **Permiso** (ej. «Resolución 045 de 2026 · Alcaldía de Montería») que se
   muestra en la página pública, la imagen y el texto para WhatsApp. El pie de la
   página pública aclara que la rifa es responsabilidad de quien la organiza.
+- **Gana Más (premios adicionales)**: en rifas de 10, 100 o 1.000 números (sin
+  etapas) el organizador puede sumar premios que salen del **mismo resultado de la
+  lotería** (`Raffle.extraPrizes`, `lib/prizes.ts`), cada uno con su premio:
+  **al revés** (sale 47 → gana el 74), **primeras cifras** (resultado 3847 → gana el
+  38) y **vecinos** (el 46 y el 48, cada uno). El formulario muestra las cuentas
+  (lo que entra contra los premios en dinero). Al cerrar se escribe el **resultado
+  completo** de la lotería (`lotteryResult`): la rifa juega con sus últimas cifras y
+  la hoja muestra, antes de confirmar, cada premio con su número, quién lo tiene y si
+  paga o queda en la casa. Los premios adicionales solo los gana un número
+  **pagado** (el mayor sigue la regla de siempre) y **se suman** si coinciden (el 33
+  es su propio revés). Se guardan en `prizeResults`; el aviso de rifa cerrada lista
+  los ganadores con un botón de WhatsApp para cada uno y una imagen para el estado
+  con todos; a cada ganador le llega "¡Ganaste!" con sus premios y a los demás el
+  resultado con los premios adicionales. La página pública, la imagen y el texto
+  para compartir muestran "Gana Más: Al revés $100.000 · Vecinos $20.000 c/u".
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación

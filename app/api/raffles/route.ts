@@ -9,6 +9,7 @@ import { accountInputSchema, accountRows } from "@/lib/accounts";
 import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { billingEnabled, raffleActive } from "@/lib/billing";
+import { supportsExtraPrizes } from "@/lib/prizes";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 
@@ -27,10 +28,16 @@ const groupSchema = z.object({
   values: z.array(z.number().int().min(0)).min(1).max(1000),
 });
 
+const extraPrizeSchema = z.object({
+  kind: z.enum(["reverse", "first", "neighbors"]),
+  prize: z.string().trim().min(1).max(80),
+});
+
 const createRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   permit: z.string().trim().max(120).nullable().optional(),
+  extraPrizes: z.array(extraPrizeSchema).max(3).optional(),
   lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive(),
   totalNumbers: z.number().int().min(10).max(1000).optional(),
@@ -201,6 +208,15 @@ export async function POST(req: NextRequest) {
   if (perk === "draw" && !input.bonusStage?.prize) {
     return NextResponse.json({ error: "Escribe el premio del sorteo extra por pagar todo." }, { status: 400 });
   }
+  const extraPrizes = input.extraPrizes ?? [];
+  if (extraPrizes.length > 0) {
+    if (byStages || !supportsExtraPrizes(totalNumbers)) {
+      return NextResponse.json({ error: "Los premios adicionales son para rifas de 10, 100 o 1.000 números, sin etapas." }, { status: 400 });
+    }
+    if (new Set(extraPrizes.map((p) => p.kind)).size !== extraPrizes.length) {
+      return NextResponse.json({ error: "Cada premio adicional va una sola vez." }, { status: 400 });
+    }
+  }
   const lastStageDate = [...stages].reverse().find((s) => s.drawDate)?.drawDate ?? null;
 
   // Sets: each letter once, only numbers that exist, no number in two sets.
@@ -231,6 +247,7 @@ export async function POST(req: NextRequest) {
         name: input.name,
         prizeLabel: input.prizeLabel ?? null,
         permit: input.permit || null,
+        extraPrizes: extraPrizes.length > 0 ? JSON.stringify(extraPrizes) : null,
         lottery: input.lottery ?? null,
         numberPrice: byStages ? stagesTotal : input.numberPrice,
         totalNumbers,

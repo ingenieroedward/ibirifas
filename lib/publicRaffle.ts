@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { parseExtraPrizes, parsePrizeWins } from "@/lib/prizes";
 import { drawCutoff, payByDay, reservationsCloseAt } from "@/lib/holds";
 import { prisma } from "@/lib/prisma";
 import { mailEnabled } from "@/lib/mail";
@@ -30,6 +31,8 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
       name: true,
       prizeLabel: true,
       permit: true,
+      extraPrizes: true,
+      prizeResults: true,
       lottery: true,
       numberPrice: true,
       drawDate: true,
@@ -73,6 +76,8 @@ export async function getPublicRaffle(token: string): Promise<PublicRaffleDTO | 
     name: raffle.name,
     prizeLabel: raffle.prizeLabel,
     permit: raffle.permit,
+    extraPrizes: parseExtraPrizes(raffle.extraPrizes),
+    prizeResults: raffle.status === "closed" ? parsePrizeWins(raffle.prizeResults) : [],
     lottery: raffle.lottery,
     numberPrice: raffle.numberPrice,
     drawDate: raffle.drawDate ? raffle.drawDate.toISOString() : null,

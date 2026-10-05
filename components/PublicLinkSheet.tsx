@@ -103,7 +103,7 @@ export function PublicLinkSheet({
               readOnly
               value={url}
               onFocus={(e) => e.currentTarget.select()}
-              className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-sm text-text outline-none focus:border-gold-400"
+              className="h-12 w-full rounded-xl border border-line bg-surface-2 px-4 text-base text-text outline-none focus:border-gold-400"
             />
           </div>
 

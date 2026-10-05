@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
 import { drawPlanOf } from "@/lib/drawPlan";
+import { extraPrizesLine, prizeDigits, prizeKindLabel } from "@/lib/prizes";
 import { formatCurrency, formatDrawDate, formatNumberValue, formatDrawWhen, formatDrawTime, formatTimeOfDay } from "@/lib/format";
 import {
   amountDueNow,
@@ -181,9 +182,24 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
               {byStages ? (
                 <p className="mt-1 text-sm text-text-muted">Se jugaron todos los sorteos: mira los resultados abajo.</p>
               ) : raffle.winnerValue !== null && (
-                <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-extrabold text-text">
-                  Ganó el <span className="text-3xl text-gold-400">{formatNumberValue(raffle.winnerValue)}</span>
-                </p>
+                <>
+                  <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-extrabold text-text">
+                    Ganó el <span className="text-3xl text-gold-400">{formatNumberValue(raffle.winnerValue)}</span>
+                  </p>
+                  {raffle.prizeResults.length > 1 && (
+                    <ul className="mt-2 flex flex-wrap justify-center gap-2" aria-label="Premios">
+                      {raffle.prizeResults
+                        .filter((w) => w.kind !== "main")
+                        .map((w, i) => (
+                          <li key={`${w.kind}-${w.value}-${i}`} className="rounded-full border border-gold-600/40 px-3 py-1 text-xs text-text">
+                            {prizeKindLabel(w.kind, prizeDigits(raffle.totalNumbers))}:{" "}
+                            <span className="font-bold text-gold-400">{formatNumberValue(w.value)}</span>
+                            {w.won ? "" : " · queda en la casa"}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -222,6 +238,12 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 )}
               </div>
             </div>
+            {raffle.extraPrizes.length > 0 && (
+              <div className="border-t border-line px-4 py-2.5 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Gana Más · con el mismo resultado</p>
+                <p className="mt-0.5 text-sm font-semibold text-text">{extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}</p>
+              </div>
+            )}
             {(plan.line || lotteryText) && (
               <p className="border-t border-line px-4 py-2.5 text-center text-sm text-text-muted">
                 {plan.line ?? "Sorteo"}
