@@ -18,7 +18,18 @@ const createUserSchema = z.object({
 });
 
 function toManagedUserDTO(
-  user: { id: string; name: string; role: string; active: boolean; plan: string; orgCode: string | null; createdAt: Date },
+  user: {
+    id: string;
+    name: string;
+    role: string;
+    active: boolean;
+    plan: string;
+    orgCode: string | null;
+    createdAt: Date;
+    billingExempt?: boolean;
+    raffleCredits?: number;
+    freeRaffleUsedAt?: Date | null;
+  },
   /** Sellers have no code of their own; they log in under their organizer's. */
   inheritedOrgCode: string | null = null,
 ): ManagedUserDTO {
@@ -30,6 +41,9 @@ function toManagedUserDTO(
     plan: user.plan,
     orgCode: user.orgCode ?? inheritedOrgCode,
     createdAt: user.createdAt.toISOString(),
+    ...(user.role === "ORGANIZER"
+      ? { billing: { exempt: user.billingExempt ?? false, credits: user.raffleCredits ?? 0, freeUsed: Boolean(user.freeRaffleUsedAt) } }
+      : {}),
   };
 }
 

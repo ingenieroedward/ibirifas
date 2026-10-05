@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestPayment, notifyOrganizer, pagoradarConfig, pagoradarPaymentSchema, tenantForAccount, verifyPagoradarSignature } from "@/lib/pagoradar";
+import { prisma } from "@/lib/prisma";
+import { activateFromCharge, isBillingCharge, type BillingCharge } from "@/lib/billing";
+import { ingestPayment, isBillingPayment, notifyOrganizer, pagoradarConfig, pagoradarPaymentSchema, tenantForAccount, verifyPagoradarSignature } from "@/lib/pagoradar";
 
 const MAX_BYTES = 64 * 1024;
 
@@ -47,11 +49,28 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true });
   }
+  // A raffle's activation got paid (billing): the raffle starts selling and its organizer hears about it.
+  if (event.type === "charge.paid" || event.type === "charge.expired") {
+    const charge = (event.data ?? null) as BillingCharge | null;
+    if (!isBillingCharge(charge)) return NextResponse.json({ ok: true, ignored: true });
+    if (event.type === "charge.paid") {
+      const raffleId = await activateFromCharge(charge!);
+      if (raffleId) {
+        const raffle = await prisma.raffle.findUnique({ where: { id: raffleId }, select: { ownerId: true, name: true } });
+        if (raffle) {
+          void notifyOrganizer(raffle.ownerId, { title: "Rifa activada", body: `Recibimos el pago: «${raffle.name}» ya puede vender.`, url: `/rifas/${raffleId}` });
+        }
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
   if (event.type !== "payment.received") return NextResponse.json({ ok: true, ignored: true });
 
   const parsed = pagoradarPaymentSchema.safeParse(event.data);
   if (!parsed.success) return NextResponse.json({ error: "Pago inválido" }, { status: 400 });
 
+  // Paying a raffle's activation (billing): handled by charge.paid, never a buyer's payment.
+  if (await isBillingPayment(parsed.data)) return NextResponse.json({ ok: true, ignored: "billing" });
   const tenantId = await tenantForAccount(parsed.data.account?.id ?? parsed.data.accountId);
   if (!tenantId) {
     // An account nobody here connected (or a deleted organization): acknowledged, so pagoradar stops retrying.

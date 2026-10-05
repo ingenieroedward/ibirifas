@@ -13,6 +13,7 @@ import { stagesInclude, toStageDTO } from "@/lib/stageDto";
 import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
 import type { Prisma } from "@prisma/client";
+import { raffleActive } from "@/lib/billing";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { accountInputSchema, accountRows, accountSelect, toAccountDTO } from "@/lib/accounts";
 
@@ -26,7 +27,7 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
     accounts: { select: { id: true; label: true; number: true; holderName: true; kind: true; keyType: true; hasQr: true; position: true } };
     groups: true;
     stages: true;
-    owner: { select: { publicReservations: true } };
+    owner: { select: { publicReservations: true, billingExempt: true } };
   };
 }>;
 
@@ -68,6 +69,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
       status: raffle.status,
     }),
     publicToken: raffle.publicToken,
+    active: raffleActive(raffle, raffle.owner),
     numbers,
     accounts,
     groups,
@@ -131,7 +133,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         accounts: { select: { ...accountSelect, position: true } },
         groups: true,
         stages: stagesInclude,
-        owner: { select: { publicReservations: true } },
+        owner: { select: { publicReservations: true, billingExempt: true } },
       },
     });
   let raffle = await load();
@@ -336,7 +338,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       accounts: { select: { ...accountSelect, position: true } },
       groups: true,
       stages: stagesInclude,
-      owner: { select: { publicReservations: true } },
+      owner: { select: { publicReservations: true, billingExempt: true } },
     },
   });
 

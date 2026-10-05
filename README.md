@@ -442,6 +442,41 @@ Sin `PAGORADAR_URL` y `PAGORADAR_API_KEY` la tarjeta no permite conectar cuentas
 El webhook es `POST https://<tu-dominio>/api/pagoradar/webhook`. Cada 10 minutos (y
 al arrancar) la app pide a pagoradar los pagos que no le llegaron por webhook.
 
+## Cobro por rifa
+
+Ibirifas cobra a los organizadores **por rifa**, con un precio fijo según el tamaño
+(nunca un porcentaje de lo que vende la rifa). Toda rifa se **activa** antes de
+vender: hasta entonces se puede crear y preparar, pero no se venden números, no se
+reserva en línea ni se abre el enlace público (las rutas responden 402). Cómo se
+activa, en este orden (`lib/billing.ts`):
+
+1. **Organización sin cobro** (`billingExempt`): sus rifas se activan solas. Es
+   para tu propia organización y la de amigos; se marca en *Organizadores* →
+   Editar → *Cobro de rifas* → **Sin cobro** (las rifas que tenía esperando se
+   activan al marcarlo).
+2. **Primera rifa gratis**: la primera rifa de hasta 100 números de cada
+   organización, con todo incluido.
+3. **Rifas de regalo** (`raffleCredits`): las que das tú, de cualquier tamaño (ej.
+   alguien te pagó en efectivo): *Organizadores* → Editar → *Rifas de regalo*.
+4. **Pago**: `RAFFLE_PRICE_SMALL` (por defecto $15.000, hasta 100 números) o
+   `RAFFLE_PRICE_LARGE` ($35.000, más de 100).
+   - **En línea, con pagoradar** (si `PAGORADAR_URL`, `PAGORADAR_API_KEY` y
+     `PAGORADAR_BILLING_ACCOUNT` están puestos): "Pagar con Bre-B" crea un cobro
+     de monto único en **tu** cuenta receptora de pagoradar y lleva al organizador
+     a la página de pago; cuando pagoradar avisa `charge.paid`, la rifa se activa
+     sola y el organizador recibe una notificación. Si ese aviso se pierde, la
+     rifa se activa en cuanto el organizador vuelve a mirar (Ibirifas le pregunta
+     a pagoradar). Esos pagos no aparecen en *Pagos* de ninguna organización,
+     aunque tu cuenta de cobro sea también la de tus rifas.
+   - **A mano** (sin pagoradar): el botón abre WhatsApp hacia `BILLING_WHATSAPP`
+     con el nombre de la rifa y la organización; al confirmar el pago le das una
+     rifa de regalo y él la activa.
+
+`PAGORADAR_BILLING_ACCOUNT` es el id (`acc_…`) de tu cuenta receptora en el panel
+de pagoradar (*Cuentas*), y debe pertenecer a la misma app de pagoradar que usa
+Ibirifas. Las rifas creadas antes de esto quedaron activas (`legacy`).
+`BILLING=off` apaga el cobro por completo.
+
 ## Organizaciones y acceso
 
 Cada organizador es una **organización** (él y sus vendedores forman su

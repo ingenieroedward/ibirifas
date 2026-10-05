@@ -8,6 +8,7 @@ import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { accountInputSchema, accountRows } from "@/lib/accounts";
 import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/types";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { billingEnabled, raffleActive } from "@/lib/billing";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 
@@ -67,6 +68,7 @@ export async function GET(req: NextRequest) {
 
   const raffles = await prisma.raffle.findMany({
     where: { ownerId: tenantId },
+    include: { owner: { select: { billingExempt: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -145,6 +147,7 @@ export async function GET(req: NextRequest) {
       themeBackground: r.themeBackground,
       themeNumberColor: r.themeNumberColor,
       themeTextColor: r.themeTextColor,
+      active: raffleActive(r, r.owner),
     };
   });
 
@@ -219,6 +222,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const owner = await prisma.adminUser.findUniqueOrThrow({ where: { id: user.id }, select: { billingExempt: true } });
   const raffle = await prisma.$transaction(async (tx) => {
     const created = await tx.raffle.create({
       data: {
@@ -242,6 +246,11 @@ export async function POST(req: NextRequest) {
         // Releasing on its own only makes sense with a deadline.
         autoRelease: input.holdDays || byStages ? (input.autoRelease ?? false) : false,
         publicReservations: settingToDb(input.publicReservations ?? "inherit"),
+        // Exempt organizations (and a server without billing) sell right away; the activation is kept so the
+        // raffle keeps selling if that changes later.
+        ...(owner.billingExempt || !billingEnabled()
+          ? { activatedAt: new Date(), activationKind: owner.billingExempt ? "exempt" : "legacy" }
+          : {}),
       },
     });
 
@@ -323,6 +332,7 @@ export async function POST(req: NextRequest) {
     themeBackground: raffle.themeBackground,
     themeNumberColor: raffle.themeNumberColor,
     themeTextColor: raffle.themeTextColor,
+    active: raffleActive(raffle, owner),
   };
 
   return NextResponse.json(dto, { status: 201 });

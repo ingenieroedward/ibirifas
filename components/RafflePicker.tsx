@@ -49,6 +49,11 @@ function RaffleCard({ raffle }: { raffle: RaffleSummaryDTO }) {
             {raffle.prizeLabel || "Premio por definir"}
           </p>
         </div>
+        {raffle.status !== "closed" && !raffle.active && (
+          <span className="shrink-0 rounded-full border border-gold-600/50 bg-gold-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gold-400">
+            Sin activar
+          </span>
+        )}
         {raffle.status === "closed" && (
           <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
             {raffle.winnerValue !== null ? `Ganó el ${formatNumberValue(raffle.winnerValue)}` : "Cerrada"}

@@ -1,3 +1,4 @@
+import { activationBlock } from "@/lib/billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -64,6 +65,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!tenantId || existing.raffle.ownerId !== tenantId) {
     return NextResponse.json({ error: "Número no encontrado" }, { status: 404 });
   }
+
+  const blocked = await activationBlock(existing.raffleId);
+  if (blocked) return blocked;
 
   // A number in a lettered set moves with the whole set: selling, collecting or
   // freeing it alone would break the set (see /api/numbers/bulk).

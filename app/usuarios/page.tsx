@@ -195,7 +195,15 @@ export default function UsersPage() {
                     <p className="truncate font-semibold text-text">{u.name}</p>
                     <p className="text-xs text-text-muted">
                       {isSuperadmin && u.orgCode ? `Organización: ${u.orgCode} · ` : ""}
-                      Desde {formatDate(u.createdAt)} · Plan {u.plan}
+                      Desde {formatDate(u.createdAt)}
+                      {u.billing &&
+                        (u.billing.exempt
+                          ? " · Sin cobro"
+                          : u.billing.credits > 0
+                            ? ` · ${u.billing.credits} ${u.billing.credits === 1 ? "rifa" : "rifas"} de regalo`
+                            : u.billing.freeUsed
+                              ? " · Paga por rifa"
+                              : " · Rifa gratis disponible")}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
