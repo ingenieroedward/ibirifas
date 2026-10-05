@@ -148,6 +148,11 @@ model Raffle {
   extraPrizes   String?
   lotteryResult String?
   prizeResults  String?
+  // Trash (lib/trash.ts): a deleted raffle is hidden for TRASH_DAYS and can be restored; then it is purged.
+  // Its public link is switched off meanwhile (kept in `trashedPublicToken` to bring it back on restore).
+  deletedAt          DateTime?
+  deletedByName      String?
+  trashedPublicToken String?
 
   // Secret in the raffle's public, read-only page (/p/<token>): buyers see what
   // is still available without logging in. Null = no public page. Random and
@@ -386,4 +391,19 @@ model ReceivedPayment {
 
   @@index([ownerId, status])
   @@index([ownerId, sourceReceivedAt])
+}
+
+// What happened, for the record (lib/activity.ts): raffles sent to the trash, restored or purged. `ownerId` is the
+// organization (kept as plain text so the record survives the organization); `details` is JSON.
+model ActivityLog {
+  id         String   @id @default(cuid())
+  ownerId    String?
+  actorName  String
+  action     String
+  targetName String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+  @@index([createdAt])
 }

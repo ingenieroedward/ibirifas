@@ -598,3 +598,26 @@ export interface ActivationStateDTO {
   /** The platform owner's WhatsApp for paying by hand (digits), when configured. */
   whatsapp: string | null;
 }
+
+/** A raffle in the trash (GET /api/raffles/trash). */
+export interface TrashedRaffleDTO {
+  id: string;
+  name: string;
+  deletedAt: string;
+  deletedByName: string | null;
+  /** When it will be purged for good. */
+  purgeAt: string;
+  winnerValue: number | null;
+}
+
+/** One entry of the activity record (GET /api/activity). */
+export interface ActivityDTO {
+  id: string;
+  /** For the platform owner: which organization. */
+  organization: string | null;
+  actorName: string;
+  action: "raffle.trashed" | "raffle.restored" | "raffle.purged" | string;
+  targetName: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}

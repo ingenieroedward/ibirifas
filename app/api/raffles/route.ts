@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
   }
 
   const raffles = await prisma.raffle.findMany({
-    where: { ownerId: tenantId },
+    where: { ownerId: tenantId, deletedAt: null },
     include: { owner: { select: { billingExempt: true } } },
     orderBy: { createdAt: "desc" },
   });

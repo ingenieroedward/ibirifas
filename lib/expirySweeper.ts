@@ -1,6 +1,7 @@
 import { sweepAllRaffles } from "@/lib/expiry";
 import { snapshotIfDue } from "@/lib/snapshots";
 import { reconcilePagoradar } from "@/lib/pagoradar";
+import { purgeTrash } from "@/lib/trash";
 
 const EVERY_MS = 10 * 60 * 1000;
 
@@ -20,6 +21,8 @@ export function startExpirySweeper(): void {
     void snapshotIfDue();
     // Payments pagoradar reported while we couldn't receive them (lib/pagoradar.ts).
     void reconcilePagoradar();
+    // Raffles in the trash longer than lib/trash.ts allows are purged (and recorded).
+    void purgeTrash().catch(() => {});
   };
   const timer = setInterval(tick, EVERY_MS);
   timer.unref();

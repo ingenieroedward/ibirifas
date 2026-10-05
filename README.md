@@ -96,7 +96,7 @@ producción. El superadmin entra **sin** código de organización.
   ni pagos: `lib/publicRaffle.ts` es el único camino de datos anónimo y elige
   los campos uno por uno. La página se actualiza sola cada 20 s, no se indexa
   en buscadores, el endpoint público limita 60 consultas por minuto por IP y
-  eliminar la rifa mata el enlace. Los vendedores pueden copiarlo si está
+  mandar la rifa a la papelera mata el enlace. Los vendedores pueden copiarlo si está
   activo, pero solo el organizador lo administra.
 - **Vista previa al compartir enlaces** (WhatsApp, Telegram, Facebook…): el
   enlace de ingreso muestra una tarjeta de marca con título y descripción
@@ -284,10 +284,21 @@ producción. El superadmin entra **sin** código de organización.
   Una rifa cerrada **no vende ni
   libera** números (el servidor responde 409), pero sí deja registrar,
   deshacer o corregir pagos y datos del comprador. "Reabrir rifa" la vuelve a
-  abrir y olvida al ganador. "Eliminar rifa" solo existe para rifas cerradas,
-  pide escribir el nombre de la rifa y borra todo (números, compradores,
-  comprobantes) sin vuelta atrás. Los tableros abiertos se enteran en vivo:
+  abrir y olvida al ganador. "Eliminar rifa" solo existe para rifas cerradas y
+  pide escribir el nombre de la rifa. Los tableros abiertos se enteran en vivo:
   `/api/raffles/[id]/numbers` devuelve también el estado de la rifa.
+- **Papelera y registro de actividad**: eliminar una rifa no la borra de
+  inmediato, la manda a la **papelera** (`lib/trash.ts`) por 30 días. Mientras
+  está ahí desaparece de "Mis rifas", su enlace público deja de funcionar y
+  nadie puede venderle ni cobrarle números. El organizador la ve en **Menú →
+  Papelera** y la puede **restaurar** con todo (números, compradores,
+  comprobantes; el enlace público vuelve si nadie lo tomó). Pasados los 30 días
+  el barrido periódico la borra para siempre. Cada eliminación, restauración y
+  borrado definitivo queda en el **registro de actividad** (`ActivityLog`,
+  **Menú → Actividad**): quién, cuándo, y un resumen de la rifa (vendidos,
+  pagados, ganador, cómo se activó). El organizador ve lo de su organización;
+  el superadmin ve todas. Al eliminar o restaurar, el resto del equipo recibe
+  una notificación.
 - **Ventas por vendedor**: en Participantes, el selector "Vendedores" (el
   vendedor lo ve como "Mis ventas") muestra cuánto vendió cada persona, cuánto de
   eso ya está cobrado y cuánto falta, con conjuntos a su precio de conjunto. Sirve
@@ -376,7 +387,7 @@ producción. El superadmin entra **sin** código de organización.
 ## Exportar a Excel
 
 El organizador descarga la rifa como archivo `.xlsx` desde **Participantes →
-Excel** (y desde "Eliminar rifa", para guardarla antes de borrarla). Hojas:
+Excel** (y desde "Eliminar rifa", para guardarla antes de mandarla a la papelera). Hojas:
 
 - **Resumen**: datos de la rifa, vendidos, pagados, disponibles, recaudado y por cobrar.
 - **Números**: una fila por número con estado, comprador, teléfono, correo,
