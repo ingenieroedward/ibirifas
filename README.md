@@ -697,6 +697,9 @@ y borrarlo.
 
 ### Cambiar de dominio
 
+Lista de pendientes para dejar en marcha el cobro por rifa, los pagos y el dominio nuevo:
+[docs/PENDIENTES-PUESTA-EN-MARCHA.md](docs/PENDIENTES-PUESTA-EN-MARCHA.md).
+
 Ver [docs/CAMBIO-DE-DOMINIO.md](docs/CAMBIO-DE-DOMINIO.md): el orden de los pasos
 (Cloudflare, Dokploy y `APP_URL`, redirección del dominio viejo, Resend, Turnstile,
 notificaciones, UptimeRobot y el lector de pagos).
