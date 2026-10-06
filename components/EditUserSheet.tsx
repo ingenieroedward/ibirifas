@@ -148,28 +148,28 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
           {!exempt && (
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0">
-                <span className="block text-sm font-medium text-text">Rifas de regalo</span>
+                <span className="block text-sm font-medium text-text">Rifas de saldo</span>
                 <span className="block text-xs text-text-muted">
-                  Activa rifas sin pagar, de cualquier tamaño (ej. pagó en efectivo).
+                  Las de sus paquetes, más las que le das a mano (ej. te pagó un paquete en efectivo). Sirven para cualquier tamaño.
                   {billing.freeUsed ? " Ya usó su rifa gratis." : " Aún tiene su primera rifa gratis."}
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  aria-label="Quitar una rifa de regalo"
+                  aria-label="Quitar una rifa del saldo"
                   onClick={() => setCredits((c) => Math.max(0, c - 1))}
                   disabled={saving || credits === 0}
                   className="h-9 w-9 rounded-full border border-line text-lg font-bold text-text disabled:opacity-40"
                 >
                   −
                 </button>
-                <span aria-label="Rifas de regalo" className="w-6 text-center text-base font-bold text-gold-400">
+                <span aria-label="Rifas de saldo" className="w-6 text-center text-base font-bold text-gold-400">
                   {credits}
                 </span>
                 <button
                   type="button"
-                  aria-label="Dar una rifa de regalo"
+                  aria-label="Agregar una rifa al saldo"
                   onClick={() => setCredits((c) => Math.min(1000, c + 1))}
                   disabled={saving}
                   className="h-9 w-9 rounded-full border border-line text-lg font-bold text-text disabled:opacity-40"
@@ -177,6 +177,22 @@ export function EditUserSheet({ user, targetRoleLabel, canEditOrgCode, onClose, 
                   +
                 </button>
               </span>
+            </div>
+          )}
+          {!exempt && (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-text-muted">Vendiste un paquete a mano:</span>
+              {[3, 10].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setCredits((c) => Math.min(1000, c + n))}
+                  disabled={saving}
+                  className="h-8 rounded-full border border-gold-600/50 px-3 text-xs font-semibold text-gold-400 disabled:opacity-40"
+                >
+                  +{n}
+                </button>
+              ))}
             </div>
           )}
         </div>

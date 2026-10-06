@@ -56,11 +56,13 @@ de forma segura, así que hay que apuntar el webhook al nuevo.
    BILLING_WHATSAPP=573001234567
    ```
 
-   - `PAGORADAR_BILLING_ACCOUNT`: la cuenta donde te pagan las activaciones; con ella la rifa
+   - `PAGORADAR_BILLING_ACCOUNT`: la cuenta donde te pagan los paquetes; con ella la rifa
      se activa sola al llegar el pago.
-   - `BILLING_WHATSAPP`: tu WhatsApp con el 57 adelante, para quien pida la activación a mano.
-   - Opcional: `RAFFLE_PRICE_SMALL` (por defecto 15000, hasta 100 números) y
-     `RAFFLE_PRICE_LARGE` (por defecto 35000, más de 100).
+   - `BILLING_WHATSAPP`: tu WhatsApp con el 57 adelante, para quien pida un paquete a mano o
+     un plan a convenir.
+   - Opcional, para cambiar los paquetes: `PACK_SMALL_RAFFLES` y `PACK_SMALL_PRICE` (por
+     defecto 3 rifas por 15000), `PACK_LARGE_RAFFLES` y `PACK_LARGE_PRICE` (por defecto 10
+     rifas por 35000).
 3. [ ] **Guarda y redespliega.**
 
 ---

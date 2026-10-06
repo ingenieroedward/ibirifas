@@ -43,13 +43,15 @@ services:
       PAGORADAR_ORG: ${PAGORADAR_ORG:-}
       PAGORADAR_URL: ${PAGORADAR_URL:-}
       PAGORADAR_API_KEY: ${PAGORADAR_API_KEY:-}
-      # Charging organizers per raffle (README "Cobro por rifa"). BILLING=off turns it off. Prices in pesos
-      # (defaults 15000 up to 100 numbers, 35000 above). PAGORADAR_BILLING_ACCOUNT: your own pagoradar
-      # receiving account (acc_…) — payments activate raffles on their own. BILLING_WHATSAPP: where to ask
-      # for an activation by hand when online payment isn't set up.
+      # Charging organizers with packs of raffles (README "Cobro por paquetes de rifas"). BILLING=off turns it
+      # off. Packs: PACK_SMALL_* (default 3 raffles for 15000) and PACK_LARGE_* (10 for 35000), prices in pesos.
+      # PAGORADAR_BILLING_ACCOUNT: your own pagoradar receiving account (acc_…) — payments activate raffles on
+      # their own. BILLING_WHATSAPP: where to ask for a pack by hand, or for a custom plan.
       BILLING: ${BILLING:-}
-      RAFFLE_PRICE_SMALL: ${RAFFLE_PRICE_SMALL:-}
-      RAFFLE_PRICE_LARGE: ${RAFFLE_PRICE_LARGE:-}
+      PACK_SMALL_RAFFLES: ${PACK_SMALL_RAFFLES:-}
+      PACK_SMALL_PRICE: ${PACK_SMALL_PRICE:-}
+      PACK_LARGE_RAFFLES: ${PACK_LARGE_RAFFLES:-}
+      PACK_LARGE_PRICE: ${PACK_LARGE_PRICE:-}
       PAGORADAR_BILLING_ACCOUNT: ${PAGORADAR_BILLING_ACCOUNT:-}
       BILLING_WHATSAPP: ${BILLING_WHATSAPP:-}
     volumes:

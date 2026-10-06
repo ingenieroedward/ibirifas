@@ -200,9 +200,9 @@ export default function UsersPage() {
                         (u.billing.exempt
                           ? " · Sin cobro"
                           : u.billing.credits > 0
-                            ? ` · ${u.billing.credits} ${u.billing.credits === 1 ? "rifa" : "rifas"} de regalo`
+                            ? ` · ${u.billing.credits} ${u.billing.credits === 1 ? "rifa" : "rifas"} de saldo`
                             : u.billing.freeUsed
-                              ? " · Paga por rifa"
+                              ? " · Compra paquetes"
                               : " · Rifa gratis disponible")}
                     </p>
                   </div>

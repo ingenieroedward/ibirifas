@@ -589,10 +589,12 @@ export interface ActivationStateDTO {
   kind: "legacy" | "exempt" | "free" | "credit" | "paid" | null;
   /** How it would be activated now: the free raffle, a credit, or paying (null when active). */
   option: "free" | "credit" | "pay" | null;
-  price: number;
+  /** The packs of prepaid raffles on sale, smallest first. */
+  packs: { id: "small" | "large"; raffles: number; price: number }[];
   credits: number;
-  /** A payment under way: the page where to pay. */
+  /** A payment under way: the page where to pay, and the pack it's for. */
   checkoutUrl: string | null;
+  pendingPack: "small" | "large" | null;
   /** Paying online is set up (pagoradar); otherwise it's by hand, through WhatsApp. */
   payOnline: boolean;
   /** The platform owner's WhatsApp for paying by hand (digits), when configured. */
@@ -616,7 +618,7 @@ export interface ActivityDTO {
   /** For the platform owner: which organization. */
   organization: string | null;
   actorName: string;
-  action: "raffle.trashed" | "raffle.restored" | "raffle.purged" | string;
+  action: "raffle.trashed" | "raffle.restored" | "raffle.purged" | "pack.purchased" | string;
   targetName: string;
   details: Record<string, unknown> | null;
   createdAt: string;

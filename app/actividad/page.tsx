@@ -13,9 +13,13 @@ const ACTION: Record<string, { label: string; tone: string }> = {
   "raffle.trashed": { label: "Eliminó la rifa", tone: "border-red-500/40 text-red-300" },
   "raffle.restored": { label: "Restauró la rifa", tone: "border-green-500/40 text-green-300" },
   "raffle.purged": { label: "Se borró para siempre", tone: "border-line text-text-muted" },
+  "pack.purchased": { label: "Compró un paquete", tone: "border-gold-600/50 text-gold-400" },
 };
 
-/** The record of deleted, restored and purged raffles: every organization's for the platform owner, else one's own. */
+/**
+ * The record of deleted, restored and purged raffles and of packs bought: every organization's for the platform owner,
+ * else one's own.
+ */
 export default function ActivityPage() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
@@ -52,7 +56,7 @@ export default function ActivityPage() {
         userName={user.name}
         onLogout={handleLogout}
         title="Actividad"
-        subtitle={user.role === "SUPERADMIN" ? "Rifas eliminadas, restauradas y borradas en todas las organizaciones" : "Rifas eliminadas, restauradas y borradas"}
+        subtitle={user.role === "SUPERADMIN" ? "Rifas eliminadas y restauradas, y paquetes comprados, en todas las organizaciones" : "Rifas eliminadas y restauradas, y paquetes comprados"}
         backHref={user.role === "SUPERADMIN" ? "/usuarios" : "/rifas"}
         backLabel="Volver"
       />
@@ -74,17 +78,22 @@ export default function ActivityPage() {
                 totalNumbers?: number;
                 winnerValue?: number | null;
                 activation?: { kind: string; amount: number | null } | null;
+                raffles?: number;
+                amount?: number;
               } | null;
               return (
                 <li key={r.id} className="rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 font-semibold text-text">«{r.targetName}»</p>
+                    <p className="min-w-0 font-semibold text-text">{r.action === "pack.purchased" ? r.targetName : `«${r.targetName}»`}</p>
                     <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${a.tone}`}>{a.label}</span>
                   </div>
                   <p className="mt-1 text-sm text-text-muted">
                     {r.actorName} · {formatDate(r.createdAt)}
                     {r.organization ? ` · ${r.organization}` : ""}
                   </p>
+                  {r.action === "pack.purchased" && typeof d?.amount === "number" && (
+                    <p className="mt-1 text-xs text-text-muted">Pagó {formatCurrency(d.amount)} por Bre-B</p>
+                  )}
                   {d && typeof d.sold === "number" && (
                     <p className="mt-1 text-xs text-text-muted">
                       {d.sold} de {d.totalNumbers} vendidos · {d.paid} pagados

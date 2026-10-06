@@ -16,7 +16,7 @@ import {
 } from "@/lib/billing";
 import type { ActivationStateDTO } from "@/lib/types";
 
-const bodySchema = z.object({ action: z.enum(["allowance", "pay"]) });
+const bodySchema = z.object({ action: z.enum(["allowance", "pay"]), pack: z.enum(["small", "large"]).optional() });
 
 function dto(state: ActivationState): ActivationStateDTO {
   return { ...state, payOnline: billingPaymentsReady(), whatsapp: billingWhatsapp() };
@@ -44,8 +44,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 /**
- * The organizer activates the raffle: "allowance" spends the free raffle or a credit; "pay" opens (or reuses) a
- * pagoradar charge and returns where to pay — the raffle activates itself when the payment is confirmed.
+ * The organizer activates the raffle: "allowance" spends the free raffle or a credit; "pay" buys a pack (`pack`,
+ * small by default): it opens (or reuses) a pagoradar charge and returns where to pay — once the payment is
+ * confirmed the pack's raffles become credits and this raffle activates itself with one.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json(dto(state));
     }
     const returnUrl = new URL(`/rifas/${id}?activacion=1`, await requestOrigin()).toString();
-    return NextResponse.json(dto(await startActivationPayment(id, returnUrl)));
+    return NextResponse.json(dto(await startActivationPayment(id, parsed.data.pack ?? "small", returnUrl)));
   } catch (err) {
     if (err instanceof ActivationError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
