@@ -1,5 +1,7 @@
 import type {
   TrashedRaffleDTO,
+  BillingSettingsDTO,
+  PackRequestDTO,
   ActivityDTO,
   ActivationStateDTO,
   PaymentsAccountDTO,
@@ -411,6 +413,41 @@ export async function getActivation(raffleId: string): Promise<ActivationStateDT
 /** "allowance": activate with the free raffle or a credit; "pay": get (or reuse) the page where to pay for a pack. */
 export async function activateRaffle(raffleId: string, action: "allowance" | "pay", pack?: "small" | "large"): Promise<ActivationStateDTO> {
   return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, { method: "POST", body: JSON.stringify({ action, pack }) });
+}
+
+/** The pack was paid by transfer to the platform owner's Bre-B key: send the receipt for review. */
+export async function sendPackReceipt(
+  raffleId: string,
+  pack: "small" | "large",
+  receiptDataUrl: string,
+  payerName: string,
+): Promise<ActivationStateDTO> {
+  return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, {
+    method: "POST",
+    body: JSON.stringify({ action: "receipt", pack, receiptDataUrl, payerName: payerName || undefined }),
+  });
+}
+
+/** Superadmin: how organizers pay for packs (Cobros). */
+export async function getBillingSettings(): Promise<BillingSettingsDTO> {
+  return request<BillingSettingsDTO>("/api/billing/settings");
+}
+
+export async function saveBillingSettings(key: string, holder: string): Promise<BillingSettingsDTO> {
+  return request<BillingSettingsDTO>("/api/billing/settings", { method: "PUT", body: JSON.stringify({ key, holder }) });
+}
+
+/** Superadmin: receipts of packs paid by transfer, waiting first. */
+export async function getPackRequests(): Promise<PackRequestDTO[]> {
+  return request<PackRequestDTO[]>("/api/billing/requests");
+}
+
+export async function getPendingReceiptsCount(): Promise<number> {
+  return (await request<{ pending: number }>("/api/billing/requests?summary=1")).pending;
+}
+
+export async function reviewPackRequest(id: string, action: "approve" | "reject", reason?: string): Promise<void> {
+  await request<{ ok: true }>(`/api/billing/requests/${id}`, { method: "POST", body: JSON.stringify({ action, reason }) });
 }
 
 /** The organization's trash: raffles deleted in the last 30 days. */

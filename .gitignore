@@ -45,3 +45,6 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 /prisma/backups/
+
+# Screenshots left by local UI tests
+/nav-*.png

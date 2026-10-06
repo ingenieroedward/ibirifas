@@ -595,6 +595,10 @@ export interface ActivationStateDTO {
   /** A payment under way: the page where to pay, and the pack it's for. */
   checkoutUrl: string | null;
   pendingPack: "small" | "large" | null;
+  /** A receipt sent from this raffle (paid by transfer) that's waiting for review or was rejected. */
+  receipt: { status: "pending" | "rejected"; pack: "small" | "large"; raffles: number; amount: number; reason: string | null; sentAt: string } | null;
+  /** The platform owner's Bre-B key for paying a pack by transfer and sending the receipt, when set. */
+  breb: { key: string; holder: string | null } | null;
   /** Paying online is set up (pagoradar); otherwise it's by hand, through WhatsApp. */
   payOnline: boolean;
   /** The platform owner's WhatsApp for paying by hand (digits), when configured. */
@@ -622,4 +626,28 @@ export interface ActivityDTO {
   targetName: string;
   details: Record<string, unknown> | null;
   createdAt: string;
+}
+
+/** A pack paid by transfer, as the superadmin reviews it (Cobros). */
+export interface PackRequestDTO {
+  id: string;
+  organization: string;
+  raffleName: string | null;
+  raffles: number;
+  amount: number;
+  payerName: string | null;
+  status: "pending" | "approved" | "rejected";
+  rejectReason: string | null;
+  reviewedAt: string | null;
+  reviewedByName: string | null;
+  createdAt: string;
+  /** Only for the ones waiting for review. */
+  receiptDataUrl: string | null;
+}
+
+export interface BillingSettingsDTO {
+  breb: { key: string; holder: string | null } | null;
+  payOnline: boolean;
+  whatsapp: string | null;
+  packs: { id: "small" | "large"; raffles: number; price: number }[];
 }

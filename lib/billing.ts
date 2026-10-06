@@ -10,9 +10,11 @@ import { logActivity } from "@/lib/activity";
  *   - its organization is exempt (`billingExempt`: the platform owner's own, friends) — always active;
  *   - the organization's first raffle of up to FREE_MAX_NUMBERS numbers is free;
  *   - a prepaid raffle (`raffleCredits`, any size): left from a pack, or given by the platform owner by hand;
- *   - otherwise the organizer buys a pack of raffles (3 or 10; bigger deals are agreed by WhatsApp): a pagoradar
- *     charge to the platform owner's account (PAGORADAR_BILLING_ACCOUNT). When pagoradar reports it paid
- *     (charge.paid) the pack's raffles become credits and the raffle it was bought from takes one of them.
+ *   - otherwise the organizer buys a pack of raffles (3 or 10; bigger deals are agreed by WhatsApp), either
+ *     online — a pagoradar charge to the platform owner's account (PAGORADAR_BILLING_ACCOUNT), granted when
+ *     pagoradar reports it paid (charge.paid) — or by transfer to the platform owner's Bre-B key with a receipt
+ *     the superadmin approves. Either way the pack's raffles become credits and the raffle it was bought from
+ *     takes one of them.
  * Never a cut of what the raffle sells. BILLING=off turns all of it off.
  */
 
@@ -96,6 +98,8 @@ export interface ActivationState {
   /** A payment under way: where to pay, and for which pack. */
   checkoutUrl: string | null;
   pendingPack: PackId | null;
+  /** A receipt sent from this raffle that's waiting for review or was rejected. */
+  receipt: ActivationReceipt | null;
 }
 
 type RaffleForBilling = {
@@ -122,7 +126,7 @@ export function activationOption(raffle: RaffleForBilling): ActivationOption {
   return "pay";
 }
 
-function stateOf(raffle: RaffleForBilling, pending: BillingCharge | null = null): ActivationState {
+function stateOf(raffle: RaffleForBilling, pending: BillingCharge | null = null, receipt: ActivationReceipt | null = null): ActivationState {
   const active = raffleActive(raffle, raffle.owner);
   const open = !active && pending?.status === "pending" ? pending : null;
   return {
@@ -133,6 +137,7 @@ function stateOf(raffle: RaffleForBilling, pending: BillingCharge | null = null)
     credits: raffle.owner.raffleCredits,
     checkoutUrl: open?.checkoutUrl ?? null,
     pendingPack: open ? chargePackId(open) : null,
+    receipt: active ? null : receipt,
   };
 }
 
@@ -143,14 +148,16 @@ function stateOf(raffle: RaffleForBilling, pending: BillingCharge | null = null)
 export async function activationState(raffleId: string): Promise<ActivationState | null> {
   const raffle = await prisma.raffle.findUnique({ where: { id: raffleId }, select: raffleSelect });
   if (!raffle) return null;
-  if (raffleActive(raffle, raffle.owner) || !raffle.activationChargeId) return stateOf(raffle);
+  if (raffleActive(raffle, raffle.owner)) return stateOf(raffle);
+  const receipt = await raffleReceipt(raffleId);
+  if (!raffle.activationChargeId) return stateOf(raffle, null, receipt);
   const charge = await fetchCharge(raffle.activationChargeId).catch(() => null);
   if (charge?.status === "paid") {
     await activateFromCharge(charge);
     const fresh = await prisma.raffle.findUniqueOrThrow({ where: { id: raffleId }, select: raffleSelect });
-    return stateOf(fresh);
+    return stateOf(fresh, null, await raffleReceipt(raffleId));
   }
-  return stateOf(raffle, charge);
+  return stateOf(raffle, charge, receipt);
 }
 
 export class ActivationError extends Error {
@@ -270,32 +277,61 @@ export interface PackPaid {
 }
 
 /**
- * A billing charge got paid (charge.paid, or found paid when asked): adds the pack's raffles to the organization's
- * credits, once per charge, and activates the raffle it was bought from with one of them if it's still waiting.
+ * A billing charge got paid (charge.paid, or found paid when asked): grants its pack (lib/billing.ts grantPack).
  * Returns null when this call did nothing (already counted, not ours, unknown organization).
  */
 export async function activateFromCharge(charge: BillingCharge): Promise<PackPaid | null> {
   if (!isBillingCharge(charge) || charge.status !== "paid") return null;
   const raffleId = typeof charge.metadata?.raffleId === "string" ? charge.metadata.raffleId : null;
+  const packId = chargePackId(charge);
+  const declared = Number(charge.metadata?.raffles);
+  return grantPack({
+    purchaseId: charge.id,
+    raffleId,
+    ownerHint: typeof charge.metadata?.owner === "string" ? charge.metadata.owner : null,
+    pack: packId ?? "single",
+    // Charges from before packs paid for that one raffle.
+    raffles: packId && Number.isInteger(declared) && declared > 0 ? declared : 1,
+    amount: charge.paidAmount ?? charge.amount,
+    method: "Bre-B en línea",
+  });
+}
+
+/**
+ * A pack was paid (a pagoradar charge, or a receipt the superadmin approved): adds its raffles to the
+ * organization's credits, once per `purchaseId` (CreditPurchase.chargeId is unique), and activates the raffle it
+ * was bought from with one of them if it's still waiting. Records it in the activity log. Returns null when this
+ * call did nothing (already counted, unknown organization).
+ */
+export async function grantPack(input: {
+  purchaseId: string;
+  raffleId: string | null;
+  ownerHint?: string | null;
+  pack: string;
+  raffles: number;
+  amount: number;
+  method: string;
+}): Promise<PackPaid | null> {
+  const { purchaseId, raffleId, pack, raffles, amount } = input;
   const raffle = raffleId
     ? await prisma.raffle.findUnique({ where: { id: raffleId }, select: { id: true, ownerId: true, activatedAt: true, deletedAt: true } })
     : null;
-  const ownerId = raffle?.ownerId ?? (typeof charge.metadata?.owner === "string" ? charge.metadata.owner : null);
+  const ownerId = raffle?.ownerId ?? input.ownerHint ?? null;
   if (!ownerId) return null;
-  const packId = chargePackId(charge);
-  const declared = Number(charge.metadata?.raffles);
-  // Charges from before packs paid for that one raffle.
-  const raffles = packId && Number.isInteger(declared) && declared > 0 ? declared : 1;
-  const amount = charge.paidAmount ?? charge.amount;
 
   let activatedRaffleId: string | null = null;
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.creditPurchase.create({ data: { ownerId, chargeId: charge.id, pack: packId ?? "single", raffles, amount, raffleId } });
+      await tx.creditPurchase.create({ data: { ownerId, chargeId: purchaseId, pack, raffles, amount, raffleId } });
       if (raffle && !raffle.activatedAt && !raffle.deletedAt) {
         const done = await tx.raffle.updateMany({
           where: { id: raffle.id, activatedAt: null },
-          data: { activatedAt: new Date(), activationKind: "paid", activationAmount: Math.round(amount / raffles), activationChargeId: charge.id },
+          data: {
+            activatedAt: new Date(),
+            activationKind: "paid",
+            activationAmount: Math.round(amount / raffles),
+            ...(purchaseId.startsWith("receipt:") ? {} : { activationChargeId: purchaseId }),
+          },
         });
         if (done.count === 1) activatedRaffleId = raffle.id;
       }
@@ -316,7 +352,122 @@ export async function activateFromCharge(charge: BillingCharge): Promise<PackPai
     actorName: owner?.name ?? "Organizador",
     action: "pack.purchased",
     targetName: raffles === 1 ? "1 rifa" : `Paquete de ${raffles} rifas`,
-    details: { raffles, amount },
+    details: { raffles, amount, method: input.method },
   });
   return { ownerId, raffles, amount, activatedRaffleId };
+}
+
+// ---- Paying by transfer + receipt (the superadmin reviews it) ----
+
+const BREB_KEY = "billing.brebKey";
+const BREB_HOLDER = "billing.brebHolder";
+
+export interface BillingBreb {
+  key: string;
+  holder: string | null;
+}
+
+/** The platform owner's Bre-B key for packs paid by transfer (set in the superadmin's Cobros page), or null. */
+export async function billingBreb(): Promise<BillingBreb | null> {
+  const rows = await prisma.platformSetting.findMany({ where: { key: { in: [BREB_KEY, BREB_HOLDER] } } });
+  const key = rows.find((r) => r.key === BREB_KEY)?.value.trim();
+  if (!key) return null;
+  return { key, holder: rows.find((r) => r.key === BREB_HOLDER)?.value.trim() || null };
+}
+
+export async function saveBillingBreb(key: string, holder: string): Promise<BillingBreb | null> {
+  await prisma.$transaction([
+    prisma.platformSetting.upsert({ where: { key: BREB_KEY }, create: { key: BREB_KEY, value: key }, update: { value: key } }),
+    prisma.platformSetting.upsert({ where: { key: BREB_HOLDER }, create: { key: BREB_HOLDER, value: holder }, update: { value: holder } }),
+  ]);
+  return billingBreb();
+}
+
+/** The latest receipt sent from a raffle, while it still matters (waiting for review, or rejected). */
+export async function raffleReceipt(raffleId: string): Promise<ActivationReceipt | null> {
+  const last = await prisma.packRequest.findFirst({
+    where: { raffleId },
+    orderBy: { createdAt: "desc" },
+    select: { status: true, pack: true, raffles: true, amount: true, rejectReason: true, createdAt: true },
+  });
+  if (!last || last.status === "approved") return null;
+  return {
+    status: last.status === "rejected" ? "rejected" : "pending",
+    pack: last.pack === "large" ? "large" : "small",
+    raffles: last.raffles,
+    amount: last.amount,
+    reason: last.rejectReason,
+    sentAt: last.createdAt.toISOString(),
+  };
+}
+
+export interface ActivationReceipt {
+  status: "pending" | "rejected";
+  pack: PackId;
+  raffles: number;
+  amount: number;
+  reason: string | null;
+  sentAt: string;
+}
+
+/**
+ * The organizer paid a pack by transfer and sends the receipt from a waiting raffle. A receipt still waiting for
+ * review from the same raffle is replaced (new photo or another pack). Returns the request id.
+ */
+export async function submitPackReceipt(
+  raffleId: string,
+  packId: string,
+  receiptDataUrl: string,
+  payerName: string | null,
+): Promise<{ id: string; ownerId: string; raffleName: string; pack: RafflePack }> {
+  const pack = rafflePack(packId);
+  if (!pack) throw new ActivationError("Ese paquete no existe.", 400);
+  if (!(await billingBreb())) throw new ActivationError("El pago por transferencia no está disponible.", 503);
+  const raffle = await prisma.raffle.findUnique({ where: { id: raffleId }, select: { ...raffleSelect, ownerId: true, name: true } });
+  if (!raffle) throw new ActivationError("Rifa no encontrada", 404);
+  if (raffleActive(raffle, raffle.owner)) throw new ActivationError("La rifa ya está activa.");
+  if (activationOption(raffle) !== "pay") throw new ActivationError("Esta rifa se activa sin pagar.");
+
+  const data = { pack: pack.id, raffles: pack.raffles, amount: pack.price, payerName, receiptDataUrl };
+  const open = await prisma.packRequest.findFirst({ where: { raffleId, status: "pending" }, select: { id: true } });
+  // Only while it's still waiting: one the superadmin just reviewed stays as it is, and this one is new.
+  const replaced = open
+    ? await prisma.packRequest.updateMany({ where: { id: open.id, status: "pending" }, data: { ...data, createdAt: new Date() } })
+    : { count: 0 };
+  const id = replaced.count === 1
+    ? open!.id
+    : (await prisma.packRequest.create({ data: { ...data, ownerId: raffle.ownerId, raffleId }, select: { id: true } })).id;
+  return { id, ownerId: raffle.ownerId, raffleName: raffle.name, pack };
+}
+
+/**
+ * The superadmin reviews a receipt: "approve" grants the pack (once), "reject" sends it back with a reason so
+ * the organizer can send another. Returns what happened, for the notice to the organizer.
+ */
+export async function reviewPackRequest(
+  id: string,
+  action: "approve" | "reject",
+  reviewerName: string,
+  reason: string | null,
+): Promise<{ ownerId: string; raffleId: string | null; raffles: number; activatedRaffleId: string | null }> {
+  const request = await prisma.packRequest.findUnique({ where: { id } });
+  if (!request) throw new ActivationError("Comprobante no encontrado", 404);
+  if (request.status !== "pending") throw new ActivationError("Este comprobante ya se revisó.");
+  // Claim it first, so two reviews at once can't both act.
+  const claimed = await prisma.packRequest.updateMany({
+    where: { id, status: "pending" },
+    data: { status: action === "approve" ? "approved" : "rejected", reviewedAt: new Date(), reviewedByName: reviewerName, rejectReason: action === "reject" ? reason : null },
+  });
+  if (claimed.count !== 1) throw new ActivationError("Este comprobante ya se revisó.");
+  if (action === "reject") return { ownerId: request.ownerId, raffleId: request.raffleId, raffles: request.raffles, activatedRaffleId: null };
+  const paid = await grantPack({
+    purchaseId: `receipt:${request.id}`,
+    raffleId: request.raffleId,
+    ownerHint: request.ownerId,
+    pack: request.pack,
+    raffles: request.raffles,
+    amount: request.amount,
+    method: "comprobante",
+  });
+  return { ownerId: request.ownerId, raffleId: request.raffleId, raffles: request.raffles, activatedRaffleId: paid?.activatedRaffleId ?? null };
 }

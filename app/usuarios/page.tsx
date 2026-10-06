@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
-import { ApiError, getOrgSettings, getUsers, sendTestEmail, updateOrgSettings, updateUser } from "@/lib/api-client";
+import { ApiError, getOrgSettings, getPendingReceiptsCount, getUsers, sendTestEmail, updateOrgSettings, updateUser } from "@/lib/api-client";
 import type { ManagedUserDTO, OrgSettingsDTO } from "@/lib/types";
 import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
@@ -12,6 +12,7 @@ import { EditUserSheet } from "@/components/EditUserSheet";
 import { Spinner } from "@/components/Spinner";
 import { PaymentsAccountCard } from "@/components/PaymentsAccountCard";
 import { formatDate } from "@/lib/format";
+import Link from "next/link";
 
 export default function UsersPage() {
   const router = useRouter();
@@ -23,6 +24,15 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<ManagedUserDTO | null>(null);
+  const [receiptsWaiting, setReceiptsWaiting] = useState(0);
+
+  // The platform owner: receipts of packs paid by transfer waiting in Cobros.
+  useEffect(() => {
+    if (user?.role !== "SUPERADMIN") return;
+    getPendingReceiptsCount()
+      .then(setReceiptsWaiting)
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -156,6 +166,24 @@ export default function UsersPage() {
           {!isSuperadmin && <ReservationsCard onError={show} />}
           {!isSuperadmin && <EmailCard onError={show} />}
           {user.role === "ORGANIZER" && <PaymentsAccountCard onNotify={show} defaultEmail={null} />}
+          {isSuperadmin && (
+            <Link
+              href="/cobros"
+              className={`mb-4 flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-card ${
+                receiptsWaiting ? "border-gold-600/60 bg-gold-400/10" : "border-line bg-bg-elevated"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-text">Cobros de paquetes</span>
+                <span className="block text-xs text-text-muted">
+                  {receiptsWaiting
+                    ? `${receiptsWaiting} ${receiptsWaiting === 1 ? "comprobante espera" : "comprobantes esperan"} tu revisión`
+                    : "Tu llave Bre-B y los comprobantes que envían los organizadores"}
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-bold text-gold-400">{receiptsWaiting ? "Revisar" : "Abrir"}</span>
+            </Link>
+          )}
 
           {loading && (
             <div className="flex flex-1 items-center justify-center py-24">

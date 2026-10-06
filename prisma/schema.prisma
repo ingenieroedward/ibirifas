@@ -423,3 +423,35 @@ model CreditPurchase {
 
   @@index([ownerId, createdAt])
 }
+
+// Platform-wide settings the superadmin edits from the panel (lib/billing.ts): e.g. the Bre-B key where
+// organizers pay for packs by hand.
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// An organizer paid a pack by transfer to the platform owner's Bre-B key and sent the receipt
+// (lib/billing.ts). The superadmin approves it (the pack is granted like a paid charge, CreditPurchase
+// "receipt:<id>") or rejects it with a reason. `raffleId` is the raffle it was sent from.
+model PackRequest {
+  id             String    @id @default(cuid())
+  ownerId        String
+  raffleId       String?
+  pack           String
+  raffles        Int
+  amount         Int
+  payerName      String?
+  receiptDataUrl String
+  // pending | approved | rejected
+  status         String    @default("pending")
+  rejectReason   String?
+  reviewedAt     DateTime?
+  reviewedByName String?
+  createdAt      DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt])
+  @@index([raffleId, createdAt])
+}
