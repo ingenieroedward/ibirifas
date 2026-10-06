@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/authCookies";
-import { activationPrice, billingWhatsapp } from "@/lib/billing";
+import { billingWhatsapp, rafflePacks } from "@/lib/billing";
 import { formatCurrency } from "@/lib/format";
 import { CrownIcon } from "@/components/icons/Crown";
 import { SiteFooter, SiteHeader } from "@/components/landing/SiteChrome";
@@ -37,10 +37,11 @@ export default async function HomePage() {
   if (jar.has(ACCESS_TOKEN_COOKIE) || jar.has(REFRESH_TOKEN_COOKIE)) redirect("/rifas");
 
   const whatsapp = billingWhatsapp();
-  const ask = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent("Hola, quiero usar Ibirifas para mi rifa.")}` : "/login";
+  const askWith = (text: string) => (whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}` : "/login");
+  const ask = askWith("Hola, quiero usar Ibirifas para mi rifa.");
   const external: Record<string, string> = whatsapp ? { target: "_blank", rel: "noopener noreferrer" } : {};
-  const small = formatCurrency(activationPrice(100));
-  const large = formatCurrency(activationPrice(1000));
+  const [small, large] = rafflePacks();
+  const deal = askWith("Hola, necesito más rifas para mi organización. ¿Qué plan me ofrecen?");
 
   return (
     <div className="relative flex min-h-dvh flex-1 flex-col bg-bg text-text">
@@ -174,13 +175,38 @@ export default async function HomePage() {
         {/* Pricing */}
         <section id="precios" className="scroll-mt-20 border-y border-line/60 bg-bg-elevated/40 px-4 py-16 sm:px-6 md:py-24">
           <div className="mx-auto w-full max-w-6xl">
-            <SectionTitle eyebrow="Precios" title="Un solo pago por rifa" text="Sin mensualidades y sin comisión sobre lo que vendes." />
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <SectionTitle
+              eyebrow="Precios"
+              title="Paquetes de rifas"
+              text="Sin mensualidades y sin comisión sobre lo que vendes. Las rifas del paquete no vencen."
+            />
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Price title="Primera rifa" price="Gratis" note="Hasta 100 números" featured cta={{ href: ask, label: "Empezar gratis", external }} />
-              <Price title="Hasta 100 números" price={small} note="Por rifa" cta={{ href: ask, label: "Pedir mi rifa", external }} />
-              <Price title="Hasta 1.000 números" price={large} note="Por rifa" cta={{ href: ask, label: "Pedir mi rifa", external }} />
+              <Price
+                title={`Paquete de ${small.raffles} rifas`}
+                price={formatCurrency(small.price)}
+                note={`${formatCurrency(Math.round(small.price / small.raffles))} por rifa`}
+                cta={{ href: askWith(`Hola, quiero el paquete de ${small.raffles} rifas de Ibirifas.`), label: "Quiero este paquete", external }}
+              />
+              <Price
+                title={`Paquete de ${large.raffles} rifas`}
+                price={formatCurrency(large.price)}
+                note={`${formatCurrency(Math.round(large.price / large.raffles))} por rifa`}
+                badge={`Ahorras ${Math.round((1 - large.price / large.raffles / (small.price / small.raffles)) * 100)}%`}
+                cta={{ href: askWith(`Hola, quiero el paquete de ${large.raffles} rifas de Ibirifas.`), label: "Quiero este paquete", external }}
+              />
+              <Price
+                title="Más rifas"
+                price="A convenir"
+                note="Para organizaciones con muchas rifas"
+                features={["Todas las funciones", "Precio según tu volumen", "Acompañamiento directo"]}
+                cta={{ href: deal, label: "Hablemos", external }}
+              />
             </div>
-            <p className="mt-6 text-center text-sm text-text-muted">Todas incluyen todo: tablero, enlace con reservas, pagos Bre-B, imagen para compartir, equipo y avisos al ganador.</p>
+            <p className="mt-6 text-center text-sm text-text-muted">
+              Cada rifa del paquete sirve para cualquier tamaño, hasta 1.000 números, e incluye todo: tablero, enlace con reservas, pagos
+              Bre-B, imagen para compartir, equipo y avisos al ganador.
+            </p>
           </div>
         </section>
 
@@ -305,21 +331,28 @@ function Price({
   price,
   note,
   featured = false,
+  badge,
+  features = ["Todas las funciones", "Equipo de vendedores", "Pagos Bre-B automáticos"],
   cta,
 }: {
   title: string;
   price: string;
   note: string;
   featured?: boolean;
+  badge?: string;
+  features?: string[];
   cta: { href: string; label: string; external: Record<string, string> };
 }) {
   return (
     <div className={`flex flex-col rounded-3xl border p-7 ${featured ? "border-gold-600/60 bg-gradient-to-b from-gold-400/15 to-bg-elevated shadow-gold" : "border-line bg-bg-elevated"}`}>
-      <p className="text-sm font-semibold text-text-muted">{title}</p>
-      <p className="mt-3 font-[family-name:var(--font-heading)] text-5xl font-extrabold text-gold-400">{price}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-text-muted">{title}</p>
+        {badge && <span className="shrink-0 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">{badge}</span>}
+      </div>
+      <p className="mt-3 font-[family-name:var(--font-heading)] text-4xl font-extrabold text-gold-400">{price}</p>
       <p className="mt-1 text-sm text-text-muted">{note}</p>
-      <ul className="mt-6 space-y-2 text-sm text-text">
-        {["Todas las funciones", "Equipo de vendedores", "Pagos Bre-B automáticos"].map((f) => (
+      <ul className="mb-7 mt-6 space-y-2 text-sm text-text">
+        {features.map((f) => (
           <li key={f} className="flex items-center gap-2">
             <CheckIcon className="h-4 w-4 shrink-0 text-gold-400" />
             {f}
@@ -329,7 +362,7 @@ function Price({
       <a
         href={cta.href}
         {...cta.external}
-        className={`mt-7 flex h-12 items-center justify-center rounded-2xl text-sm font-bold transition active:scale-[0.98] ${
+        className={`mt-auto flex h-12 items-center justify-center rounded-2xl text-sm font-bold transition active:scale-[0.98] ${
           featured ? "bg-gradient-to-b from-gold-300 to-gold-500 text-[#241a02] shadow-gold" : "border border-gold-600/50 text-gold-400 hover:bg-gold-400/10"
         }`}
       >
@@ -428,7 +461,7 @@ const FAQ = [
   },
   {
     q: "¿Cobran comisión sobre mis ventas?",
-    a: "No. Pagas una tarifa fija por rifa según su tamaño, y la primera rifa de hasta 100 números es gratis.",
+    a: "No. Compras un paquete de rifas con precio fijo, sin importar cuánto vendas, y la primera rifa de hasta 100 números es gratis.",
   },
   {
     q: "¿Necesito instalar algo?",

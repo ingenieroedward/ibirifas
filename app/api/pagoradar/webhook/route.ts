@@ -54,12 +54,19 @@ export async function POST(req: NextRequest) {
     const charge = (event.data ?? null) as BillingCharge | null;
     if (!isBillingCharge(charge)) return NextResponse.json({ ok: true, ignored: true });
     if (event.type === "charge.paid") {
-      const raffleId = await activateFromCharge(charge!);
-      if (raffleId) {
-        const raffle = await prisma.raffle.findUnique({ where: { id: raffleId }, select: { ownerId: true, name: true } });
-        if (raffle) {
-          void notifyOrganizer(raffle.ownerId, { title: "Rifa activada", body: `Recibimos el pago: «${raffle.name}» ya puede vender.`, url: `/rifas/${raffleId}` });
-        }
+      const paid = await activateFromCharge(charge!);
+      if (paid) {
+        const raffle = paid.activatedRaffleId
+          ? await prisma.raffle.findUnique({ where: { id: paid.activatedRaffleId }, select: { name: true } })
+          : null;
+        const left = paid.raffles - (raffle ? 1 : 0);
+        const extra = left > 0 ? ` Te ${left === 1 ? "queda 1 rifa" : `quedan ${left} rifas`} de saldo.` : "";
+        void notifyOrganizer(
+          paid.ownerId,
+          raffle
+            ? { title: "Rifa activada", body: `Recibimos el pago: «${raffle.name}» ya puede vender.${extra}`, url: `/rifas/${paid.activatedRaffleId}` }
+            : { title: "Pago recibido", body: `Recibimos el pago del paquete.${extra}`, url: "/rifas" },
+        );
       }
     }
     return NextResponse.json({ ok: true });

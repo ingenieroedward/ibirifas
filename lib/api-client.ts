@@ -408,9 +408,9 @@ export async function getActivation(raffleId: string): Promise<ActivationStateDT
   return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`);
 }
 
-/** "allowance": activate with the free raffle or a credit; "pay": get (or reuse) the page where to pay. */
-export async function activateRaffle(raffleId: string, action: "allowance" | "pay"): Promise<ActivationStateDTO> {
-  return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, { method: "POST", body: JSON.stringify({ action }) });
+/** "allowance": activate with the free raffle or a credit; "pay": get (or reuse) the page where to pay for a pack. */
+export async function activateRaffle(raffleId: string, action: "allowance" | "pay", pack?: "small" | "large"): Promise<ActivationStateDTO> {
+  return request<ActivationStateDTO>(`/api/raffles/${raffleId}/activation`, { method: "POST", body: JSON.stringify({ action, pack }) });
 }
 
 /** The organization's trash: raffles deleted in the last 30 days. */

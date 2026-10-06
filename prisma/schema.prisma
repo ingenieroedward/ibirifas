@@ -53,8 +53,8 @@ model AdminUser {
   termsAcceptedAt DateTime?
   // Only meaningful for ORGANIZER — billing (lib/billing.ts). Each raffle is activated before it sells:
   // `billingExempt` organizations never pay (the platform owner's own, friends); the first raffle of up to
-  // 100 numbers is free (`freeRaffleUsedAt` marks it used); `raffleCredits` are raffles the platform owner
-  // gave or sold by hand, any size; otherwise the activation is paid (pagoradar charge).
+  // 100 numbers is free (`freeRaffleUsedAt` marks it used); `raffleCredits` are prepaid raffles, any size: bought
+  // as a pack (CreditPurchase) or given by the platform owner by hand.
   billingExempt    Boolean   @default(false)
   freeRaffleUsedAt DateTime?
   raffleCredits    Int       @default(0)
@@ -406,4 +406,20 @@ model ActivityLog {
 
   @@index([ownerId, createdAt])
   @@index([createdAt])
+}
+
+// A raffle pack paid through pagoradar (lib/billing.ts): `raffles` credits added to the organization once per
+// charge (`chargeId` unique keeps a repeated charge.paid from adding them twice). `raffleId` is the raffle the pack
+// was bought from (it took one of the credits when it was still waiting). Plain ids, so the record outlives both.
+model CreditPurchase {
+  id        String   @id @default(cuid())
+  ownerId   String
+  chargeId  String   @unique
+  pack      String
+  raffles   Int
+  amount    Int
+  raffleId  String?
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, createdAt])
 }

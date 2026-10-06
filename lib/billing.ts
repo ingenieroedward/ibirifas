@@ -2,20 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pagoradarApi, pagoradarApiReady, PagoradarUnavailable } from "@/lib/pagoradar";
 import { publishRaffleChange } from "@/lib/realtime";
+import { logActivity } from "@/lib/activity";
 
 /**
  * Billing: a raffle sells (numbers change hands, the public link opens) only once it is activated. How it gets
  * activated, in this order:
  *   - its organization is exempt (`billingExempt`: the platform owner's own, friends) — always active;
  *   - the organization's first raffle of up to FREE_MAX_NUMBERS numbers is free;
- *   - a raffle credit the platform owner gave or sold by hand (`raffleCredits`, any size);
- *   - otherwise it is paid: a pagoradar charge to the platform owner's account (PAGORADAR_BILLING_ACCOUNT),
- *     activated when pagoradar reports it paid (charge.paid), or by hand through a credit.
- * Never a cut of what the raffle sells: a flat price by size. BILLING=off turns all of it off.
+ *   - a prepaid raffle (`raffleCredits`, any size): left from a pack, or given by the platform owner by hand;
+ *   - otherwise the organizer buys a pack of raffles (3 or 10; bigger deals are agreed by WhatsApp): a pagoradar
+ *     charge to the platform owner's account (PAGORADAR_BILLING_ACCOUNT). When pagoradar reports it paid
+ *     (charge.paid) the pack's raffles become credits and the raffle it was bought from takes one of them.
+ * Never a cut of what the raffle sells. BILLING=off turns all of it off.
  */
 
 export const FREE_MAX_NUMBERS = 100;
-export const SMALL_MAX_NUMBERS = 100;
 
 export type ActivationKind = "legacy" | "exempt" | "free" | "credit" | "paid";
 export type ActivationOption = "free" | "credit" | "pay";
@@ -24,14 +25,30 @@ export function billingEnabled(): boolean {
   return (process.env.BILLING ?? "").trim().toLowerCase() !== "off";
 }
 
-function priceEnv(name: string, fallback: number): number {
+function intEnv(name: string, fallback: number): number {
   const n = Number(process.env[name]);
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
-/** What activating a raffle of `totalNumbers` numbers costs, in pesos. */
-export function activationPrice(totalNumbers: number): number {
-  return totalNumbers <= SMALL_MAX_NUMBERS ? priceEnv("RAFFLE_PRICE_SMALL", 15_000) : priceEnv("RAFFLE_PRICE_LARGE", 35_000);
+export type PackId = "small" | "large";
+
+/** A pack of prepaid raffles: `raffles` activations, any size, for `price` pesos. */
+export interface RafflePack {
+  id: PackId;
+  raffles: number;
+  price: number;
+}
+
+/** The packs on sale, smallest first (PACK_SMALL_RAFFLES/PACK_SMALL_PRICE, PACK_LARGE_RAFFLES/PACK_LARGE_PRICE). */
+export function rafflePacks(): RafflePack[] {
+  return [
+    { id: "small", raffles: intEnv("PACK_SMALL_RAFFLES", 3), price: intEnv("PACK_SMALL_PRICE", 15_000) },
+    { id: "large", raffles: intEnv("PACK_LARGE_RAFFLES", 10), price: intEnv("PACK_LARGE_PRICE", 35_000) },
+  ];
+}
+
+export function rafflePack(id: string): RafflePack | null {
+  return rafflePacks().find((p) => p.id === id) ?? null;
 }
 
 /** Whether a raffle can sell right now. */
@@ -74,10 +91,11 @@ export interface ActivationState {
   kind: ActivationKind | null;
   /** How it would be activated now (null when already active). */
   option: ActivationOption | null;
-  price: number;
+  packs: RafflePack[];
   credits: number;
-  /** A payment under way: where to pay. */
+  /** A payment under way: where to pay, and for which pack. */
   checkoutUrl: string | null;
+  pendingPack: PackId | null;
 }
 
 type RaffleForBilling = {
@@ -104,15 +122,17 @@ export function activationOption(raffle: RaffleForBilling): ActivationOption {
   return "pay";
 }
 
-function stateOf(raffle: RaffleForBilling, checkoutUrl: string | null = null): ActivationState {
+function stateOf(raffle: RaffleForBilling, pending: BillingCharge | null = null): ActivationState {
   const active = raffleActive(raffle, raffle.owner);
+  const open = !active && pending?.status === "pending" ? pending : null;
   return {
     active,
     kind: raffle.activatedAt ? ((raffle.activationKind as ActivationKind | null) ?? "paid") : active ? "exempt" : null,
     option: active ? null : activationOption(raffle),
-    price: activationPrice(raffle.totalNumbers),
+    packs: rafflePacks(),
     credits: raffle.owner.raffleCredits,
-    checkoutUrl: active ? null : checkoutUrl,
+    checkoutUrl: open?.checkoutUrl ?? null,
+    pendingPack: open ? chargePackId(open) : null,
   };
 }
 
@@ -130,7 +150,7 @@ export async function activationState(raffleId: string): Promise<ActivationState
     const fresh = await prisma.raffle.findUniqueOrThrow({ where: { id: raffleId }, select: raffleSelect });
     return stateOf(fresh);
   }
-  return stateOf(raffle, charge?.status === "pending" ? charge.checkoutUrl : null);
+  return stateOf(raffle, charge);
 }
 
 export class ActivationError extends Error {
@@ -171,7 +191,7 @@ export interface BillingCharge {
   amount: number;
   paidAmount?: number | null;
   checkoutUrl: string;
-  metadata?: { ibirifas?: unknown; raffleId?: unknown } | null;
+  metadata?: { ibirifas?: unknown; raffleId?: unknown; owner?: unknown; pack?: unknown; raffles?: unknown } | null;
 }
 
 /** pagoradar charges made by billing carry this mark in their metadata. */
@@ -181,6 +201,12 @@ export function isBillingCharge(charge: { metadata?: { ibirifas?: unknown } | nu
   return charge?.metadata?.ibirifas === BILLING_MARK;
 }
 
+/** The pack a charge pays for; null for charges from before packs (they paid for one raffle). */
+function chargePackId(charge: BillingCharge): PackId | null {
+  const pack = charge.metadata?.pack;
+  return pack === "small" || pack === "large" ? pack : null;
+}
+
 async function fetchCharge(id: string): Promise<BillingCharge | null> {
   if (!pagoradarApiReady()) return null;
   const { status, data } = await pagoradarApi<BillingCharge>(`/v1/charges/${encodeURIComponent(id)}`);
@@ -188,13 +214,16 @@ async function fetchCharge(id: string): Promise<BillingCharge | null> {
 }
 
 /**
- * Where to pay for a raffle's activation: the open pagoradar charge when there is one, or a new one (amount made
- * unique by pagoradar so the bank notice identifies it). Throws ActivationError when it can't be paid this way.
+ * Where to pay for a pack bought from a waiting raffle: the open pagoradar charge for that same pack when there is
+ * one, or a new one (amount made unique by pagoradar so the bank notice identifies it). Throws ActivationError when
+ * it can't be paid this way.
  */
-export async function startActivationPayment(raffleId: string, returnUrl: string | null): Promise<ActivationState> {
+export async function startActivationPayment(raffleId: string, packId: string, returnUrl: string | null): Promise<ActivationState> {
+  const pack = rafflePack(packId);
+  if (!pack) throw new ActivationError("Ese paquete no existe.", 400);
   const raffle = await prisma.raffle.findUnique({
     where: { id: raffleId },
-    select: { ...raffleSelect, name: true, owner: { select: { billingExempt: true, freeRaffleUsedAt: true, raffleCredits: true, orgCode: true } } },
+    select: { ...raffleSelect, ownerId: true, owner: { select: { billingExempt: true, freeRaffleUsedAt: true, raffleCredits: true, orgCode: true } } },
   });
   if (!raffle) throw new ActivationError("Rifa no encontrada", 404);
   if (raffleActive(raffle, raffle.owner)) return stateOf(raffle);
@@ -209,42 +238,85 @@ export async function startActivationPayment(raffleId: string, returnUrl: string
         await activateFromCharge(open);
         return stateOf(await prisma.raffle.findUniqueOrThrow({ where: { id: raffleId }, select: raffleSelect }));
       }
-      if (open?.status === "pending") return stateOf(raffle, open.checkoutUrl);
+      if (open?.status === "pending" && chargePackId(open) === pack.id) return stateOf(raffle, open);
     }
     const { status, data } = await pagoradarApi<BillingCharge & { error?: string }>("/v1/charges", {
       method: "POST",
       body: {
         account,
-        amount: activationPrice(raffle.totalNumbers),
-        description: `Ibirifas · activar la rifa «${raffle.name.slice(0, 90)}»`,
+        amount: pack.price,
+        description: `Ibirifas · paquete de ${pack.raffles} rifas`,
         reference: `rifa:${raffle.id}`,
         expiresInMinutes: 60,
-        metadata: { ibirifas: BILLING_MARK, raffleId: raffle.id, org: raffle.owner.orgCode },
+        metadata: { ibirifas: BILLING_MARK, raffleId: raffle.id, owner: raffle.ownerId, org: raffle.owner.orgCode, pack: pack.id, raffles: pack.raffles },
         ...(returnUrl ? { returnUrl } : {}),
       },
     });
     if (status !== 200 && status !== 201) throw new ActivationError(data.error ?? "No se pudo crear el cobro.", 502);
     await prisma.raffle.update({ where: { id: raffleId }, data: { activationChargeId: data.id } });
-    return stateOf(raffle, data.checkoutUrl);
+    return stateOf(raffle, { ...data, status: "pending", metadata: { pack: pack.id } });
   } catch (err) {
     if (err instanceof PagoradarUnavailable) throw new ActivationError("El pago en línea no responde ahora. Intenta en unos minutos.", 503);
     throw err;
   }
 }
 
+export interface PackPaid {
+  ownerId: string;
+  raffles: number;
+  amount: number;
+  /** The raffle the pack was bought from, when it took one of the raffles just now. */
+  activatedRaffleId: string | null;
+}
+
 /**
- * A billing charge got paid (charge.paid, or found paid when asked): activates its raffle once. Returns the
- * raffle id when this call activated it, null otherwise (already active, unknown raffle, not ours).
+ * A billing charge got paid (charge.paid, or found paid when asked): adds the pack's raffles to the organization's
+ * credits, once per charge, and activates the raffle it was bought from with one of them if it's still waiting.
+ * Returns null when this call did nothing (already counted, not ours, unknown organization).
  */
-export async function activateFromCharge(charge: BillingCharge): Promise<string | null> {
+export async function activateFromCharge(charge: BillingCharge): Promise<PackPaid | null> {
   if (!isBillingCharge(charge) || charge.status !== "paid") return null;
   const raffleId = typeof charge.metadata?.raffleId === "string" ? charge.metadata.raffleId : null;
-  if (!raffleId) return null;
-  const done = await prisma.raffle.updateMany({
-    where: { id: raffleId, activatedAt: null },
-    data: { activatedAt: new Date(), activationKind: "paid", activationAmount: charge.paidAmount ?? charge.amount, activationChargeId: charge.id },
+  const raffle = raffleId
+    ? await prisma.raffle.findUnique({ where: { id: raffleId }, select: { id: true, ownerId: true, activatedAt: true, deletedAt: true } })
+    : null;
+  const ownerId = raffle?.ownerId ?? (typeof charge.metadata?.owner === "string" ? charge.metadata.owner : null);
+  if (!ownerId) return null;
+  const packId = chargePackId(charge);
+  const declared = Number(charge.metadata?.raffles);
+  // Charges from before packs paid for that one raffle.
+  const raffles = packId && Number.isInteger(declared) && declared > 0 ? declared : 1;
+  const amount = charge.paidAmount ?? charge.amount;
+
+  let activatedRaffleId: string | null = null;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.creditPurchase.create({ data: { ownerId, chargeId: charge.id, pack: packId ?? "single", raffles, amount, raffleId } });
+      if (raffle && !raffle.activatedAt && !raffle.deletedAt) {
+        const done = await tx.raffle.updateMany({
+          where: { id: raffle.id, activatedAt: null },
+          data: { activatedAt: new Date(), activationKind: "paid", activationAmount: Math.round(amount / raffles), activationChargeId: charge.id },
+        });
+        if (done.count === 1) activatedRaffleId = raffle.id;
+      }
+      const left = raffles - (activatedRaffleId ? 1 : 0);
+      if (left > 0) await tx.adminUser.update({ where: { id: ownerId }, data: { raffleCredits: { increment: left } } });
+    });
+  } catch (err) {
+    // Already counted (a repeated charge.paid, or the webhook and a check racing): the unique chargeId says so.
+    if ((err as { code?: string }).code === "P2002") return null;
+    // The organization is gone: nothing to add the raffles to.
+    if ((err as { code?: string }).code === "P2025") return null;
+    throw err;
+  }
+  if (activatedRaffleId) publishRaffleChange(activatedRaffleId);
+  const owner = await prisma.adminUser.findUnique({ where: { id: ownerId }, select: { name: true } });
+  await logActivity({
+    ownerId,
+    actorName: owner?.name ?? "Organizador",
+    action: "pack.purchased",
+    targetName: raffles === 1 ? "1 rifa" : `Paquete de ${raffles} rifas`,
+    details: { raffles, amount },
   });
-  if (done.count !== 1) return null;
-  publishRaffleChange(raffleId);
-  return raffleId;
+  return { ownerId, raffles, amount, activatedRaffleId };
 }

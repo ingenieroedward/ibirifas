@@ -7,7 +7,7 @@ comprobante, y acceso simple por código de 6 dígitos.
 ## Página pública y panel
 
 - **`/`** es la página pública de Ibirifas (`app/page.tsx`): qué es, funciones,
-  modalidades, precios (salen de `RAFFLE_PRICE_SMALL`/`RAFFLE_PRICE_LARGE`),
+  modalidades, paquetes y precios (salen de `PACK_SMALL_*`/`PACK_LARGE_*`),
   preguntas frecuentes y "Quiero mi rifa" (abre WhatsApp hacia `BILLING_WHATSAPP`;
   sin él, lleva al login). No pide sesión; quien ya inició sesión va directo a
   `/rifas`.
@@ -499,10 +499,13 @@ Sin `PAGORADAR_URL` y `PAGORADAR_API_KEY` la tarjeta no permite conectar cuentas
 El webhook es `POST https://<tu-dominio>/api/pagoradar/webhook`. Cada 10 minutos (y
 al arrancar) la app pide a pagoradar los pagos que no le llegaron por webhook.
 
-## Cobro por rifa
+## Cobro por paquetes de rifas
 
-Ibirifas cobra a los organizadores **por rifa**, con un precio fijo según el tamaño
-(nunca un porcentaje de lo que vende la rifa). Toda rifa se **activa** antes de
+Ibirifas cobra a los organizadores con **paquetes de rifas** a precio fijo (nunca
+un porcentaje de lo que vende la rifa): por defecto **3 rifas por $15.000** y **10
+rifas por $35.000**, y un plan **a convenir** por WhatsApp para quien necesite más.
+Cada rifa del paquete sirve para cualquier tamaño (hasta 1.000 números) y no vence.
+Toda rifa se **activa** antes de
 vender: hasta entonces se puede crear y preparar, pero no se venden números, no se
 reserva en línea ni se abre el enlace público (las rutas responden 402). Cómo se
 activa, en este orden (`lib/billing.ts`):
@@ -513,21 +516,27 @@ activa, en este orden (`lib/billing.ts`):
    activan al marcarlo).
 2. **Primera rifa gratis**: la primera rifa de hasta 100 números de cada
    organización, con todo incluido.
-3. **Rifas de regalo** (`raffleCredits`): las que das tú, de cualquier tamaño (ej.
-   alguien te pagó en efectivo): *Organizadores* → Editar → *Rifas de regalo*.
-4. **Pago**: `RAFFLE_PRICE_SMALL` (por defecto $15.000, hasta 100 números) o
-   `RAFFLE_PRICE_LARGE` ($35.000, más de 100).
+3. **Rifas de saldo** (`raffleCredits`): las que le quedan de sus paquetes, más
+   las que le das tú a mano (ej. te pagó un paquete en efectivo): *Organizadores*
+   → Editar → *Rifas de saldo* (con atajos +3 y +10).
+4. **Comprar un paquete**: la hoja de activación ofrece los dos paquetes
+   (`PACK_SMALL_RAFFLES`/`PACK_SMALL_PRICE`, por defecto 3 por $15.000, y
+   `PACK_LARGE_RAFFLES`/`PACK_LARGE_PRICE`, por defecto 10 por $35.000) y un
+   enlace a WhatsApp para un plan a convenir. La rifa desde la que se compra usa
+   una rifa del paquete y el resto queda de saldo.
    - **En línea, con pagoradar** (si `PAGORADAR_URL`, `PAGORADAR_API_KEY` y
      `PAGORADAR_BILLING_ACCOUNT` están puestos): "Pagar con Bre-B" crea un cobro
      de monto único en **tu** cuenta receptora de pagoradar y lleva al organizador
-     a la página de pago; cuando pagoradar avisa `charge.paid`, la rifa se activa
-     sola y el organizador recibe una notificación. Si ese aviso se pierde, la
-     rifa se activa en cuanto el organizador vuelve a mirar (Ibirifas le pregunta
-     a pagoradar). Esos pagos no aparecen en *Pagos* de ninguna organización,
-     aunque tu cuenta de cobro sea también la de tus rifas.
+     a la página de pago; cuando pagoradar avisa `charge.paid`, se suman las rifas
+     del paquete (una sola vez por cobro: `CreditPurchase`), la rifa se activa
+     sola y el organizador recibe una notificación con el saldo que le queda. Si
+     ese aviso se pierde, todo pasa en cuanto el organizador vuelve a mirar
+     (Ibirifas le pregunta a pagoradar). Cada compra queda en **Actividad**. Esos
+     pagos no aparecen en *Pagos* de ninguna organización, aunque tu cuenta de
+     cobro sea también la de tus rifas.
    - **A mano** (sin pagoradar): el botón abre WhatsApp hacia `BILLING_WHATSAPP`
-     con el nombre de la rifa y la organización; al confirmar el pago le das una
-     rifa de regalo y él la activa.
+     con el paquete, la rifa y la organización; al confirmar el pago le sumas las
+     rifas del paquete a su saldo y él activa la rifa.
 
 `PAGORADAR_BILLING_ACCOUNT` es el id (`acc_…`) de tu cuenta receptora en el panel
 de pagoradar (*Cuentas*), y debe pertenecer a la misma app de pagoradar que usa
@@ -733,7 +742,7 @@ y borrarlo.
 
 ### Cambiar de dominio
 
-Lista de pendientes para dejar en marcha el cobro por rifa, los pagos y el dominio nuevo:
+Lista de pendientes para dejar en marcha el cobro por paquetes de rifas, los pagos y el dominio nuevo:
 [docs/PENDIENTES-PUESTA-EN-MARCHA.md](docs/PENDIENTES-PUESTA-EN-MARCHA.md).
 
 Ver [docs/CAMBIO-DE-DOMINIO.md](docs/CAMBIO-DE-DOMINIO.md): el orden de los pasos
