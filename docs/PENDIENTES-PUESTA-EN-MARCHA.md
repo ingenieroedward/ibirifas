@@ -45,7 +45,13 @@ de forma segura, así que hay que apuntar el webhook al nuevo.
 
 ---
 
-## 4. Configurar el cobro por rifa
+## 4. Configurar el cobro de paquetes
+
+**Lo mínimo (sin pagoradar):** entra como superadmin → **Menú → Cobros** → escribe tu llave
+Bre-B y tu nombre → **Guardar llave**. Desde ese momento los organizadores te transfieren el
+paquete y suben el comprobante; tú lo apruebas en **Cobros** y la rifa se activa sola.
+
+**Opcional, cobro en línea automático con pagoradar:**
 
 1. [ ] Panel de pagoradar → **Cuentas** → abre **tu** cuenta receptora y copia su id
    (empieza por `acc_`).

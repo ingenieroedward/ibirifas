@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Spinner } from "@/components/Spinner";
 import { CheckIcon, TrophyIcon } from "@/components/icons/LineIcons";
-import { activateRaffle, ApiError, getActivation } from "@/lib/api-client";
-import { formatCurrency } from "@/lib/format";
+import { CopyButton } from "@/components/CopyButton";
+import { activateRaffle, ApiError, getActivation, sendPackReceipt } from "@/lib/api-client";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { fileToCompressedDataUrl } from "@/lib/image";
 import type { ActivationStateDTO } from "@/lib/types";
 
 type PackId = ActivationStateDTO["packs"][number]["id"];
@@ -22,17 +24,25 @@ interface ActivationSheetProps {
 }
 
 const POLL_MS = 5_000;
+/** A receipt waits for a person to look at it: no need to ask as often. */
+const RECEIPT_POLL_MS = 20_000;
 
 /**
  * Activating a raffle so it can sell (lib/billing.ts): with the free first raffle, a credit, or buying a pack of
- * raffles (this one takes one, the rest stay as credits). While a payment is under way it keeps asking, so the sheet
- * turns into "¡Activada!" by itself once the bank confirms.
+ * raffles (this one takes one, the rest stay as credits), online through pagoradar or by transfer to the platform
+ * owner's Bre-B key with a receipt the superadmin reviews. While a payment or a receipt is under way it keeps
+ * asking, so the sheet turns into "¡Activada!" by itself once it's confirmed.
  */
 export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, isOrganizer, onClose, onActivated }: ActivationSheetProps) {
   const [state, setState] = useState<ActivationStateDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pickedPack, setPickedPack] = useState<PackId | null>(null);
+  const [manualPicked, setManualPicked] = useState<boolean | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [payerName, setPayerName] = useState("");
+  const [resend, setResend] = useState(false);
 
   const apply = useCallback(
     (next: ActivationStateDTO) => {
@@ -52,17 +62,27 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
     };
   }, [raffleId, apply]);
 
-  // A payment under way: check now and then until it's confirmed.
-  const waiting = Boolean(state && !state.active && state.checkoutUrl);
+  // A payment or a receipt under way: check now and then until it's confirmed.
+  const waitEvery = !state || state.active ? null : state.checkoutUrl ? POLL_MS : state.receipt?.status === "pending" ? RECEIPT_POLL_MS : null;
   useEffect(() => {
-    if (!waiting) return;
+    if (!waitEvery) return;
     const timer = setInterval(() => {
       getActivation(raffleId).then(apply).catch(() => {});
-    }, POLL_MS);
+    }, waitEvery);
     return () => clearInterval(timer);
-  }, [waiting, raffleId, apply]);
+  }, [waitEvery, raffleId, apply]);
 
-  const pack: PackId = pickedPack ?? state?.pendingPack ?? "small";
+  const pickReceipt = (file: File | null) => {
+    setReceiptFile(file);
+    setReceiptPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const pack: PackId = pickedPack ?? state?.pendingPack ?? state?.receipt?.pack ?? "small";
+  // Paying by transfer + receipt: the only way without online payment, or the organizer's choice next to it.
+  const manual = Boolean(state?.breb) && (!state?.payOnline || (manualPicked ?? Boolean(state?.receipt)));
   const chosen = state?.packs.find((p) => p.id === pack) ?? state?.packs[0];
 
   const run = async (action: "allowance" | "pay") => {
@@ -74,6 +94,22 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
       if (action === "pay" && next.checkoutUrl && !next.active) window.location.assign(next.checkoutUrl);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo completar. Revisa tu conexión.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReceipt = async () => {
+    if (!receiptFile) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const photo = await fileToCompressedDataUrl(receiptFile, { maxSize: 1400, quality: 0.75 });
+      apply(await sendPackReceipt(raffleId, pack, photo, payerName.trim()));
+      pickReceipt(null);
+      setResend(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo enviar el comprobante. Revisa tu conexión.");
     } finally {
       setBusy(false);
     }
@@ -199,7 +235,21 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
                 cobramos comisión de tus ventas.
               </p>
 
-              {state.payOnline ? (
+              {manual && state.breb ? (
+                <TransferReceipt
+                  breb={state.breb}
+                  price={chosen.price}
+                  receipt={state.receipt}
+                  resend={resend}
+                  onResend={() => setResend(true)}
+                  payerName={payerName}
+                  onPayerName={setPayerName}
+                  preview={receiptPreview}
+                  onFile={pickReceipt}
+                  busy={busy}
+                  onSubmit={() => void submitReceipt()}
+                />
+              ) : state.payOnline ? (
                 <>
                   {state.checkoutUrl && state.pendingPack === pack && (
                     <p role="status" className="flex items-center gap-2 text-sm text-gold-400">
@@ -235,6 +285,17 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
                 <p className="text-sm text-text-muted">Comunícate con quien te dio acceso a Ibirifas para activarla.</p>
               )}
 
+              {state.payOnline && state.breb && (
+                <button
+                  type="button"
+                  onClick={() => setManualPicked(!manual)}
+                  disabled={busy}
+                  className="block w-full text-center text-xs font-semibold text-gold-400 underline-offset-2 hover:underline"
+                >
+                  {manual ? "Prefiero pagar en línea" : "Prefiero transferir y subir el comprobante"}
+                </button>
+              )}
+
               {state.whatsapp && (
                 <p className="text-center text-xs text-text-muted">
                   ¿Necesitas más rifas?{" "}
@@ -253,6 +314,105 @@ export function ActivationSheet({ raffleId, raffleName, totalNumbers, orgCode, i
         </div>
       )}
     </BottomSheet>
+  );
+}
+
+/** Paying a pack by transfer: where to send it, then the photo of the receipt (or how the one sent is going). */
+function TransferReceipt({
+  breb,
+  price,
+  receipt,
+  resend,
+  onResend,
+  payerName,
+  onPayerName,
+  preview,
+  onFile,
+  busy,
+  onSubmit,
+}: {
+  breb: NonNullable<ActivationStateDTO["breb"]>;
+  price: number;
+  receipt: ActivationStateDTO["receipt"];
+  resend: boolean;
+  onResend: () => void;
+  payerName: string;
+  onPayerName: (v: string) => void;
+  preview: string | null;
+  onFile: (f: File | null) => void;
+  busy: boolean;
+  onSubmit: () => void;
+}) {
+  if (receipt?.status === "pending" && !resend) {
+    return (
+      <div className="space-y-3">
+        <div role="status" className="rounded-2xl border border-gold-600/40 bg-gold-400/10 p-4">
+          <p className="flex items-center gap-2 font-semibold text-gold-400">
+            <Spinner size={14} /> Comprobante en revisión
+          </p>
+          <p className="mt-1 text-sm text-text-muted">
+            Enviado el {formatDate(receipt.sentAt)}: paquete de {receipt.raffles} rifas por {formatCurrency(receipt.amount)}. Cuando lo
+            aprobemos, la rifa se activa sola y te llega un aviso.
+          </p>
+        </div>
+        <button type="button" onClick={onResend} className="block w-full text-center text-xs font-semibold text-gold-400 underline-offset-2 hover:underline">
+          Enviar otro comprobante
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {receipt?.status === "rejected" && (
+        <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          No aprobamos el comprobante anterior{receipt.reason ? `: ${receipt.reason}` : "."} Envía otro, por favor.
+        </p>
+      )}
+      <div className="rounded-2xl border border-line bg-surface-2/60 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">1. Transfiere {formatCurrency(price)} a la llave Bre-B</p>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="min-w-0 break-all font-[family-name:var(--font-heading)] text-xl font-extrabold text-text">{breb.key}</p>
+          <CopyButton text={breb.key} label="la llave Bre-B" />
+        </div>
+        {breb.holder && <p className="mt-1 text-xs text-text-muted">A nombre de {breb.holder}</p>}
+      </div>
+      <label className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">2. ¿A nombre de quién salió el pago?</span>
+        <input
+          type="text"
+          value={payerName}
+          onChange={(e) => onPayerName(e.target.value)}
+          maxLength={80}
+          placeholder="Como aparece en tu banco (opcional)"
+          disabled={busy}
+          className="mt-1.5 h-12 w-full rounded-2xl border border-line bg-surface-2 px-4 text-base text-text placeholder:text-text-muted focus:border-gold-500 focus:outline-none"
+        />
+      </label>
+      <div>
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">3. Sube la foto o captura del comprobante</span>
+        <label className="mt-1.5 flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-gold-600/50 p-3 hover:bg-gold-400/5">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Comprobante elegido" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-2xl text-gold-400">+</span>
+          )}
+          <span className="text-sm text-text">{preview ? "Cambiar la imagen" : "Elegir imagen"}</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-label="Comprobante de pago"
+            disabled={busy}
+            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+            className="sr-only"
+          />
+        </label>
+      </div>
+      <button type="button" onClick={onSubmit} disabled={busy || !preview} className={PRIMARY}>
+        {busy ? <Spinner size={18} /> : "Enviar comprobante"}
+      </button>
+      <p className="text-center text-xs text-text-muted">Lo revisamos y, al aprobarlo, la rifa se activa sola.</p>
+    </div>
   );
 }
 

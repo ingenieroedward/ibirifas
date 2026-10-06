@@ -80,6 +80,7 @@ export default function ActivityPage() {
                 activation?: { kind: string; amount: number | null } | null;
                 raffles?: number;
                 amount?: number;
+                method?: string;
               } | null;
               return (
                 <li key={r.id} className="rounded-2xl border border-line bg-bg-elevated p-4 shadow-card">
@@ -92,7 +93,7 @@ export default function ActivityPage() {
                     {r.organization ? ` · ${r.organization}` : ""}
                   </p>
                   {r.action === "pack.purchased" && typeof d?.amount === "number" && (
-                    <p className="mt-1 text-xs text-text-muted">Pagó {formatCurrency(d.amount)} por Bre-B</p>
+                    <p className="mt-1 text-xs text-text-muted">Pagó {formatCurrency(d.amount)} {d.method === "comprobante" ? "por transferencia (comprobante aprobado)" : "por Bre-B"}</p>
                   )}
                   {d && typeof d.sold === "number" && (
                     <p className="mt-1 text-xs text-text-muted">

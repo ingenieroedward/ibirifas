@@ -534,9 +534,18 @@ activa, en este orden (`lib/billing.ts`):
      (Ibirifas le pregunta a pagoradar). Cada compra queda en **Actividad**. Esos
      pagos no aparecen en *Pagos* de ninguna organización, aunque tu cuenta de
      cobro sea también la de tus rifas.
-   - **A mano** (sin pagoradar): el botón abre WhatsApp hacia `BILLING_WHATSAPP`
-     con el paquete, la rifa y la organización; al confirmar el pago le sumas las
-     rifas del paquete a su saldo y él activa la rifa.
+   - **Por transferencia con comprobante** (si pusiste tu llave en **Cobros**):
+     la hoja muestra tu llave Bre-B y el titular, el organizador transfiere el
+     valor del paquete, escribe a nombre de quién salió el pago y sube la foto del
+     comprobante (`PackRequest`). Tú recibes una notificación y lo ves en **Menú →
+     Cobros** (y un aviso en *Organizadores*): **Aprobar** suma las rifas del
+     paquete (una sola vez: `CreditPurchase` con `receipt:<id>`) y activa la rifa;
+     **Rechazar** pide un motivo, que el organizador ve para enviar otro. Mientras
+     espera, la hoja muestra "Comprobante en revisión" y se activa sola al
+     aprobarlo. Si también hay pago en línea, el organizador elige cómo pagar.
+   - **A mano** (sin llave ni pagoradar): el botón abre WhatsApp hacia
+     `BILLING_WHATSAPP` con el paquete, la rifa y la organización; al confirmar el
+     pago le sumas las rifas del paquete a su saldo y él activa la rifa.
 
 `PAGORADAR_BILLING_ACCOUNT` es el id (`acc_…`) de tu cuenta receptora en el panel
 de pagoradar (*Cuentas*), y debe pertenecer a la misma app de pagoradar que usa
