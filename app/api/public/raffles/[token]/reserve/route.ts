@@ -1,5 +1,6 @@
 import { activationBlock } from "@/lib/billing";
-import { comboSalePrices, comboTotal, parseCombos } from "@/lib/combos";
+import { parseCombos } from "@/lib/combos";
+import { repriceBuyerCombos } from "@/lib/comboPricing";
 import { NextRequest, NextResponse } from "next/server";
 import { drawCutoff, payByDay, reservationsCloseAt } from "@/lib/holds";
 import { z } from "zod";
@@ -179,14 +180,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
         },
       });
       if (count !== ids.length) throw new TakenError();
-      // Loose numbers reserved together get the raffle's combos (lib/combos.ts): each stores its share.
-      if (combos.length > 0 && values.length > 1) {
-        const loose = await tx.raffleNumber.findMany({ where: { id: { in: ids }, groupId: null }, select: { id: true }, orderBy: { value: "asc" } });
-        const prices = comboSalePrices(loose.length, raffle.numberPrice, combos);
-        for (const [i, n] of loose.entries()) {
-          if (prices[i] !== null) await tx.raffleNumber.update({ where: { id: n.id }, data: { salePrice: prices[i] } });
-        }
-      }
+      // Combos count everything this phone still owes in the raffle, earlier reservations included
+      // (lib/comboPricing.ts): reserving the 18 and then the 30 costs the same as both at once.
+      if (combos.length > 0) await repriceBuyerCombos(tx, raffle.id, { phone: input.phone, name: input.name });
     });
   } catch (err) {
     if (err instanceof TakenError) {
@@ -198,7 +194,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   publishRaffleChange(raffle.id);
   void syncCompletion(raffle.id);
 
-  const total = chosenGroups.reduce((sum, g) => sum + g!.price, 0) + comboTotal(values.length, raffle.numberPrice, combos);
+  // What this reservation comes to: its sets, and its loose numbers at their (possibly combo) price.
+  const reservedLoose = await prisma.raffleNumber.findMany({ where: { id: { in: ids }, groupId: null }, select: { salePrice: true } });
+  const total =
+    chosenGroups.reduce((sum, g) => sum + g!.price, 0) + reservedLoose.reduce((sum, n) => sum + (n.salePrice ?? raffle.numberPrice), 0);
   const what = [
     ...(labels.length > 0 ? [`${labels.length > 1 ? "los conjuntos" : "el conjunto"} ${labels.join(", ")}`] : []),
     ...(values.length > 0 ? [values.length > 1 ? `los números ${describeNumbers(values)}` : `el ${describeNumbers(values)}`] : []),

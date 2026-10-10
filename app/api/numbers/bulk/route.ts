@@ -10,7 +10,8 @@ import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
 import { buyerRowSelect, emailBuyers, mailOrigin, type BuyerRow } from "@/lib/buyerMail";
-import { comboSalePrices, loosePrice, parseCombos } from "@/lib/combos";
+import { loosePrice } from "@/lib/combos";
+import { repriceBuyerCombos, repriceBuyersOf } from "@/lib/comboPricing";
 
 const MAX_IDS = 100;
 const MAX_PHOTO_DATA_URL_LENGTH = 3 * 1024 * 1024;
@@ -171,15 +172,8 @@ export async function POST(req: NextRequest) {
         if (count !== ids.length) {
           throw new ConflictError("Alguno de los números ya fue vendido. Actualiza el tablero e inténtalo de nuevo.");
         }
-        // Loose numbers sold together get the raffle's combos (lib/combos.ts): each stores its share.
-        const combos = parseCombos(found[0]!.raffle.combos);
-        const loose = found.filter((n) => n.groupId === null).sort((a, b) => a.value - b.value);
-        if (combos.length > 0 && loose.length > 1) {
-          const prices = comboSalePrices(loose.length, found[0]!.raffle.numberPrice, combos);
-          for (const [i, n] of loose.entries()) {
-            if (prices[i] !== null) await tx.raffleNumber.update({ where: { id: n.id }, data: { salePrice: prices[i] } });
-          }
-        }
+        // Combos count all this buyer still owes in the raffle, with what was just sold (lib/comboPricing.ts).
+        await repriceBuyerCombos(tx, found[0]!.raffleId, { phone: input.buyerPhone, name: input.buyerName });
         return;
       }
 
@@ -188,6 +182,10 @@ export async function POST(req: NextRequest) {
         releasedBefore = await tx.raffleNumber.findMany({
           where: { id: { in: ids }, status: { not: "available" } },
           select: buyerRowSelect,
+        });
+        const freedBuyers = await tx.raffleNumber.findMany({
+          where: { id: { in: ids }, status: "occupied" },
+          select: { buyerPhone: true, buyerName: true },
         });
         await tx.raffleNumber.updateMany({
           where: { id: { in: ids } },
@@ -213,6 +211,8 @@ export async function POST(req: NextRequest) {
             salePrice: null,
           },
         });
+        // Whoever still owes other numbers may have lost a combo with the ones freed.
+        await repriceBuyersOf(tx, found[0]!.raffleId, freedBuyers);
         return;
       }
 

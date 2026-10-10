@@ -1,4 +1,5 @@
 import { activationBlock } from "@/lib/billing";
+import { repriceBuyerCombos, repriceBuyersOf } from "@/lib/comboPricing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -200,7 +201,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       // A freed number loses its installments with its buyer.
       if (status === "available") await tx.numberQuota.deleteMany({ where: { numberId: id } });
-      return tx.raffleNumber.update({ where: { id }, data, include: numberInclude });
+      const saved = await tx.raffleNumber.update({ where: { id }, data, include: numberInclude });
+      // Combos count all a buyer owes (lib/comboPricing.ts): a new sale may complete one, a release may break one.
+      if (status === "available" && existing.status === "occupied") {
+        await repriceBuyersOf(tx, existing.raffleId, [{ buyerPhone: existing.buyerPhone, buyerName: existing.buyerName }]);
+      } else if (saved.status === "occupied") {
+        await repriceBuyerCombos(tx, existing.raffleId, { phone: saved.buyerPhone, name: saved.buyerName });
+        return tx.raffleNumber.findUniqueOrThrow({ where: { id }, include: numberInclude });
+      }
+      return saved;
     });
   } catch (err) {
     if (err instanceof TakenError) {
