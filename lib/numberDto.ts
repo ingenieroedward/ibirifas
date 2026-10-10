@@ -38,6 +38,7 @@ export function toNumberDTO(n: NumberWithAuthors): RaffleNumberDTO {
       paidAt: q.paidAt.toISOString(),
     })),
     salePrice: n.salePrice,
+    paymentRef: n.paymentRef,
     updatedAt: n.updatedAt.toISOString(),
   };
 }

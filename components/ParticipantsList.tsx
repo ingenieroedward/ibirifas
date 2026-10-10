@@ -6,7 +6,7 @@ import { triggerCondition } from "@/lib/drawPlan";
 import { DAY_MS, daysLeft, daysText, daysWaiting, drawCutoff, isOverdue } from "@/lib/holds";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment";
 import { PhoneEditor } from "@/components/PhoneEditor";
-import type { RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
+import type { BankPaymentDTO, RaffleDTO, RaffleGroupDTO, RaffleNumberDTO } from "@/lib/types";
 import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/whatsapp";
 import {
   amountRemaining,
@@ -17,6 +17,8 @@ import {
   standingOf,
   type StageSettings,
 } from "@/lib/stages";
+
+const bankWhen = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" });
 
 interface ParticipantsListProps {
   numbers: RaffleNumberDTO[];
@@ -36,6 +38,8 @@ interface ParticipantsListProps {
   drawTime?: string | null;
   /** Overdue numbers go back on sale by themselves. */
   autoRelease?: boolean;
+  /** Bank payments (pagoradar) behind paid numbers, by id: shown on the buyer that they paid. */
+  bankPayments?: Record<string, BankPaymentDTO>;
   onSelect: (number: RaffleNumberDTO) => void;
   /** Collect every unpaid number of one buyer in a single step. */
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
@@ -116,6 +120,7 @@ export function ParticipantsList({
   drawDate = null,
   drawTime = null,
   autoRelease = false,
+  bankPayments = {},
   onSelect,
   onPayAll,
   onEditPhone,
@@ -255,6 +260,7 @@ export function ParticipantsList({
               drawTime={drawTime}
               now={now}
               isWinner={winnerValue !== null && winnerValue !== undefined && p.numbers.some((n) => n.value === winnerValue)}
+              bankPayments={bankPayments}
               onSelect={onSelect}
               onPayAll={onPayAll}
               onEditPhone={onEditPhone}
@@ -313,6 +319,7 @@ function ParticipantCard({
   drawTime,
   now,
   isWinner,
+  bankPayments,
   onSelect,
   onPayAll,
   onEditPhone,
@@ -328,6 +335,7 @@ function ParticipantCard({
   drawTime: string | null;
   now: number;
   isWinner: boolean;
+  bankPayments: Record<string, BankPaymentDTO>;
   onSelect: (number: RaffleNumberDTO) => void;
   onPayAll: (buyerName: string, pending: RaffleNumberDTO[]) => void;
   onEditPhone?: (numbers: RaffleNumberDTO[], phone: string | null) => Promise<void>;
@@ -479,6 +487,25 @@ function ParticipantCard({
           Reserva en línea
         </p>
       )}
+      {(() => {
+        // Paid through a payment the bank reported (pagoradar): say so, with the bank notice behind it.
+        const refs = [...new Set(p.numbers.filter((n) => n.status === "paid" && n.paymentRef).map((n) => n.paymentRef!))];
+        if (refs.length === 0) return null;
+        const known = refs.map((r) => bankPayments[r]).filter((b): b is BankPaymentDTO => Boolean(b));
+        return (
+          <>
+            <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
+              Pagado por Bre-B · verificado con el banco
+            </p>
+            {known.map((b, i) => (
+              <p key={i} className="mt-1.5 text-xs text-text-muted">
+                {b.bank} · {b.payerName} · {formatCurrency(b.amount)} · {bankWhen.format(new Date(b.paidAt))}
+                {b.reference ? ` · Ref. ${b.reference}` : ""} · {b.auto ? "aprobado solo" : "aprobado por el equipo"}
+              </p>
+            ))}
+          </>
+        );
+      })()}
       {p.numbers.some((n) => n.photoDataUrl) && (
         <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
           Con comprobante

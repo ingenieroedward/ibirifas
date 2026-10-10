@@ -485,7 +485,11 @@ Mejor aún: usa para las rifas una cuenta que no reciba otros pagos. El botón c
 lleva a **Pagos** y muestra cuántos esperan. Esa página (**Menú → Pagos**) tiene dos
 pestañas: **Pagos recibidos** (la que abre, con Por revisar / Aprobados / Ignorados) y
 **Configuración**, donde el organizador conecta su cuenta y apaga o enciende "Aprobar
-solos los pagos" (abre en Configuración mientras no hay cuenta conectada). Cada número pagado así
+solos los pagos" (abre en Configuración mientras no hay cuenta conectada). En
+**Participantes**, el comprador cuyos números pagó un aviso del banco lleva "Pagado por
+Bre-B · verificado con el banco" con el banco, quién pagó, valor, hora, referencia y si
+se aprobó solo o lo aprobó el equipo (`RaffleDTO.bankPayments`); la hoja del número dice
+"Pagado · Bre-B · verificado con el banco". Cada número pagado así
 guarda el id del pago (`paymentRef`).
 
 ### Conectar la cuenta de cada organizador

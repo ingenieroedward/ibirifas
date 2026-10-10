@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BANK_LABEL } from "@/lib/pagoradar";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, tenantIdFor } from "@/lib/session";
@@ -9,7 +10,7 @@ import { emailDrawResult, mailOrigin } from "@/lib/buyerMail";
 import { publishRaffleChange } from "@/lib/realtime";
 import { sweepRaffle } from "@/lib/expiry";
 import { reservationsOpen, settingFromDb, settingToDb } from "@/lib/reservations";
-import type { DrawTrigger, FullPayPerk, RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
+import type { BankPaymentDTO, DrawTrigger, FullPayPerk, RaffleAccountDTO, RaffleDTO, RaffleGroupDTO } from "@/lib/types";
 import { stagesInclude, toStageDTO } from "@/lib/stageDto";
 import { MAX_STAGES, stageInputSchema } from "@/lib/stageSchema";
 import { syncCompletion } from "@/lib/completion";
@@ -36,7 +37,23 @@ type RaffleWithNumbers = Prisma.RaffleGetPayload<{
 }>;
 
 /** Shared GET/PATCH response mapping — keep this the single source of truth for RaffleDTO shape. */
-function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
+/** The bank payments (pagoradar) behind the raffle's paid numbers, for the team to see what paid each buyer. */
+async function bankPaymentsOf(raffle: RaffleWithNumbers): Promise<Record<string, BankPaymentDTO>> {
+  const refs = [...new Set(raffle.numbers.map((n) => n.paymentRef).filter((r): r is string => Boolean(r)))];
+  if (refs.length === 0) return {};
+  const rows = await prisma.receivedPayment.findMany({
+    where: { id: { in: refs }, ownerId: raffle.ownerId },
+    select: { id: true, bank: true, payerName: true, reference: true, amount: true, paidAt: true, status: true },
+  });
+  return Object.fromEntries(
+    rows.map((p) => [
+      p.id,
+      { bank: BANK_LABEL[p.bank] ?? p.bank, payerName: p.payerName, reference: p.reference, amount: p.amount, paidAt: p.paidAt.toISOString(), auto: p.status === "auto" },
+    ]),
+  );
+}
+
+function toRaffleDTO(raffle: RaffleWithNumbers, bankPayments: Record<string, BankPaymentDTO> = {}): RaffleDTO {
   const numbers = raffle.numbers.map(toNumberDTO);
 
   const groups: RaffleGroupDTO[] = raffle.groups
@@ -76,6 +93,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     publicToken: raffle.publicToken,
     extraPrizes: parseExtraPrizes(raffle.extraPrizes),
     combos: parseCombos(raffle.combos),
+    bankPayments,
     lotteryResult: raffle.lotteryResult,
     prizeResults: parsePrizeWins(raffle.prizeResults),
     active: raffleActive(raffle, raffle.owner),
@@ -173,7 +191,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (swept.released > 0) raffle = (await load()) ?? raffle;
   }
 
-  return NextResponse.json(toRaffleDTO(raffle));
+  return NextResponse.json(toRaffleDTO(raffle, await bankPaymentsOf(raffle)));
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -452,7 +470,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  return NextResponse.json(toRaffleDTO(updated));
+  return NextResponse.json(toRaffleDTO(updated, await bankPaymentsOf(updated)));
 }
 
 /**
