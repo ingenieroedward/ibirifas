@@ -342,9 +342,14 @@ function ParticipantCard({
   onViewReceipt: (photoDataUrl: string) => void;
   stageSettings: StageSettings | null;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Bank payments (pagoradar) that paid this buyer's numbers, and the details known about them.
+  const bankRefs = [...new Set(p.numbers.filter((n) => n.status === "paid" && n.paymentRef).map((n) => n.paymentRef!))];
+  const bankKnown = bankRefs.map((r) => bankPayments[r]).filter((b): b is BankPaymentDTO => Boolean(b));
   // Every distinct receipt this buyer sent (a set carries one copy on each of its numbers), viewable from here
   // without opening each number or set.
   const receipts = [...new Set(p.numbers.map((n) => n.photoDataUrl).filter((u): u is string => Boolean(u)))];
+  const hasDetails = bankKnown.length > 0 || receipts.length > 0;
   // A raffle by stages: what is owed overall, what must be paid now to play the next draw, and what was paid.
   const stageMoney = stageSettings
     ? (() => {
@@ -482,70 +487,37 @@ function ParticipantCard({
         </div>
       )}
 
-      {p.numbers.some((n) => n.online) && (
-        <p className="mt-2 mr-1.5 inline-block rounded-full border border-gold-600/40 bg-gold-400/10 px-2.5 py-0.5 text-[11px] font-bold text-gold-400">
-          Reserva en línea
-        </p>
-      )}
       {(() => {
-        // Paid through a payment the bank reported (pagoradar): say so, with the bank notice behind it.
-        const refs = [...new Set(p.numbers.filter((n) => n.status === "paid" && n.paymentRef).map((n) => n.paymentRef!))];
-        if (refs.length === 0) return null;
-        const known = refs.map((r) => bankPayments[r]).filter((b): b is BankPaymentDTO => Boolean(b));
+        // One row of short labels: how they bought, how it was paid, and when it's due.
+        const chip = "inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-bold";
+        const rejected = p.numbers.some((n) => n.status === "occupied" && !n.photoDataUrl && n.receiptRejectedAt);
+        const due =
+          holdDays !== null && unpaid.length > 0
+            ? isLate
+              ? `Vencido · ${daysText(lateDays)} sin pagar`
+              : soonest === 0
+                ? "Vence hoy"
+                : `Vence en ${daysText(soonest)}`
+            : null;
+        if (!p.numbers.some((n) => n.online) && bankRefs.length === 0 && receipts.length === 0 && !rejected && !due) return null;
         return (
-          <>
-            <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
-              Pagado por Bre-B · verificado con el banco
-            </p>
-            {known.map((b, i) => (
-              <p key={i} className="mt-1.5 text-xs text-text-muted">
-                {b.bank} · {b.payerName} · {formatCurrency(b.amount)} · {bankWhen.format(new Date(b.paidAt))}
-                {b.reference ? ` · Ref. ${b.reference}` : ""} · {b.auto ? "aprobado solo" : "aprobado por el equipo"}
-              </p>
-            ))}
-          </>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {p.numbers.some((n) => n.online) && <span className={`${chip} border-gold-600/40 bg-gold-400/10 text-gold-400`}>En línea</span>}
+            {bankRefs.length > 0 && <span className={`${chip} border-green-500/40 bg-green-500/10 text-green-400`}>Bre-B verificado</span>}
+            {receipts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => (receipts.length === 1 ? onViewReceipt(receipts[0]!) : setDetailsOpen(true))}
+                className={`${chip} border-green-500/40 bg-green-500/10 text-green-400 underline-offset-2 hover:underline`}
+              >
+                {receipts.length === 1 ? "Ver comprobante" : `${receipts.length} comprobantes`}
+              </button>
+            )}
+            {rejected && <span className={`${chip} border-red-500/40 bg-red-500/10 text-red-400`}>Comprobante rechazado</span>}
+            {due && <span className={`${chip} ${isLate ? "border-red-500/40 bg-red-500/10 text-red-400" : "border-line text-text-muted"}`}>{due}</span>}
+          </div>
         );
       })()}
-      {p.numbers.some((n) => n.photoDataUrl) && (
-        <p className="mt-2 mr-1.5 inline-block rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-400">
-          Con comprobante
-        </p>
-      )}
-      {p.numbers.some((n) => n.status === "occupied" && !n.photoDataUrl && n.receiptRejectedAt) && (
-        <p className="mt-2 mr-1.5 inline-block rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-bold text-red-400">
-          Comprobante rechazado
-        </p>
-      )}
-      {receipts.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {receipts.map((url, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onViewReceipt(url)}
-              aria-label={receipts.length > 1 ? `Ver comprobante ${i + 1}` : "Ver comprobante"}
-              className="relative block h-16 w-16 overflow-hidden rounded-xl border border-green-500/40 transition active:scale-95"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
-              <span className="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[10px] font-bold text-white">Ver</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {holdDays !== null && unpaid.length > 0 && (
-        <p
-          className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-            isLate ? "border border-red-500/40 bg-red-500/10 text-red-400" : "text-text-muted"
-          }`}
-        >
-          {isLate
-            ? `Vencido · ${daysText(lateDays)} sin pagar`
-            : soonest === 0
-              ? "Vence hoy"
-              : `Vence en ${daysText(soonest)}`}
-        </p>
-      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {holdings.map((h) => {
@@ -634,11 +606,52 @@ function ParticipantCard({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-text-muted">
+      {detailsOpen && hasDetails && (
+        <div className="mt-3 space-y-2 rounded-xl bg-surface-2/60 p-3">
+          {bankKnown.map((b, i) => (
+            <p key={i} className="text-xs text-text-muted">
+              <span className="font-semibold text-green-400">Aviso del banco:</span> {b.bank} · {b.payerName} · {formatCurrency(b.amount)} ·{" "}
+              {bankWhen.format(new Date(b.paidAt))}
+              {b.reference ? ` · Ref. ${b.reference}` : ""} · {b.auto ? "aprobado solo" : "aprobado por el equipo"}
+            </p>
+          ))}
+          {receipts.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {receipts.map((url, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onViewReceipt(url)}
+                  aria-label={receipts.length > 1 ? `Ver comprobante ${i + 1}` : "Ver comprobante"}
+                  className="relative block h-16 w-16 overflow-hidden rounded-xl border border-green-500/40 transition active:scale-95"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[10px] font-bold text-white">Ver</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+      <p className="text-xs text-text-muted">
         {p.numbers.length} {p.numbers.length === 1 ? "número" : "números"}
         {paidItems > 0 && ` · ${paidItems} pagado${paidItems === 1 ? "" : "s"}`}
         {pendingItems > 0 && ` · ${pendingItems} pendiente${pendingItems === 1 ? "" : "s"}`}
       </p>
+      {hasDetails && (
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(!detailsOpen)}
+          aria-expanded={detailsOpen}
+          className="shrink-0 text-xs font-semibold text-gold-400 underline-offset-2 hover:underline"
+        >
+          {detailsOpen ? "Ocultar detalle" : "Ver detalle del pago"}
+        </button>
+      )}
+      </div>
     </li>
   );
 }

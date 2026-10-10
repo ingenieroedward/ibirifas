@@ -486,9 +486,11 @@ lleva a **Pagos** y muestra cuántos esperan. Esa página (**Menú → Pagos**) 
 pestañas: **Pagos recibidos** (la que abre, con Por revisar / Aprobados / Ignorados) y
 **Configuración**, donde el organizador conecta su cuenta y apaga o enciende "Aprobar
 solos los pagos" (abre en Configuración mientras no hay cuenta conectada). En
-**Participantes**, el comprador cuyos números pagó un aviso del banco lleva "Pagado por
-Bre-B · verificado con el banco" con el banco, quién pagó, valor, hora, referencia y si
-se aprobó solo o lo aprobó el equipo (`RaffleDTO.bankPayments`); la hoja del número dice
+**Participantes**, cada comprador lleva una fila de etiquetas cortas (En línea, Bre-B
+verificado, Ver comprobante / N comprobantes, Comprobante rechazado, Vence en…) y el
+detalle plegado en "Ver detalle del pago": el aviso del banco (banco, quién pagó, valor,
+hora, referencia, si se aprobó solo o lo aprobó el equipo; `RaffleDTO.bankPayments`) y
+las fotos de los comprobantes; la hoja del número dice
 "Pagado · Bre-B · verificado con el banco". Cada número pagado así
 guarda el id del pago (`paymentRef`).
 
