@@ -10,7 +10,6 @@ import { AppHeader } from "@/components/AppHeader";
 import { CreateUserSheet } from "@/components/CreateUserSheet";
 import { EditUserSheet } from "@/components/EditUserSheet";
 import { Spinner } from "@/components/Spinner";
-import { PaymentsAccountCard } from "@/components/PaymentsAccountCard";
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
 
@@ -165,7 +164,18 @@ export default function UsersPage() {
           {!isSuperadmin && user.orgCode && <OrgCodeCard orgCode={user.orgCode} onCopied={show} />}
           {!isSuperadmin && <ReservationsCard onError={show} />}
           {!isSuperadmin && <EmailCard onError={show} />}
-          {user.role === "ORGANIZER" && <PaymentsAccountCard onNotify={show} defaultEmail={null} />}
+          {user.role === "ORGANIZER" && (
+            <Link
+              href="/pagos"
+              className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-bg-elevated p-4 shadow-card"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-text">Pagos Bre-B automáticos</span>
+                <span className="block text-xs text-text-muted">Conectar, cambiar o desconectar tu cuenta, y ver los pagos recibidos.</span>
+              </span>
+              <span className="shrink-0 text-sm font-bold text-gold-400">Ir a Pagos</span>
+            </Link>
+          )}
           {isSuperadmin && (
             <Link
               href="/cobros"
