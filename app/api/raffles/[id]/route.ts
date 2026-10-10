@@ -18,6 +18,7 @@ import { raffleActive } from "@/lib/billing";
 import { TRASH_DAYS, trashRaffle } from "@/lib/trash";
 import { computeDraw, parseExtraPrizes, parsePrizeWins, prizeDigits, prizeKindLabel, supportsExtraPrizes } from "@/lib/prizes";
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
+import { combosProblem, MAX_COMBO_COUNT, MAX_COMBOS, parseCombos } from "@/lib/combos";
 import { accountInputSchema, accountRows, accountSelect, toAccountDTO } from "@/lib/accounts";
 
 const MAX_ACCOUNTS = 5;
@@ -74,6 +75,7 @@ function toRaffleDTO(raffle: RaffleWithNumbers): RaffleDTO {
     }),
     publicToken: raffle.publicToken,
     extraPrizes: parseExtraPrizes(raffle.extraPrizes),
+    combos: parseCombos(raffle.combos),
     lotteryResult: raffle.lotteryResult,
     prizeResults: parsePrizeWins(raffle.prizeResults),
     active: raffleActive(raffle, raffle.owner),
@@ -108,6 +110,7 @@ const updateRaffleSchema = z.object({
   // Closing with the lottery's result: the winner and every "Gana Más" prize come out of it (lib/prizes.ts).
   lotteryResult: z.string().trim().max(12).nullable().optional(),
   extraPrizes: z.array(extraPrizeSchema).max(3).optional(),
+  combos: z.array(z.object({ count: z.number().int().min(2).max(MAX_COMBO_COUNT), price: z.number().int().positive() })).max(MAX_COMBOS).optional(),
   name: z.string().trim().min(1).max(120).optional(),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   permit: z.string().trim().max(120).nullable().optional(),
@@ -290,6 +293,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Cada premio adicional va una sola vez." }, { status: 400 });
     }
     data.extraPrizes = input.extraPrizes.length > 0 ? JSON.stringify(input.extraPrizes) : null;
+  }
+  // Combos: only for loose numbers (no sets, no stages), each cheaper than its numbers apart — checked again when
+  // the number price changes, since a combo has to stay a deal.
+  if (input.combos !== undefined || (input.numberPrice !== undefined && existing.combos)) {
+    const combos = input.combos ?? parseCombos(existing.combos);
+    if (combos.length > 0) {
+      const hasGroups = (await prisma.raffleGroup.count({ where: { raffleId: id } })) > 0;
+      if (byStages || hasGroups) {
+        return NextResponse.json({ error: "Los combos son para rifas de números sueltos, sin letras ni etapas." }, { status: 400 });
+      }
+      const problem = combosProblem(combos, input.numberPrice ?? existing.numberPrice);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
+    if (input.combos !== undefined) data.combos = combos.length > 0 ? JSON.stringify([...combos].sort((a, b) => a.count - b.count)) : null;
   }
   if (!byStages && (input.stages || input.fullPayPerk || input.bonusStage)) {
     return NextResponse.json({ error: "Esta rifa no es por etapas." }, { status: 400 });

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { loosePrice } from "@/lib/combos";
 import { accountLine, accountQrPath, accountSelect, toAccountDTO } from "@/lib/accounts";
 import { ensureContrast, luminance, mix } from "@/lib/color";
 import { resolvedTheme, type RaffleTheme } from "@/lib/theme";
@@ -47,6 +48,8 @@ export interface BuyerRow {
   holdToken: string | null;
   soldAt: Date | null;
   quotas?: { quota: number; paidAt: Date }[];
+  /** Its share of a combo's price (lib/combos.ts); null/absent = the raffle's number price. */
+  salePrice?: number | null;
 }
 
 /** The fields every event needs from the database, for a `select`. */
@@ -57,6 +60,7 @@ export const buyerRowSelect = {
   buyerEmail: true,
   holdToken: true,
   soldAt: true,
+  salePrice: true,
   quotas: { select: { quota: true, paidAt: true } },
 } as const;
 
@@ -226,7 +230,8 @@ export async function emailBuyers(raffleId: string, rows: BuyerRow[], event: Buy
         sets.map((g) => g.label),
         loose,
       );
-      const amount = sets.reduce((sum, g) => sum + g.price, 0) + loose.length * raffle.numberPrice;
+      const amount =
+        sets.reduce((sum, g) => sum + g.price, 0) + mine.filter((r) => r.groupId === null).reduce((sum, r) => sum + loosePrice(r, raffle.numberPrice), 0);
       const key = mine.find((r) => r.holdToken)?.holdToken;
       const link = origin && key && raffle.publicToken ? `${origin}/p/${raffle.publicToken}/reserva/${key}` : null;
       const soldAt = mine.map((r) => r.soldAt).find(Boolean) ?? null;

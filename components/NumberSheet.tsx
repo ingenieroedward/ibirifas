@@ -200,7 +200,8 @@ function SheetContent({
               Número {formatNumberValue(number.value)}
             </p>
             <p className="text-sm text-text-muted">
-              {STATUS_LABEL[number.status]} · {formatCurrency(numberPrice)}
+              {STATUS_LABEL[number.status]} · {formatCurrency(number.salePrice ?? numberPrice)}
+              {number.salePrice !== null && number.status !== "available" ? " (en combo)" : ""}
             </p>
           </div>
         </div>

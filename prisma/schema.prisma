@@ -148,6 +148,9 @@ model Raffle {
   extraPrizes   String?
   lotteryResult String?
   prizeResults  String?
+  // Combos (lib/combos.ts): several loose numbers bought together for less (JSON [{count, price}], e.g. 2 for
+  // $4.000). Only for raffles without sets or stages.
+  combos        String?
   // Trash (lib/trash.ts): a deleted raffle is hidden for TRASH_DAYS and can be restored; then it is purged.
   // Its public link is switched off meanwhile (kept in `trashedPublicToken` to bring it back on restore).
   deletedAt          DateTime?
@@ -328,6 +331,9 @@ model RaffleNumber {
   // Who owns the account the payment came from, as the buyer typed it with the receipt: what the bank's
   // notice shows, so a payment can be matched to its reservation.
   payerName           String?
+  // What this number was sold for when it went in a combo (its share of the combo's price); null = the raffle's
+  // number price. Cleared when the number is freed.
+  salePrice           Int?
   // Installments paid, for a raffle by stages.
   quotas        NumberQuota[]
 

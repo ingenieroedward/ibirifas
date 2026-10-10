@@ -1,4 +1,5 @@
 import { drawPlanFromNumbers } from "@/lib/drawPlan";
+import { combosLine } from "@/lib/combos";
 import { accountLine } from "@/lib/accountText";
 import { formatCurrency, formatNumberValue, formatDrawWhen } from "@/lib/format";
 import { installmentPrices, lastPayDay, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
@@ -111,6 +112,7 @@ export function buildAvailabilityText(raffle: RaffleDTO, link?: string | null): 
     }
   } else {
     if (!byStages) lines.push(`Valor del número: ${money(raffle.numberPrice)}`);
+    if (!byStages && raffle.combos.length > 0) lines.push(`Combos: ${combosLine(raffle.combos)}`);
     lines.push("");
     if (free.length === 0) lines.push("Ya no quedan números disponibles.");
     else {

@@ -24,6 +24,7 @@ import { GroupPlanner, type PlannerSet } from "@/components/GroupPlanner";
 import { StagePlanner, initialStagePlan, type StagePlan } from "@/components/StagePlanner";
 import { Spinner } from "@/components/Spinner";
 import { ExtraPrizesEditor, draftFromPrizes, prizesFromDraft, type ExtraPrizeDraft } from "@/components/ExtraPrizesEditor";
+import { CombosEditor, comboDraftProblem, combosFromDraft, draftFromCombos, type ComboDraft } from "@/components/CombosEditor";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 const DEFAULT_HOLD_DAYS = 3;
@@ -150,6 +151,8 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
   const [prizeLabel, setPrizeLabel] = useState(raffle?.prizeLabel ?? "");
   // "Gana Más": extra prizes from the same lottery result (lib/prizes.ts).
   const [extraDraft, setExtraDraft] = useState<ExtraPrizeDraft>(() => draftFromPrizes(raffle?.extraPrizes));
+  // Combos (lib/combos.ts): several loose numbers for less, only without sets or stages.
+  const [comboDraft, setComboDraft] = useState<ComboDraft[]>(() => draftFromCombos(raffle?.combos));
   const [lottery, setLottery] = useState(raffle?.lottery ?? "");
   const [permit, setPermit] = useState(raffle?.permit ?? "");
   const [numberPrice, setNumberPrice] = useState(raffle ? String(raffle.numberPrice) : "");
@@ -394,6 +397,15 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       setError("Los días para pagar deben ser un número entre 1 y 365.");
       return;
     }
+    const combosAllowed = !useStages && !useSets && existingSets.length === 0;
+    if (combosAllowed) {
+      const comboProblem = comboDraftProblem(comboDraft, Math.round(Number(numberPrice)));
+      if (comboProblem) {
+        setError(comboProblem);
+        return;
+      }
+    }
+    const combosPayload = combosAllowed ? combosFromDraft(comboDraft) : [];
     const holdPayload = {
       holdDays: holdOn ? holdValue : null,
       autoRelease: (holdOn || useStages) && autoRelease,
@@ -428,6 +440,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           permit: permit.trim() || null,
           drawTime: drawTime || null,
           extraPrizes: useStages ? [] : prizesFromDraft(extraDraft),
+          combos: combosPayload,
           lottery: lottery.trim() || null,
           ...(useStages
             ? stagesPayload!
@@ -444,6 +457,7 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
           permit: permit.trim() || null,
           drawTime: drawTime || null,
           extraPrizes: useStages ? [] : prizesFromDraft(extraDraft),
+          combos: combosPayload,
           lottery: lottery.trim() || null,
           numberPrice: looseNumberPrice,
           totalNumbers: total,
@@ -850,6 +864,9 @@ export function RaffleForm({ mode, raffle }: RaffleFormProps) {
       )}
 
       {!useSets && !useStages && individualPriceField}
+      {!useSets && !useStages && existingSets.length === 0 && (
+        <CombosEditor numberPrice={Number(numberPrice)} value={comboDraft} onChange={setComboDraft} disabled={submitting} />
+      )}
 
       {!useStages && (
         <>

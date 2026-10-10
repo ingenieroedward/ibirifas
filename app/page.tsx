@@ -120,7 +120,7 @@ export default async function HomePage() {
         <section id="modalidades" className="scroll-mt-20 border-y border-line/60 bg-bg-elevated/40 px-4 py-16 sm:px-6 md:py-24">
           <div className="mx-auto w-full max-w-6xl">
             <SectionTitle eyebrow="Modalidades" title="Rifas que se venden solas" text="Elige la que más le guste a tu gente. Todas se deciden con la lotería oficial." />
-            <div className="mt-12 grid gap-4 lg:grid-cols-3">
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <ModeCard title="Normal" text="El número que coincida con la lotería se lleva el premio. Simple y de confianza." example="100 números · juega con la Sinuano noche">
                 <div className="flex justify-center">
                   <Ball value="47" big />
@@ -148,6 +148,14 @@ export default async function HomePage() {
                     </li>
                   ))}
                 </ol>
+              </ModeCard>
+              <ModeCard title="Combos" text="Varios números juntos por menos. Quien lleva más paga menos y tú vendes más rápido." example="1 número $2.500 · 2 números $4.000">
+                <div className="flex items-center justify-center gap-2">
+                  <Ball value="12" />
+                  <span className="text-xl font-bold text-gold-400">+</span>
+                  <Ball value="35" />
+                  <span className="ml-2 rounded-full bg-gradient-to-b from-gold-300 to-gold-500 px-3 py-1.5 text-sm font-bold text-[#241a02]">$4.000</span>
+                </div>
               </ModeCard>
             </div>
           </div>

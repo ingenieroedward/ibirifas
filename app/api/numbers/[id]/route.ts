@@ -135,6 +135,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       receiptRejectReason: null,
       privacyConsentAt: null,
       payerName: null,
+      salePrice: null,
     };
   } else {
     const resultingBuyerName =
@@ -172,6 +173,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.buyerEmail = null;
       data.privacyConsentAt = null;
       data.payerName = null;
+      // Sold on its own: the raffle's number price (combos apply to numbers sold together).
+      data.salePrice = null;
     }
     // Paid: whatever was said about an earlier receipt no longer matters.
     if (status === "paid") {
@@ -237,6 +240,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         buyerName: kind === "released" ? existing.buyerName : updated.buyerName,
         values: [updated.value],
         numberPrice: existing.raffle.numberPrice,
+        amount: updated.salePrice ?? existing.raffle.numberPrice,
         paymentMethod: updated.paymentMethod as PaymentMethod | null,
       }),
       url: `/rifas/${existing.raffleId}`,

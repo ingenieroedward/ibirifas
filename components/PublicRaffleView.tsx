@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { darken, lighten, withAlpha } from "@/lib/color";
+import { comboTotal, combosLine, planText } from "@/lib/combos";
 import { drawPlanOf } from "@/lib/drawPlan";
 import { extraPrizesLine, prizeDigits, prizeKindLabel } from "@/lib/prizes";
 import { formatCurrency, formatDrawDate, formatNumberValue, formatDrawWhen, formatDrawTime, formatTimeOfDay } from "@/lib/format";
@@ -103,8 +104,9 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
   const freeSets = useMemo(() => new Set(raffle.groups.filter((g) => !g.sold).map((g) => g.label)), [raffle.groups]);
   const numbersPicked = [...pickedNumbers].filter((v) => freeNumbers.has(v)).sort((a, b) => a - b);
   const setsPicked = [...pickedSets].filter((l) => freeSets.has(l)).sort();
+  // Loose numbers taken together get the raffle's combos (lib/combos.ts).
   const pickedTotal =
-    numbersPicked.length * raffle.numberPrice +
+    comboTotal(numbersPicked.length, raffle.numberPrice, raffle.combos) +
     setsPicked.reduce((sum, l) => sum + (raffle.groups.find((g) => g.label === l)?.price ?? 0), 0);
   const pickedCount = numbersPicked.length + setsPicked.length;
 
@@ -225,6 +227,11 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 </p>
                 {hasSets && loose.length > 0 && (
                   <p className="text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
+                )}
+                {raffle.combos.length > 0 && (
+                  <p className="mt-1 inline-flex rounded-full bg-gold-400/15 px-2.5 py-0.5 text-xs font-semibold text-gold-400">
+                    Combos: {combosLine(raffle.combos)}
+                  </p>
                 )}
                 {byStages && (
                   <p className="text-xs text-text-muted">
@@ -471,6 +478,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
                 </p>
                 <p className="text-xs text-text-muted">
                   {formatCurrency(pickedTotal)}
+                  {planText(numbersPicked.length, raffle.numberPrice, raffle.combos) ? ` · ${planText(numbersPicked.length, raffle.numberPrice, raffle.combos)}` : ""}
                   {byStages && numbersPicked.length > 0 && ` · para el próximo sorteo: ${formatCurrency(numbersPicked.length * perNumberNow)}`}
                 </p>
               </div>

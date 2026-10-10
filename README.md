@@ -13,6 +13,11 @@ comprobante, y acceso simple por código de 6 dígitos.
   `/rifas`.
 - **`/rifas`** es el panel (la lista de rifas del organizador o vendedor). El login
   y la app instalada (`start_url`) llevan ahí.
+- **`/ayuda`** es la guía pública "¿Qué hace cada persona?" (`components/HelpGuide.tsx`),
+  con una pestaña para organizador, vendedor y comprador (y administrador para el
+  superadmin). `?rol=vendedor` (organizador, comprador) abre esa guía, y cada una
+  tiene "Copiar" para enviársela a quien la necesite. Con sesión abre la del propio
+  rol. Se llega desde el menú (Ayuda), la cabecera y el pie de la página pública.
 
 ## Roles
 
@@ -267,6 +272,18 @@ producción. El superadmin entra **sin** código de organización.
   con todos; a cada ganador le llega "¡Ganaste!" con sus premios y a los demás el
   resultado con los premios adicionales. La página pública, la imagen y el texto
   para compartir muestran "Gana Más: Al revés $100.000 · Vecinos $20.000 c/u".
+- **Combos** (`lib/combos.ts`): en rifas de números sueltos (sin letras ni etapas) el
+  organizador agrega hasta 3 combos, ej. "2 números por $4.000" cuando uno vale
+  $2.500; cada combo debe costar menos que sus números por separado (también se
+  revisa si después cambia el valor del número). Cuando se venden o reservan varios
+  números **juntos** (selección múltiple en el tablero o reserva en línea), se cobra
+  la combinación más barata (7 números con "2 por $4.000" y "5 por $9.000" = 5 + 2) y
+  cada número guarda su parte del combo (`RaffleNumber.salePrice`); los números
+  vendidos de a uno valen el precio normal. Todos los totales (recaudado, por cobrar,
+  por vendedor, por comprador, Cobrar por WhatsApp, Excel, correos, cruce de pagos)
+  suman lo que de verdad se cobró. Liberar un número borra su precio de combo. El
+  tablero, la página pública, la imagen y el texto para compartir muestran
+  "Combos: 2 por $4.000", y al elegir varios se ve el total con "1 combo de 2 + 1 suelto".
 - **Cierre de la rifa**: el organizador puede "Cerrar rifa" desde el tablero,
   con el número ganador (o sin él si terminó sin sorteo). Se guardan
   `Raffle.winnerValue` y `closedAt`, el equipo recibe una notificación

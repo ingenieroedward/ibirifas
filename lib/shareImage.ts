@@ -4,6 +4,7 @@ import { drawPlanFromNumbers } from "@/lib/drawPlan";
 import { currentStage, installmentPrices, paidStages, sortedStages, stagesPrizeSummary, totalPrice } from "@/lib/stages";
 import { DEFAULT_THEME, resolvedTheme } from "@/lib/theme";
 import { extraPrizesLine } from "@/lib/prizes";
+import { combosLine } from "@/lib/combos";
 import type { RaffleDTO, RaffleNumberDTO } from "@/lib/types";
 
 /**
@@ -680,8 +681,13 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
   const byStages = raffle.stages.length > 0;
   const ladderHeight = byStages ? stagesLadderHeight(raffle.stages.length) : 0;
   // "Gana Más": one more line in the hero with the extra prizes.
-  const extraText = !byStages && raffle.extraPrizes.length > 0 ? `Gana Más: ${extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}` : null;
-  const HERO_EXTRA_HEIGHT = extraText ? 62 : 0;
+  // Combos (lib/combos.ts): their own line too, so "2 por $4.000" is seen next to the number price.
+  const extraLines = [
+    ...(!byStages && raffle.extraPrizes.length > 0 ? [`Gana Más: ${extraPrizesLine(raffle.extraPrizes, raffle.totalNumbers)}`] : []),
+    ...(!byStages && raffle.combos.length > 0 ? [`Combos: ${combosLine(raffle.combos)}`] : []),
+  ];
+  const EXTRA_LINE_HEIGHT = 62;
+  const HERO_EXTRA_HEIGHT = extraLines.length * EXTRA_LINE_HEIGHT;
   const heroHeight = byStages ? ladderHeight : HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0) + HERO_EXTRA_HEIGHT;
 
   const accountsCount = raffle.accounts.length;
@@ -940,8 +946,8 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       ctx.fillStyle = mutedText;
       ctx.fillText(metaText, metaBlockStartX + metaIconSize + metaIconGap, metaCenterY + 8);
     }
-    if (extraText) {
-      const extraY = cursorY + HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0);
+    for (const [i, extraText] of extraLines.entries()) {
+      const extraY = cursorY + HERO_TOP_HEIGHT + (hasMeta ? HERO_META_HEIGHT : 0) + i * EXTRA_LINE_HEIGHT;
       ctx.strokeStyle = withAlpha(dark ? "#ffffff" : "#000000", 0.12);
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -952,7 +958,7 @@ export async function generateRaffleShareImage(raffle: RaffleDTO): Promise<Blob>
       ctx.font = `700 ${fit.fontSize}px ${bodyFont}`;
       ctx.textAlign = "center";
       ctx.fillStyle = theme.numberColor;
-      ctx.fillText(fit.text, gridStartX + gridWidth / 2, extraY + HERO_EXTRA_HEIGHT / 2 + 9);
+      ctx.fillText(fit.text, gridStartX + gridWidth / 2, extraY + EXTRA_LINE_HEIGHT / 2 + 9);
     }
   }
 

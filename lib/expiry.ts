@@ -86,7 +86,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
       }
     } else {
       b.values.push(n.value);
-      b.amount += raffle.numberPrice;
+      b.amount += n.salePrice ?? raffle.numberPrice;
     }
     buyers.set(name, b);
   }
@@ -112,6 +112,7 @@ export async function sweepRaffle(raffleId: string, now: Date = new Date()): Pro
       },
       data: {
         status: "available",
+        salePrice: null,
         buyerName: null,
         buyerPhone: null,
         photoDataUrl: null,
@@ -226,6 +227,7 @@ async function sweepStageDeadline(raffleId: string, now: Date): Promise<number> 
         where: { id: { in: ids } },
         data: {
           status: "available",
+          salePrice: null,
           buyerName: null,
           buyerPhone: null,
           photoDataUrl: null,

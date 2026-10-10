@@ -10,6 +10,7 @@ import { numberInclude, toNumberDTO } from "@/lib/numberDto";
 import type { PaymentStatus } from "@/lib/types";
 import { BODY_LIMITS, RECEIPT_IMAGE_RE, readJsonBody } from "@/lib/body";
 import { buyerRowSelect, emailBuyers, mailOrigin, type BuyerRow } from "@/lib/buyerMail";
+import { comboSalePrices, loosePrice, parseCombos } from "@/lib/combos";
 
 const MAX_IDS = 100;
 const MAX_PHOTO_DATA_URL_LENGTH = 3 * 1024 * 1024;
@@ -85,7 +86,13 @@ export async function POST(req: NextRequest) {
 
   const found = await prisma.raffleNumber.findMany({
     where: { id: { in: ids } },
-    select: { id: true, raffleId: true, groupId: true, raffle: { select: { ownerId: true, status: true, _count: { select: { stages: true } } } } },
+    select: {
+      id: true,
+      value: true,
+      raffleId: true,
+      groupId: true,
+      raffle: { select: { ownerId: true, status: true, numberPrice: true, combos: true, _count: { select: { stages: true } } } },
+    },
   });
 
   const tenantId = tenantIdFor(user);
@@ -158,10 +165,20 @@ export async function POST(req: NextRequest) {
             receiptRejectReason: null,
             privacyConsentAt: null,
             payerName: null,
+            salePrice: null,
           },
         });
         if (count !== ids.length) {
           throw new ConflictError("Alguno de los números ya fue vendido. Actualiza el tablero e inténtalo de nuevo.");
+        }
+        // Loose numbers sold together get the raffle's combos (lib/combos.ts): each stores its share.
+        const combos = parseCombos(found[0]!.raffle.combos);
+        const loose = found.filter((n) => n.groupId === null).sort((a, b) => a.value - b.value);
+        if (combos.length > 0 && loose.length > 1) {
+          const prices = comboSalePrices(loose.length, found[0]!.raffle.numberPrice, combos);
+          for (const [i, n] of loose.entries()) {
+            if (prices[i] !== null) await tx.raffleNumber.update({ where: { id: n.id }, data: { salePrice: prices[i] } });
+          }
         }
         return;
       }
@@ -193,6 +210,7 @@ export async function POST(req: NextRequest) {
             receiptRejectReason: null,
             privacyConsentAt: null,
             payerName: null,
+            salePrice: null,
           },
         });
         return;
@@ -306,10 +324,10 @@ export async function POST(req: NextRequest) {
       ? await prisma.raffleGroup.findMany({ where: { id: { in: groupIds } }, orderBy: { position: "asc" } })
       : [];
     const isLoose = (n: { groupId: string | null }) => n.groupId === null;
-    const describe = (rows: { value: number; groupId: string | null }[]) => ({
+    const describe = (rows: { value: number; groupId: string | null; salePrice: number | null }[]) => ({
       sets: sets.map((g) => g.label),
       looseValues: rows.filter(isLoose).map((n) => n.value),
-      amount: sets.reduce((sum, g) => sum + g.price, 0) + rows.filter(isLoose).length * raffle.numberPrice,
+      amount: sets.reduce((sum, g) => sum + g.price, 0) + rows.filter(isLoose).reduce((sum, n) => sum + loosePrice(n, raffle.numberPrice), 0),
     });
 
     if (input.action === "sell") {
@@ -340,7 +358,7 @@ export async function POST(req: NextRequest) {
           paymentMethod: input.paymentMethod,
           sets: paidSets.map((g) => g.label),
           looseValues: paidRows.filter(isLoose).map((n) => n.value),
-          amount: paidSets.reduce((sum, g) => sum + g.price, 0) + paidRows.filter(isLoose).length * raffle.numberPrice,
+          amount: paidSets.reduce((sum, g) => sum + g.price, 0) + paidRows.filter(isLoose).reduce((sum, n) => sum + loosePrice(n, raffle.numberPrice), 0),
         }),
         url,
       });

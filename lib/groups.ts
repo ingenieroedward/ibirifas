@@ -35,11 +35,11 @@ export function setsThatFit(total: number, size: number): number {
 type PricedRaffle = Pick<RaffleDTO, "numberPrice" | "groups" | "numbers">;
 
 /**
- * Worth of a bunch of numbers: loose ones at the raffle's number price, and
+ * Worth of a bunch of numbers: loose ones at the raffle's number price (or their combo share), and
  * numbers of a set at that set's price (sets are always sold whole, so a set's
  * numbers together are exactly its price).
  */
-export function makePricer(raffle: PricedRaffle): (subset: Pick<RaffleNumberDTO, "groupId">[]) => number {
+export function makePricer(raffle: PricedRaffle): (subset: Pick<RaffleNumberDTO, "groupId" | "salePrice">[]) => number {
   const price = new Map(raffle.groups.map((g) => [g.id, g.price]));
   const size = new Map<string, number>();
   for (const n of raffle.numbers) if (n.groupId) size.set(n.groupId, (size.get(n.groupId) ?? 0) + 1);
@@ -48,7 +48,8 @@ export function makePricer(raffle: PricedRaffle): (subset: Pick<RaffleNumberDTO,
     let total = 0;
     const perGroup = new Map<string, number>();
     for (const n of subset) {
-      if (!n.groupId) total += raffle.numberPrice;
+      // A loose number sold in a combo counts its share of the combo (lib/combos.ts).
+      if (!n.groupId) total += n.salePrice ?? raffle.numberPrice;
       else perGroup.set(n.groupId, (perGroup.get(n.groupId) ?? 0) + 1);
     }
     for (const [id, count] of perGroup) {

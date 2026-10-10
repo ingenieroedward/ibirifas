@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { combosLine, parseCombos } from "@/lib/combos";
 import { prisma } from "@/lib/prisma";
 import { formatNumberValue } from "@/lib/format";
 import { groupStatus, makePricer } from "@/lib/groups";
@@ -105,6 +106,7 @@ export async function buildRaffleWorkbook(raffleId: string): Promise<{ buffer: B
     ["Estado", raffle.status === "closed" ? "Cerrada" : "Activa"],
     ...(raffle.winnerValue !== null ? ([["Número ganador", formatNumberValue(raffle.winnerValue)]] as [string, unknown][]) : []),
     ["Valor del número", raffle.numberPrice, MONEY],
+    ...(parseCombos(raffle.combos).length > 0 ? ([["Combos", combosLine(parseCombos(raffle.combos))]] as [string, unknown][]) : []),
     ...(stageSettings ? ([["Cuotas por número", quotaCount]] as [string, unknown][]) : []),
     ["Cantidad de números", raffle.totalNumbers],
     ["Vendidos o apartados", sold.length],
