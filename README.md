@@ -275,11 +275,15 @@ producción. El superadmin entra **sin** código de organización.
 - **Combos** (`lib/combos.ts`): en rifas de números sueltos (sin letras ni etapas) el
   organizador agrega hasta 3 combos, ej. "2 números por $4.000" cuando uno vale
   $2.500; cada combo debe costar menos que sus números por separado (también se
-  revisa si después cambia el valor del número). Cuando se venden o reservan varios
-  números **juntos** (selección múltiple en el tablero o reserva en línea), se cobra
-  la combinación más barata (7 números con "2 por $4.000" y "5 por $9.000" = 5 + 2) y
-  cada número guarda su parte del combo (`RaffleNumber.salePrice`); los números
-  vendidos de a uno valen el precio normal. Todos los totales (recaudado, por cobrar,
+  revisa si después cambia el valor del número). El combo se calcula sobre **todo lo
+  que un comprador debe** en la rifa (`lib/comboPricing.ts`): sus números sin pagar,
+  vendidos o reservados juntos o en ventas separadas (el mismo teléfono, o el mismo
+  nombre si no hay teléfono). Se cobra la combinación más barata (7 números con "2 por
+  $4.000" y "5 por $9.000" = 5 + 2) y cada número guarda su parte
+  (`RaffleNumber.salePrice`). Reservar el 18 y un minuto después el 30 cuesta lo mismo
+  que los dos juntos; al liberar uno, los demás se recalculan. Los números ya pagados
+  conservan lo que se cobró. Al arrancar, la app recalcula una vez las rifas abiertas
+  con combos. Todos los totales (recaudado, por cobrar,
   por vendedor, por comprador, Cobrar por WhatsApp, Excel, correos, cruce de pagos)
   suman lo que de verdad se cobró. Liberar un número borra su precio de combo. El
   tablero, la página pública, la imagen y el texto para compartir muestran

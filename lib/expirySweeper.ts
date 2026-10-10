@@ -2,6 +2,7 @@ import { sweepAllRaffles } from "@/lib/expiry";
 import { snapshotIfDue } from "@/lib/snapshots";
 import { reconcilePagoradar } from "@/lib/pagoradar";
 import { purgeTrash } from "@/lib/trash";
+import { repriceAllCombos } from "@/lib/comboPricing";
 
 const EVERY_MS = 10 * 60 * 1000;
 
@@ -28,4 +29,6 @@ export function startExpirySweeper(): void {
   timer.unref();
   globalForSweeper.__ibirifasSweeper = timer;
   tick();
+  // Once per start: combos priced by buyer for numbers sold before that rule (lib/comboPricing.ts).
+  void repriceAllCombos().catch((err) => console.error("[combos] reprice failed:", err instanceof Error ? err.message : err));
 }
