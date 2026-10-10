@@ -462,7 +462,10 @@ organización (rifas abiertas, no por etapas):
   **titular** que avisa el banco coincide con el que escribió el comprador al subir
   el comprobante (o con su propio nombre). Los bancos dan el nombre completo
   ("ANA MARIA PEREZ GOMEZ") y la gente escribe parte ("Ana Pérez"): coincide si al
-  menos dos palabras coinciden y están todas las del nombre más corto.
+  menos dos palabras coinciden y están todas las del nombre más corto. Una palabra
+  cuenta si es igual, si es una abreviatura ("Ma" por "María") o, en palabras de 5
+  letras o más, si solo le falta o le sobra una letra o tiene dos letras cambiadas de
+  orden ("Edwad" por "Edward"); una letra distinta no cuenta ("Mario" no es "María").
 - Si coincide **una sola** reserva en línea → se **aprueba sola** (números pagados
   con método *Bre-B*, correo "Pago confirmado" al comprador, aviso al equipo) y queda
   en **Pagos recibidos → Aprobados** con **Deshacer**.

@@ -158,9 +158,36 @@ export function nameTokens(name: string | null | undefined): string[] {
 export type NameMatch = "strong" | "weak" | "none";
 
 /**
+ * One typo apart: same first letter, both words of 5+ letters, and one letter missing, added, or two swapped
+ * ("EDWAD" / "EDWARD", "ANDERA" / "ANDREA"). A changed letter doesn't count: "MARIO" and "MARIA" are two people.
+ */
+function oneTypoApart(a: string, b: string): boolean {
+  if (a.length < 5 || b.length < 5 || a[0] !== b[0] || Math.abs(a.length - b.length) > 1) return false;
+  // Optimal string alignment distance, stopping as soon as it can't be 1 or less.
+  const prev2: number[] = [];
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      // A different letter costs 2, so only a missing/extra letter or a swap can come out as one typo.
+      const cost = a[i - 1] === b[j - 1] ? 0 : 2;
+      let d = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, prev2[j - 2]! + 1);
+      cur[j] = d;
+      rowMin = Math.min(rowMin, d);
+    }
+    if (rowMin > 1) return false;
+    prev2.splice(0, prev2.length, ...prev);
+    prev = cur;
+  }
+  return prev[b.length]! <= 1;
+}
+
+/**
  * How well a name someone typed matches the one the bank shows. Banks show the full legal name
- * ("ANA MARIA PEREZ GOMEZ"); people type part of it ("Ana Pérez") or shorten a word ("Ma." / "Andr").
- * Strong: at least two words match and every word of the shorter of the two names is found.
+ * ("ANA MARIA PEREZ GOMEZ"); people type part of it ("Ana Pérez"), shorten a word ("Ma." / "Andr") or miss a
+ * letter ("Edwad"). Strong: at least two words match and every word of the shorter of the two names is found.
  */
 export function nameMatch(typed: string | null | undefined, bank: string | null | undefined): NameMatch {
   const t = nameTokens(typed);
@@ -170,7 +197,9 @@ export function nameMatch(typed: string | null | undefined, bank: string | null 
   let matched = 0;
   for (const word of t) {
     const i = b.findIndex(
-      (w, idx) => !used.has(idx) && (w === word || (word.length >= 3 && w.startsWith(word)) || (w.length >= 3 && word.startsWith(w))),
+      (w, idx) =>
+        !used.has(idx) &&
+        (w === word || (word.length >= 3 && w.startsWith(word)) || (w.length >= 3 && word.startsWith(w)) || oneTypoApart(w, word)),
     );
     if (i !== -1) {
       used.add(i);
