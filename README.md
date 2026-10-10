@@ -482,8 +482,10 @@ se vuelve a aprobar solo.
 avisa todo lo que entra a la cuenta (con el nombre de quien paga), también lo que no
 es de las rifas. Los vendedores solo ven los números quedar pagados en el tablero.
 Mejor aún: usa para las rifas una cuenta que no reciba otros pagos. El botón con el ícono de banco (arriba, junto a la campana)
-lleva a **Pagos** y muestra cuántos esperan. En esa misma página (**Menú → Pagos**) el
-organizador conecta su cuenta y apaga o enciende "Aprobar solos los pagos". Cada número pagado así
+lleva a **Pagos** y muestra cuántos esperan. Esa página (**Menú → Pagos**) tiene dos
+pestañas: **Pagos recibidos** (la que abre, con Por revisar / Aprobados / Ignorados) y
+**Configuración**, donde el organizador conecta su cuenta y apaga o enciende "Aprobar
+solos los pagos" (abre en Configuración mientras no hay cuenta conectada). Cada número pagado así
 guarda el id del pago (`paymentRef`).
 
 ### Conectar la cuenta de cada organizador
