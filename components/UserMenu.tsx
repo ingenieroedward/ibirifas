@@ -73,6 +73,11 @@ export function UserMenu({ userName, onLogout }: { userName: string; onLogout: (
             </Link>
           )}
           {role === "ORGANIZER" && (
+            <Link role="menuitem" href="/pagos" onClick={() => setOpen(false)} className="block px-4 py-3 text-sm text-text hover:bg-surface-2">
+              Pagos
+            </Link>
+          )}
+          {role === "ORGANIZER" && (
             <Link role="menuitem" href="/rifas/papelera" onClick={() => setOpen(false)} className="block px-4 py-3 text-sm text-text hover:bg-surface-2">
               Papelera
             </Link>

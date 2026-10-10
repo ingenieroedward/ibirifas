@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   ApiError,
   connectPaymentsAccount,
@@ -25,17 +24,30 @@ const dt = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", ho
 type Notify = (message: string, variant?: "success" | "error" | "info") => void;
 
 /**
- * Mi equipo → "Pagos Bre-B automáticos": the organizer connects the account their buyers pay to. pagoradar
+ * Pagos → "Pagos Bre-B automáticos": the organizer connects the account their buyers pay to. pagoradar
  * gives it a forwarding address; the organizer's Gmail forwards the bank's notices there (with the code
  * Gmail asks for shown right here), and from then on payments are matched to reservations by themselves.
+ * Once connected it shows a summary (Gmail, banks, last payment) with the setup steps folded away, and lets the
+ * organizer change the Gmail or banks, or disconnect after saying what that does.
  */
-export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Notify; defaultEmail: string | null }) {
+export function PaymentsAccountCard({
+  onNotify,
+  defaultEmail,
+  onChange,
+}: {
+  onNotify: Notify;
+  defaultEmail: string | null;
+  /** The connection changed (connected, edited or disconnected). */
+  onChange?: () => void;
+}) {
   const [state, setState] = useState<PaymentsAccountDTO | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [email, setEmail] = useState(defaultEmail ?? "");
   const [banks, setBanks] = useState<string[]>(["nequi_negocios", "nequi", "bancolombia"]);
   const [error, setError] = useState<string | null>(null);
+  const [stepsOpen, setStepsOpen] = useState<boolean | null>(null);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -73,7 +85,9 @@ export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Noti
     try {
       setState(await fn());
       setEditing(false);
+      setConfirmingDisconnect(false);
       if (done) onNotify(done, "success");
+      onChange?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo completar. Inténtalo de nuevo.");
     } finally {
@@ -181,6 +195,25 @@ export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Noti
 
       {a && !editing && (
         <>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-xl bg-surface-2/60 p-3 text-sm">
+            <dt className="text-text-muted">Gmail</dt>
+            <dd className="min-w-0 break-all text-text">{a.ownerEmails.join(", ")}</dd>
+            <dt className="text-text-muted">Bancos</dt>
+            <dd className="text-text">{a.banks.map((id) => BANKS.find((b) => b.id === id)?.label ?? id).join(", ")}</dd>
+            <dt className="text-text-muted">Último pago</dt>
+            <dd className="text-text">{a.lastPaymentAt ? dt.format(new Date(a.lastPaymentAt)) : "Todavía ninguno"}</dd>
+          </dl>
+          {a.status === "active" && (
+            <button
+              type="button"
+              onClick={() => setStepsOpen(!(stepsOpen ?? false))}
+              aria-expanded={stepsOpen ?? false}
+              className="text-sm font-semibold text-gold-400 underline-offset-2 hover:underline"
+            >
+              {stepsOpen ? "Ocultar los pasos de configuración" : "Ver los pasos de configuración"}
+            </button>
+          )}
+          {(stepsOpen ?? a.status !== "active") && (
           <ol className="list-decimal space-y-3 pl-5 text-sm text-text">
             <li>
               En <b>{a.ownerEmails.join(", ")}</b>: Gmail → ⚙️ <b>Ver toda la configuración</b> → <b>Reenvío y correo POP/IMAP</b> →{" "}
@@ -234,6 +267,7 @@ export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Noti
               )}
             </li>
           </ol>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -244,21 +278,54 @@ export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Noti
               }}
               className="h-10 flex-1 rounded-xl border border-line px-3 text-sm font-semibold text-text transition active:scale-[0.98]"
             >
-              Cambiar correo o bancos
+              Cambiar datos
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={() => {
-                if (window.confirm("¿Desconectar? Los pagos dejarán de cruzarse solos. Recuerda quitar el filtro de reenvío en Gmail.")) {
-                  void run(() => disconnectPaymentsAccount(), "Cuenta desconectada.");
-                }
-              }}
-              className="h-10 flex-1 rounded-xl border border-line px-3 text-sm font-semibold text-red-400 transition active:scale-[0.98] disabled:opacity-50"
+              disabled={busy || confirmingDisconnect}
+              onClick={() => setConfirmingDisconnect(true)}
+              className="h-10 flex-1 rounded-xl border border-red-500/40 px-3 text-sm font-semibold text-red-400 transition active:scale-[0.98] disabled:opacity-50"
             >
               Desconectar
             </button>
           </div>
+          {confirmingDisconnect && (
+            <div role="alertdialog" aria-label="Desconectar la cuenta" className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/10 p-3">
+              <p className="text-sm font-semibold text-red-300">¿Desconectar la cuenta {a.ownerEmails[0] ?? ""}?</p>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-text">
+                <li>Los pagos que lleguen desde ahora dejarán de cruzarse solos con las reservas.</li>
+                <li>Los pagos ya recibidos y las reservas ya pagadas no cambian.</li>
+                <li>
+                  En tu Gmail, borra el filtro y la dirección de reenvío <span className="break-all">{a.address}</span> para dejar de
+                  reenviar los avisos.
+                </li>
+                <li>Puedes volver a conectar otra cuenta cuando quieras.</li>
+              </ul>
+              {error && (
+                <p role="alert" className="text-sm font-medium text-red-400">
+                  {error}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDisconnect(false)}
+                  disabled={busy}
+                  className="h-10 flex-1 rounded-xl border border-line text-sm font-semibold text-text"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void run(() => disconnectPaymentsAccount(), "Cuenta desconectada.")}
+                  disabled={busy}
+                  className="flex h-10 flex-1 items-center justify-center rounded-xl bg-red-500/90 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {busy ? <Spinner size={16} /> : "Sí, desconectar"}
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -289,9 +356,6 @@ export function PaymentsAccountCard({ onNotify, defaultEmail }: { onNotify: Noti
               </span>
             </span>
           </label>
-          <Link href="/pagos" className="inline-block text-sm font-semibold text-gold-400 underline-offset-2 hover:underline">
-            Ver pagos recibidos
-          </Link>
         </div>
       )}
     </section>

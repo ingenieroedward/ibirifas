@@ -462,14 +462,14 @@ se vuelve a aprobar solo.
 avisa todo lo que entra a la cuenta (con el nombre de quien paga), también lo que no
 es de las rifas. Los vendedores solo ven los números quedar pagados en el tablero.
 Mejor aún: usa para las rifas una cuenta que no reciba otros pagos. El botón con el ícono de banco (arriba, junto a la campana)
-lleva a **Pagos recibidos** y muestra cuántos esperan. En **Mi equipo** el
+lleva a **Pagos** y muestra cuántos esperan. En esa misma página (**Menú → Pagos**) el
 organizador conecta su cuenta y apaga o enciende "Aprobar solos los pagos". Cada número pagado así
 guarda el id del pago (`paymentRef`).
 
 ### Conectar la cuenta de cada organizador
 
-Cada organizador conecta **su propia cuenta** en **Mi equipo → Pagos Bre-B
-automáticos**: escribe el Gmail donde el banco le avisa y elige los bancos. La app
+Cada organizador conecta **su propia cuenta** en **Menú → Pagos** (tarjeta *Pagos
+Bre-B automáticos*; *Mi equipo* tiene un acceso directo): escribe el Gmail donde el banco le avisa y elige los bancos. La app
 crea en pagoradar una cuenta receptora (con `tenantRef` = id del organizador) y le
 muestra los pasos ahí mismo:
 
@@ -479,8 +479,12 @@ muestra los pasos ahí mismo:
 3. El texto del **filtro** (remitentes de sus bancos) para reenviar solo los avisos.
 4. Con el primer aviso de pago la cuenta queda **Conectado**.
 
-Puede cambiar el Gmail o los bancos, o desconectarla (si la cuenta ya tiene pagos,
-pagoradar la desactiva en vez de borrarla). Cada pago llega con el id de su cuenta y
+Ya conectada, la tarjeta muestra un resumen (Gmail, bancos, último pago) y guarda los
+pasos de configuración detrás de "Ver los pasos de configuración". Puede **cambiar
+datos** (Gmail o bancos) o **desconectar**: antes de hacerlo le explica qué pasa (los
+pagos nuevos dejan de cruzarse, lo ya pagado no cambia, y debe borrar en Gmail el
+filtro y la dirección de reenvío). Si la cuenta ya tiene pagos, pagoradar la
+desactiva en vez de borrarla. Cada pago llega con el id de su cuenta y
 se cruza solo con las reservas de ese organizador; un pago de una cuenta que nadie
 tiene conectada se ignora.
 

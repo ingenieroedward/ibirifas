@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomSheet } from "@/components/BottomSheet";
 import { Spinner } from "@/components/Spinner";
+import { PaymentsAccountCard } from "@/components/PaymentsAccountCard";
 
 type Filter = "pending" | "approved" | "ignored";
 
@@ -34,8 +35,9 @@ const MATCH_TEXT: Record<PaymentCandidateDTO["nameMatch"], { text: string; class
 };
 
 /**
- * "Pagos recibidos": the Bre-B payments the bank reported (through pagoradar) and what happened to each —
- * approved on its own (with "Deshacer"), waiting for the team with its possible reservations, or set aside.
+ * "Pagos": the organizer's Bre-B account connected to pagoradar (connect, change, disconnect, automatic
+ * approval) and "Pagos recibidos", the payments the bank reported and what happened to each — approved on its
+ * own (with "Deshacer"), waiting for the team with its possible reservations, or set aside.
  */
 export default function PaymentsPage() {
   const router = useRouter();
@@ -113,17 +115,18 @@ export default function PaymentsPage() {
       <AppHeader
         userName={user.name}
         onLogout={handleLogout}
-        title="Pagos recibidos"
-        subtitle="Pagos por Bre-B que avisó el banco y a qué reserva corresponden."
-        backHref="/"
+        title="Pagos"
+        subtitle="Tu cuenta Bre-B conectada y los pagos que avisó el banco."
+        backHref="/rifas"
         backLabel="Volver a tus rifas"
       />
       <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-2xl space-y-4">
+          {user.role === "ORGANIZER" && <PaymentsAccountCard onNotify={show} defaultEmail={null} onChange={() => void load(filter)} />}
+          <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Pagos recibidos</h2>
           {data && !data.enabled ? (
             <p className="rounded-2xl border border-line bg-bg-elevated p-4 text-sm text-text-muted">
-              Tu organización todavía no está conectada al lector de pagos. Cuando lo esté, aquí verás cada pago que
-              llegue a tu cuenta y la reserva que pagó.
+              Cuando conectes tu cuenta, aquí verás cada pago que llegue y la reserva que pagó.
             </p>
           ) : (
             <>
