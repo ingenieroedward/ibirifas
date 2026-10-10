@@ -48,6 +48,8 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<ReceivedPaymentDTO | null>(null);
+  // Two views: the payments the bank reported, and the account setup (shown first only while not connected).
+  const [view, setView] = useState<"payments" | "settings" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -102,6 +104,8 @@ export default function PaymentsPage() {
     router.push("/login");
   }, [signOut, router]);
 
+  const current = view ?? (data && !data.enabled ? "settings" : "payments");
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-dvh flex-1 items-center justify-center py-24">
@@ -122,15 +126,51 @@ export default function PaymentsPage() {
       />
       <main className="mt-4 flex-1 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-2xl space-y-4">
-          {user.role === "ORGANIZER" && <PaymentsAccountCard onNotify={show} defaultEmail={null} onChange={() => void load(filter)} />}
-          <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Pagos recibidos</h2>
-          {data && !data.enabled ? (
-            <p className="rounded-2xl border border-line bg-bg-elevated p-4 text-sm text-text-muted">
-              Cuando conectes tu cuenta, aquí verás cada pago que llegue y la reserva que pagó.
-            </p>
-          ) : (
+          <div role="tablist" aria-label="Pagos" className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-bg-elevated p-1">
+            {(
+              [
+                { id: "payments", label: `Pagos recibidos${data && data.pending > 0 ? ` (${data.pending})` : ""}` },
+                { id: "settings", label: "Configuración" },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={current === t.id}
+                onClick={() => setView(t.id)}
+                className={`h-11 rounded-xl text-sm font-semibold transition ${
+                  current === t.id ? "bg-gradient-to-b from-gold-300 to-gold-500 text-[#241a02]" : "text-text-muted"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {current === "settings" && user.role === "ORGANIZER" && (
+            <PaymentsAccountCard
+              onNotify={show}
+              defaultEmail={null}
+              onChange={() => {
+                setView("settings");
+                void load(filter);
+              }}
+            />
+          )}
+          {current === "payments" && data && !data.enabled ? (
+            <div className="rounded-2xl border border-line bg-bg-elevated p-4 text-sm text-text-muted">
+              <p>Cuando conectes tu cuenta, aquí verás cada pago que llegue y la reserva que pagó.</p>
+              <button
+                type="button"
+                onClick={() => setView("settings")}
+                className="mt-3 text-sm font-semibold text-gold-400 underline-offset-2 hover:underline"
+              >
+                Conectar mi cuenta
+              </button>
+            </div>
+          ) : current === "payments" ? (
             <>
-              <div role="tablist" aria-label="Filtrar pagos" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-bg-elevated p-1">
+              <div role="tablist" aria-label="Filtrar pagos" className="flex gap-2">
                 {TABS.map((t) => (
                   <button
                     key={t.id}
@@ -138,8 +178,8 @@ export default function PaymentsPage() {
                     role="tab"
                     aria-selected={filter === t.id}
                     onClick={() => setFilter(t.id)}
-                    className={`h-10 rounded-xl text-xs font-semibold transition sm:text-sm ${
-                      filter === t.id ? "bg-gold-400 text-[#241a02]" : "text-text-muted"
+                    className={`h-9 rounded-full border px-4 text-xs font-semibold transition sm:text-sm ${
+                      filter === t.id ? "border-gold-500 bg-gold-400/15 text-gold-400" : "border-line text-text-muted"
                     }`}
                   >
                     {t.label}
@@ -149,7 +189,7 @@ export default function PaymentsPage() {
               </div>
               {data && !data.autoApprove && (
                 <p className="text-xs text-text-muted">
-                  La aprobación automática está apagada: cada pago espera a que alguien lo apruebe (se cambia en Mi equipo).
+                  La aprobación automática está apagada: cada pago espera a que alguien lo apruebe (se cambia en Configuración).
                 </p>
               )}
               {error && (
@@ -190,7 +230,7 @@ export default function PaymentsPage() {
                 />
               ))}
             </>
-          )}
+          ) : null}
         </div>
       </main>
       {assigning && (
