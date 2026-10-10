@@ -1044,6 +1044,7 @@ export default function RaffleDashboardPage() {
                       drawDate={raffle.stages.length === 0 ? raffle.drawDate : null}
                       drawTime={raffle.drawTime}
                       autoRelease={raffle.autoRelease}
+                      bankPayments={raffle.bankPayments}
                       onSelect={openNumber}
                       onPayAll={(buyerName, numbers) => setPayTarget({ buyerName, numbers })}
                       onEditPhone={handleEditPhone}

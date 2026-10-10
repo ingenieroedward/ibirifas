@@ -116,6 +116,8 @@ export interface RaffleNumberDTO {
   quotas: QuotaDTO[];
   /** Its share of a combo's price when it was sold in one (lib/combos.ts); null = the raffle's number price. */
   salePrice: number | null;
+  /** The bank payment (pagoradar) that paid it, when one did: details in RaffleDTO.bankPayments. */
+  paymentRef: string | null;
   updatedAt: string;
 }
 
@@ -330,6 +332,8 @@ export interface RaffleDTO {
   extraPrizes: ExtraPrize[];
   /** Several loose numbers bought together for less, e.g. 2 for $4.000 (lib/combos.ts). */
   combos: Combo[];
+  /** The bank payments that paid this raffle's numbers, by id (RaffleNumberDTO.paymentRef). */
+  bankPayments: Record<string, BankPaymentDTO>;
   /** The lottery result it was closed with ("3847"), and the prizes it gave. */
   lotteryResult: string | null;
   prizeResults: PrizeWin[];
@@ -659,4 +663,16 @@ export interface BillingSettingsDTO {
   payOnline: boolean;
   whatsapp: string | null;
   packs: { id: "small" | "large"; raffles: number; price: number }[];
+}
+
+/** A payment the bank reported (pagoradar) that paid some numbers: what the team sees on the buyer. */
+export interface BankPaymentDTO {
+  /** "Nequi Negocios", "Bancolombia"… */
+  bank: string;
+  payerName: string;
+  reference: string | null;
+  amount: number;
+  paidAt: string;
+  /** Approved on its own (true) or by someone on the team. */
+  auto: boolean;
 }

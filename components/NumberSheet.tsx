@@ -327,7 +327,7 @@ function SheetContent({
                       : `Debe ${formatCurrency(amountRemaining(number.quotas, stageSettings.stages))}`
                     : number.status === "paid"
                     ? number.paymentMethod
-                      ? `Pagado · ${PAYMENT_METHOD_LABEL[number.paymentMethod]}`
+                      ? `Pagado · ${PAYMENT_METHOD_LABEL[number.paymentMethod]}${number.paymentRef ? " · verificado con el banco" : ""}`
                       : "Pagado"
                     : "Pendiente"
                 }
