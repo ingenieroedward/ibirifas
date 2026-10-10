@@ -16,7 +16,7 @@ export function proxy(req: NextRequest) {
 }
 
 // Soft UX guard only — real enforcement is the 401s in the API routes.
-// Excludes /login itself, the terms of use (/terminos, linked from public pages), the public raffle pages (/p/<token>, no account
+// Excludes /login itself, the terms of use (/terminos, linked from public pages), the help guide (/ayuda), the public raffle pages (/p/<token>, no account
 // needed), the picture shown when a link is shared (WhatsApp's crawler has no
 // session), the service worker script (browsers fetch it
 // without going through the app), all /api routes (auth endpoints must be reachable
@@ -24,6 +24,6 @@ export function proxy(req: NextRequest) {
 // redirect), Next internals, and common static assets.
 export const config = {
   matcher: [
-    "/((?!login|terminos|p/|api|_next|opengraph-image|favicon.ico|manifest.json|sw.js|icons|fonts|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
+    "/((?!login|terminos|ayuda|p/|api|_next|opengraph-image|favicon.ico|manifest.json|sw.js|icons|fonts|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
   ],
 };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { RaffleNumberDTO } from "@/lib/types";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
+import { comboTotal, planText, type Combo } from "@/lib/combos";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { Spinner } from "@/components/Spinner";
@@ -10,13 +11,15 @@ import { Spinner } from "@/components/Spinner";
 interface SellManySheetProps {
   numbers: RaffleNumberDTO[];
   numberPrice: number;
+  /** The raffle's combos: numbers sold together get the cheapest mix (lib/combos.ts). */
+  combos?: Combo[];
   /** Names already used in this raffle — offered as suggestions so one buyer isn't typed two ways. */
   knownBuyers: string[];
   onClose: () => void;
   onConfirm: (input: { buyerName: string; buyerPhone: string | null; photoDataUrl: string | null }) => Promise<void>;
 }
 
-export function SellManySheet({ numbers, numberPrice, knownBuyers, onClose, onConfirm }: SellManySheetProps) {
+export function SellManySheet({ numbers, numberPrice, combos = [], knownBuyers, onClose, onConfirm }: SellManySheetProps) {
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function SellManySheet({ numbers, numberPrice, knownBuyers, onClose, onCo
   return (
     <BottomSheet
       title={`Vender ${count} ${count === 1 ? "número" : "números"}`}
-      subtitle={`${formatCurrency(count * numberPrice)} en total`}
+      subtitle={`${formatCurrency(comboTotal(count, numberPrice, combos))} en total${planText(count, numberPrice, combos) ? ` · ${planText(count, numberPrice, combos)}` : ""}`}
       onClose={onClose}
     >
       <div className="flex flex-wrap gap-2">

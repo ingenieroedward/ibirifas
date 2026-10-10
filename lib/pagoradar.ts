@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { loosePrice } from "@/lib/combos";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
@@ -224,7 +225,7 @@ export async function openReservations(tenantId: string): Promise<OpenReservatio
     prisma.raffleNumber.findMany({
       where: { raffleId: { in: raffleIds }, status: "occupied" },
       orderBy: { value: "asc" },
-      select: { id: true, raffleId: true, value: true, groupId: true, buyerName: true, buyerPhone: true, payerName: true, holdToken: true, online: true, soldAt: true },
+      select: { id: true, raffleId: true, value: true, groupId: true, buyerName: true, buyerPhone: true, payerName: true, holdToken: true, online: true, soldAt: true, salePrice: true },
     }),
     prisma.raffleNumber.findMany({
       where: { raffleId: { in: raffleIds }, status: "occupied", photoDataUrl: { not: null } },
@@ -266,7 +267,7 @@ export async function openReservations(tenantId: string): Promise<OpenReservatio
       payerName: rows.find((r) => r.payerName)?.payerName ?? null,
       online: key.startsWith("h:"),
       hasReceipt: rows.some((r) => receiptIds.has(r.id)),
-      amount: sets.reduce((sum, g) => sum + g.price, 0) + loose.length * raffle.numberPrice,
+      amount: sets.reduce((sum, g) => sum + g.price, 0) + loose.reduce((sum, r) => sum + loosePrice(r, raffle.numberPrice), 0),
       soldAt: soldTimes.length ? new Date(Math.min(...soldTimes)) : null,
     });
   }

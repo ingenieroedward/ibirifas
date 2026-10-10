@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { loosePrice } from "@/lib/combos";
 import { toStageDTO } from "@/lib/stageDto";
 import { accountSelect, toAccountDTO } from "@/lib/accounts";
 import { amountRemaining, installmentCount, standingOf, stageSettingsOf } from "@/lib/stages";
@@ -50,6 +51,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
       soldAt: true,
       receiptRejectedAt: true,
       receiptRejectReason: true,
+      salePrice: true,
       quotas: { select: { quota: true, amount: true, paidAt: true }, orderBy: { quota: "asc" } },
     },
   });
@@ -58,7 +60,7 @@ export async function getReservation(token: string, key: string): Promise<Reserv
   const setIds = [...new Set(rows.map((r) => r.groupId).filter((g): g is string => g !== null))];
   const sets = raffle.groups.filter((g) => setIds.includes(g.id)).sort((a, b) => a.label.localeCompare(b.label));
   const loose = rows.filter((r) => r.groupId === null);
-  const total = sets.reduce((sum, g) => sum + g.price, 0) + loose.length * raffle.numberPrice;
+  const total = sets.reduce((sum, g) => sum + g.price, 0) + loose.reduce((sum, r) => sum + loosePrice(r, raffle.numberPrice), 0);
 
   const stageSettings = stageSettingsOf({
     stages: raffle.stages.map(toStageDTO),

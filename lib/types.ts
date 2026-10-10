@@ -1,4 +1,5 @@
 import type { ExtraPrize, PrizeKind, PrizeWin } from "@/lib/prizes";
+import type { Combo } from "@/lib/combos";
 export type NumberStatus = "available" | "occupied" | "paid";
 export type PaymentStatus = "pending" | "paid" | "refunded";
 /** When a raffle is played: on its date, or once every number is sold / paid. */
@@ -113,6 +114,8 @@ export interface RaffleNumberDTO {
   payerName: string | null;
   /** Installments paid (raffles by stages only; empty otherwise), in order. */
   quotas: QuotaDTO[];
+  /** Its share of a combo's price when it was sold in one (lib/combos.ts); null = the raffle's number price. */
+  salePrice: number | null;
   updatedAt: string;
 }
 
@@ -168,6 +171,8 @@ export interface RaffleAccountDTO {
 export interface PublicRaffleDTO {
   name: string;
   extraPrizes: ExtraPrize[];
+  /** Several loose numbers together for less (lib/combos.ts). */
+  combos: Combo[];
   /** Once closed with the lottery result: the winning numbers of every prize (never who has them). */
   prizeResults: { kind: PrizeKind; value: number; prize: string | null; won: boolean }[];
   prizeLabel: string | null;
@@ -323,6 +328,8 @@ export interface RaffleDTO {
   /** Secret of the public read-only page (/p/<token>); null when there is none. */
   /** "Gana Más": extra prizes decided by the same lottery result (lib/prizes.ts). */
   extraPrizes: ExtraPrize[];
+  /** Several loose numbers bought together for less, e.g. 2 for $4.000 (lib/combos.ts). */
+  combos: Combo[];
   /** The lottery result it was closed with ("3847"), and the prizes it gave. */
   lotteryResult: string | null;
   prizeResults: PrizeWin[];
@@ -373,6 +380,7 @@ export interface RaffleGroupInput {
 export interface CreateRaffleInput {
   name: string;
   extraPrizes?: ExtraPrize[];
+  combos?: Combo[];
   prizeLabel?: string | null;
   permit?: string | null;
   lottery?: string | null;
@@ -405,6 +413,7 @@ export interface CreateRaffleInput {
 // omit the field entirely to leave existing accounts untouched.
 export interface UpdateRaffleInput {
   extraPrizes?: ExtraPrize[];
+  combos?: Combo[];
   /** With status "closed": the lottery's full result; the winner and the extra prizes come out of it. */
   lotteryResult?: string | null;
   /** "closed" ends the sales; "active" reopens the raffle (and forgets the winner). */

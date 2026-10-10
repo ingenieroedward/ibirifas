@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { combosLine } from "@/lib/combos";
 import Link from "next/link";
 import { formatCurrency, formatNumberValue, formatDrawWhen } from "@/lib/format";
 import { makePricer } from "@/lib/groups";
@@ -327,6 +328,7 @@ export function DashboardHeader({
                 {hasGroups && looseCount > 0 && (
                   <p className="truncate text-xs text-text-muted">Suelto: {formatCurrency(raffle.numberPrice)}</p>
                 )}
+                {raffle.combos.length > 0 && <p className="truncate text-xs text-text-muted">Combos: {combosLine(raffle.combos)}</p>}
                 {installmentText && <p className="truncate text-xs text-text-muted">{installmentText}</p>}
               </div>
             </div>

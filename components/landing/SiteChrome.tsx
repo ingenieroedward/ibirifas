@@ -6,6 +6,7 @@ const NAV = [
   { href: "/#modalidades", label: "Modalidades" },
   { href: "/#precios", label: "Precios" },
   { href: "/#preguntas", label: "Preguntas" },
+  { href: "/ayuda", label: "Ayuda" },
   { href: "/terminos", label: "Términos" },
 ];
 
@@ -57,6 +58,7 @@ export function SiteFooter() {
             <li><Link href="/#funciones" className="hover:text-gold-400">Funciones</Link></li>
             <li><Link href="/#modalidades" className="hover:text-gold-400">Modalidades</Link></li>
             <li><Link href="/#precios" className="hover:text-gold-400">Precios</Link></li>
+            <li><Link href="/ayuda" className="hover:text-gold-400">Ayuda: qué hace cada persona</Link></li>
             <li><Link href="/login" className="hover:text-gold-400">Ingresar</Link></li>
           </ul>
         </div>

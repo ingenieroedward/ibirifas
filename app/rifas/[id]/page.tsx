@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { comboTotal, planText } from "@/lib/combos";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/Toast";
@@ -1074,7 +1075,8 @@ export default function RaffleDashboardPage() {
                 {pickedIds.size} {pickedIds.size === 1 ? "seleccionado" : "seleccionados"}
               </p>
               <p className="text-xs text-text-muted">
-                {formatCurrency(pickedIds.size * (raffle?.numberPrice ?? 0))}
+                {formatCurrency(raffle ? comboTotal(pickedIds.size, raffle.numberPrice, raffle.combos) : 0)}
+                {raffle && planText(pickedIds.size, raffle.numberPrice, raffle.combos) ? ` · ${planText(pickedIds.size, raffle.numberPrice, raffle.combos)}` : ""}
               </p>
             </div>
             <button
@@ -1195,6 +1197,7 @@ export default function RaffleDashboardPage() {
         <SellManySheet
           numbers={pickedNumbers}
           numberPrice={raffle.numberPrice}
+          combos={raffle.combos}
           knownBuyers={knownBuyers}
           onClose={() => setSellingMany(false)}
           onConfirm={handleSellMany}

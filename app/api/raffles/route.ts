@@ -10,6 +10,7 @@ import type { CreateRaffleInput, DrawTrigger, RaffleSummaryDTO } from "@/lib/typ
 import { BODY_LIMITS, readJsonBody } from "@/lib/body";
 import { billingEnabled, raffleActive } from "@/lib/billing";
 import { supportsExtraPrizes } from "@/lib/prizes";
+import { combosProblem, MAX_COMBO_COUNT, MAX_COMBOS } from "@/lib/combos";
 
 const DEFAULT_TOTAL_NUMBERS = 100;
 
@@ -33,11 +34,14 @@ const extraPrizeSchema = z.object({
   prize: z.string().trim().min(1).max(80),
 });
 
+const comboSchema = z.object({ count: z.number().int().min(2).max(MAX_COMBO_COUNT), price: z.number().int().positive() });
+
 const createRaffleSchema = z.object({
   name: z.string().trim().min(1).max(120),
   prizeLabel: z.string().trim().max(120).nullable().optional(),
   permit: z.string().trim().max(120).nullable().optional(),
   extraPrizes: z.array(extraPrizeSchema).max(3).optional(),
+  combos: z.array(comboSchema).max(MAX_COMBOS).optional(),
   lottery: z.string().trim().max(80).nullable().optional(),
   numberPrice: z.number().int().positive(),
   totalNumbers: z.number().int().min(10).max(1000).optional(),
@@ -89,7 +93,18 @@ export async function GET(req: NextRequest) {
       })
     : [];
 
-  // Money collected: loose paid numbers at the raffle's number price, numbers of
+  // Paid numbers sold in a combo (lib/combos.ts): they count their share, not the number price.
+  const comboPaid = raffleIds.length
+    ? await prisma.raffleNumber.groupBy({
+        by: ["raffleId"],
+        where: { raffleId: { in: raffleIds }, status: "paid", groupId: null, salePrice: { not: null } },
+        _count: true,
+        _sum: { salePrice: true },
+      })
+    : [];
+  const comboByRaffle = new Map(comboPaid.map((row) => [row.raffleId, { count: row._count, sum: row._sum.salePrice ?? 0 }]));
+
+  // Money collected: loose paid numbers at the raffle's number price (or their combo share), numbers of
   // a set at that set's price (a set is paid whole, so price * paid / size).
   const groups = raffleIds.length
     ? await prisma.raffleGroup.findMany({ where: { raffleId: { in: raffleIds } }, select: { id: true, raffleId: true, price: true } })
@@ -151,7 +166,9 @@ export async function GET(req: NextRequest) {
       paidCount: counts.paid,
       groupCount: groupsByRaffle.get(r.id) ?? 0,
       collected:
-        (counts.paid - (groupedPaidCount.get(r.id) ?? 0)) * r.numberPrice + (groupedCollected.get(r.id) ?? 0),
+        (counts.paid - (groupedPaidCount.get(r.id) ?? 0) - (comboByRaffle.get(r.id)?.count ?? 0)) * r.numberPrice +
+        (comboByRaffle.get(r.id)?.sum ?? 0) +
+        (groupedCollected.get(r.id) ?? 0),
       themeBackground: r.themeBackground,
       themeNumberColor: r.themeNumberColor,
       themeTextColor: r.themeTextColor,
@@ -217,6 +234,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cada premio adicional va una sola vez." }, { status: 400 });
     }
   }
+  const combos = input.combos ?? [];
+  if (combos.length > 0) {
+    if (byStages || groups.length > 0) {
+      return NextResponse.json({ error: "Los combos son para rifas de números sueltos, sin letras ni etapas." }, { status: 400 });
+    }
+    const problem = combosProblem(combos, input.numberPrice);
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  }
   const lastStageDate = [...stages].reverse().find((s) => s.drawDate)?.drawDate ?? null;
 
   // Sets: each letter once, only numbers that exist, no number in two sets.
@@ -248,6 +273,7 @@ export async function POST(req: NextRequest) {
         prizeLabel: input.prizeLabel ?? null,
         permit: input.permit || null,
         extraPrizes: extraPrizes.length > 0 ? JSON.stringify(extraPrizes) : null,
+        combos: combos.length > 0 ? JSON.stringify([...combos].sort((a, b) => a.count - b.count)) : null,
         lottery: input.lottery ?? null,
         numberPrice: byStages ? stagesTotal : input.numberPrice,
         totalNumbers,

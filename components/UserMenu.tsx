@@ -92,6 +92,9 @@ export function UserMenu({ userName, onLogout }: { userName: string; onLogout: (
               Actividad
             </Link>
           )}
+          <Link role="menuitem" href="/ayuda" onClick={() => setOpen(false)} className="block px-4 py-3 text-sm text-text hover:bg-surface-2">
+            Ayuda
+          </Link>
           <button
             type="button"
             role="menuitem"
