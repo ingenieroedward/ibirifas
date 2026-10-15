@@ -309,6 +309,7 @@ function PaymentCard({
                     <p className="break-words text-xs text-text-muted">
                       {c.raffleName} · {c.items} · {formatCurrency(c.amount)}
                     </p>
+                    {c.key.startsWith("p:") && <p className="text-xs font-semibold text-gold-400">Sus reservas juntas</p>}
                     <p className="break-words text-xs text-text-muted">
                       {c.payerName ? `Titular que escribió: ${c.payerName}` : c.online ? "Sin comprobante todavía" : "Venta del equipo"}
                       {c.hasReceipt ? " · con comprobante" : ""}

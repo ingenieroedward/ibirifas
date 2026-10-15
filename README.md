@@ -470,6 +470,9 @@ organización (rifas abiertas, no por etapas):
   cuenta si es igual, si es una abreviatura ("Ma" por "María") o, en palabras de 5
   letras o más, si solo le falta o le sobra una letra o tiene dos letras cambiadas de
   orden ("Edwad" por "Edward"); una letra distinta no cuenta ("Mario" no es "María").
+- Si un comprador hizo **varias reservas** en la misma rifa (mismo teléfono), sus
+  reservas juntas también son una candidata ("Sus reservas juntas"): un solo pago por
+  todo coincide y se puede aprobar solo, igual que cada reserva por separado.
 - Si coincide **una sola** reserva en línea → se **aprueba sola** (números pagados
   con método *Bre-B*, correo "Pago confirmado" al comprador, aviso al equipo) y queda
   en **Pagos recibidos → Aprobados** con **Deshacer**.
