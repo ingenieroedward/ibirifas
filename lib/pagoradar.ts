@@ -274,6 +274,18 @@ export async function openReservations(tenantId: string): Promise<OpenReservatio
     list.push(n);
     groups.set(key, list);
   }
+  // Someone who reserved twice (the 18, then the 30) often pays both at once: their reservations together are one
+  // more candidate, so that single payment matches (each reservation alone stays a candidate too).
+  const byPhone = new Map<string, typeof numbers>();
+  for (const n of numbers) {
+    const tail = (n.buyerPhone ?? "").replace(/\D/g, "").slice(-10);
+    if (!n.online || !n.holdToken || tail.length < 7) continue;
+    const key = `p:${n.raffleId}:${tail}`;
+    byPhone.set(key, [...(byPhone.get(key) ?? []), n]);
+  }
+  for (const [key, rows] of byPhone) {
+    if (new Set(rows.map((r) => r.holdToken)).size > 1) groups.set(key, rows);
+  }
 
   const out: OpenReservation[] = [];
   for (const [key, rows] of groups) {
@@ -294,7 +306,7 @@ export async function openReservations(tenantId: string): Promise<OpenReservatio
       items,
       buyerName: rows[0]!.buyerName,
       payerName: rows.find((r) => r.payerName)?.payerName ?? null,
-      online: key.startsWith("h:"),
+      online: key.startsWith("h:") || key.startsWith("p:"),
       hasReceipt: rows.some((r) => receiptIds.has(r.id)),
       amount: sets.reduce((sum, g) => sum + g.price, 0) + loose.reduce((sum, r) => sum + loosePrice(r, raffle.numberPrice), 0),
       soldAt: soldTimes.length ? new Date(Math.min(...soldTimes)) : null,
