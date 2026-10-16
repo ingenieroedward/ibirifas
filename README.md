@@ -94,7 +94,10 @@ producción. El superadmin entra **sin** código de organización.
   para que un comprador vea, sin cuenta, qué números o letras siguen
   disponibles. Viene **apagada**: el organizador la activa desde "Crear enlace
   para compradores", y puede copiarla, compartirla, generar una nueva (la
-  anterior deja de funcionar al instante) o desactivarla. `Raffle.publicToken`
+  anterior deja de funcionar al instante) o desactivarla. La hoja del enlace muestra
+  además su **código QR** (`components/LinkQrCard.tsx`, librería `qrcode`, generado en
+  el navegador) con "Descargar QR" / "Compartir QR": un afiche de 1080×1350 con el
+  nombre de la rifa, el código y la dirección, para imprimir o mostrar. `Raffle.publicToken`
   guarda un secreto aleatorio de 128 bits. Quien la abre ve premio, precios,
   fecha, cuentas de pago y disponible/vendido por número y letra (y el número
   ganador si la rifa está cerrada), **nunca** nombres, teléfonos, comprobantes

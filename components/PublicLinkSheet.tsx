@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LinkQrCard } from "@/components/LinkQrCard";
 import { getVisitStats } from "@/lib/api-client";
 import type { PublicLinkAction, VisitStatsDTO } from "@/lib/types";
 import { BottomSheet } from "@/components/BottomSheet";
@@ -134,6 +135,8 @@ export function PublicLinkSheet({
               </a>
             )}
           </div>
+
+          <LinkQrCard url={url} raffleName={raffleName} />
         </>
       ) : (
         <p className="text-sm text-text-muted">
