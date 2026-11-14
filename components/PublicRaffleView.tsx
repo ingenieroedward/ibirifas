@@ -95,7 +95,7 @@ export function PublicRaffleView({ token, initial }: { token: string; initial: P
     : basePlan;
   const lotteryText = nextStage?.lottery || raffle.lottery;
   // What a number taken today must pay to play the next draw (its first installments).
-  const perNumberNow = byStages ? amountDueNow([], raffle.stages) : raffle.numberPrice;
+  const perNumberNow = byStages ? amountDueNow([], raffle.stages, raffle.stageDeadlineDays) : raffle.numberPrice;
   const canReserve = raffle.reservations.open && !closed;
   const { maxLoose, maxSets } = raffle.reservations;
 

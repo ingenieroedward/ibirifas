@@ -9,7 +9,7 @@ import { publishRaffleChange } from "@/lib/realtime";
 import { syncCompletion } from "@/lib/completion";
 import { formatCurrency, formatNumberValue } from "@/lib/format";
 import { notifyTeam } from "@/lib/push";
-import { currentPaidStage, deadlineOf, installmentPrices, installmentsNeeded, paidStages } from "@/lib/stages";
+import { collectingStage, deadlineOf, installmentPrices, installmentsNeeded, paidStages } from "@/lib/stages";
 import type { PaymentStatus } from "@/lib/types";
 import { buyerRowSelect, emailBuyers, mailOrigin } from "@/lib/buyerMail";
 
@@ -86,7 +86,8 @@ export async function POST(req: NextRequest) {
   const count = prices.length;
   const now = new Date();
   const firstDeadline = paidStages(stages)[0] ? deadlineOf(paidStages(stages)[0]!, raffle.stageDeadlineDays) : null;
-  const collecting = currentPaidStage(stages);
+  // A stage whose deadline passed is no longer collected: "due" catches up to the next one (lib/stages.ts).
+  const collecting = collectingStage(stages, raffle.stageDeadlineDays, now);
   const neededNow = collecting ? installmentsNeeded(collecting, stages) : count;
   const discountApplies = raffle.fullPayPerk === "discount" && (raffle.fullPayDiscount ?? 0) > 0 && (!firstDeadline || now <= firstDeadline);
 

@@ -221,7 +221,11 @@ producción. El superadmin entra **sin** código de organización.
     premio **queda en la casa** (`outcome = "house"`).
   - **Entrar tarde**: quien compra con etapas ya jugadas paga las cuotas
     anteriores para ponerse al día ("Ponerse al día" cobra lo necesario para la
-    próxima etapa); al final siempre paga el total.
+    próxima etapa); al final siempre paga el total. La etapa que se cobra es la
+    próxima **cuyo plazo de pago no ha vencido** (`collectingStage` en
+    `lib/stages.ts`): cuando vence el plazo de la etapa 1 ya nadie puede pagar para
+    jugarla, así que quien la debe pasa a deber la etapa 1 y la 2 juntas (2 cuotas)
+    aunque el resultado de la etapa 1 todavía no se haya registrado.
   - **Pagar todo de una** (`Raffle.fullPayPerk`): sin beneficio, con **descuento**
     (`fullPayDiscount`, se aplica si paga todo junto antes de la fecha límite de la
     primera etapa) o con un **sorteo extra gratis** (una etapa `bonus` de precio
