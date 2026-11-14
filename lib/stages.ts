@@ -70,6 +70,21 @@ export function currentPaidStage<T extends StageLike>(stages: T[]): T | null {
 }
 
 /**
+ * The stage whose installments are being collected now: the next stage still to be played whose payment deadline
+ * hasn't passed. Once a stage's deadline passes nobody can pay to play it any more, so collection moves on to the
+ * next one, and a buyer who missed the old stage pays both installments to play it (stage 1 missed, stage 2 open:
+ * 2 installments, not 1). When every remaining deadline has passed, the last stage still to be played.
+ */
+export function collectingStage<T extends StageLike>(stages: T[], deadlineDays: number, at: Date = new Date()): T | null {
+  const open = paidStages(stages).filter((s) => !s.outcome);
+  const stillPayable = open.find((s) => {
+    const deadline = deadlineOf(s, deadlineDays);
+    return !deadline || at <= deadline;
+  });
+  return stillPayable ?? open[open.length - 1] ?? null;
+}
+
+/**
  * Whether a sold number plays `stage`: it paid the installments that stage needs by its deadline (or by `at`,
  * normally now, when the stage has no date yet). For the bonus draw: every installment by the first stage's
  * deadline.
@@ -92,9 +107,13 @@ export function playsStage(
   return quotas.filter((q) => new Date(q.paidAt) <= effective).length >= installmentsNeeded(stage, stages);
 }
 
-/** What a number must still pay to play the stage being collected now (catching up earlier installments too). */
-export function amountDueNow(quotas: QuotaLike[], stages: StageLike[]): number {
-  const stage = currentPaidStage(stages);
+/**
+ * What a number must still pay to play the stage being collected now (catching up earlier installments too).
+ * With `deadlineDays`, a stage whose deadline passed is skipped (collectingStage); without it, the next stage
+ * still to be played.
+ */
+export function amountDueNow(quotas: QuotaLike[], stages: StageLike[], deadlineDays?: number, at: Date = new Date()): number {
+  const stage = deadlineDays === undefined ? currentPaidStage(stages) : collectingStage(stages, deadlineDays, at);
   if (!stage) return 0;
   const prices = installmentPrices(stages);
   const needed = installmentsNeeded(stage, stages);
@@ -165,7 +184,7 @@ export interface Standing {
 }
 
 export function standingOf(quotas: QuotaLike[], settings: StageSettings, at: Date = new Date()): Standing {
-  const stage = currentPaidStage(settings.stages);
+  const stage = collectingStage(settings.stages, settings.deadlineDays, at);
   if (!stage) return { stage: null, upToDate: true, late: false, due: 0, lastDay: null };
   const needed = installmentsNeeded(stage, settings.stages);
   const deadline = deadlineOf(stage, settings.deadlineDays);
@@ -177,7 +196,7 @@ export function standingOf(quotas: QuotaLike[], settings: StageSettings, at: Dat
     stage,
     upToDate,
     late: passed && !upToDate,
-    due: amountDueNow(quotas, settings.stages),
+    due: amountDueNow(quotas, settings.stages, settings.deadlineDays, at),
     lastDay: lastPayDay(stage, settings.deadlineDays),
   };
 }

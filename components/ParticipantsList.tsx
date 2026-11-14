@@ -11,7 +11,7 @@ import { buildReceiptMessage, buildReminderMessage, whatsAppUrl } from "@/lib/wh
 import {
   amountRemaining,
   collectedOn,
-  currentPaidStage,
+  collectingStage,
   installmentPrices,
   quotaBadge,
   standingOf,
@@ -398,11 +398,11 @@ function ParticipantCard({
     paidPart.count = withPayments.length;
     paidPart.amount = stageMoney.collected;
   }
-  const collectingStage = stageSettings ? currentPaidStage(stageSettings.stages) : null;
+  const collectingNow = stageSettings ? collectingStage(stageSettings.stages, stageSettings.deadlineDays) : null;
   const collectingDay = stageSettings && p.numbers[0] ? standingOf(p.numbers[0].quotas, stageSettings).lastDay : null;
   const stageNote =
-    stageSettings && collectingStage
-      ? `Para jugar *${collectingStage.label}* (premio ${collectingStage.prize}) debes estar al día${collectingDay ? ` antes de terminar el ${collectingDay}` : ""}.`
+    stageSettings && collectingNow
+      ? `Para jugar *${collectingNow.label}* (premio ${collectingNow.prize}) debes estar al día${collectingDay ? ` antes de terminar el ${collectingDay}` : ""}.`
       : null;
   const methods = new Set(p.numbers.filter((n) => n.status === "paid").map((n) => n.paymentMethod));
   const onlyMethod = methods.size === 1 ? [...methods][0] : null;
