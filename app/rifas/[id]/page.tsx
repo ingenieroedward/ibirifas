@@ -63,6 +63,7 @@ import { SellManySheet } from "@/components/SellManySheet";
 import { Spinner } from "@/components/Spinner";
 import { StagesPanel } from "@/components/StagesPanel";
 import { ActivationSheet } from "@/components/ActivationSheet";
+import { BroadcastSheet } from "@/components/BroadcastSheet";
 
 /** For useSyncExternalStore values that never change while the page is open (browser capabilities). */
 const subscribeNever = () => () => {};
@@ -107,6 +108,8 @@ export default function RaffleDashboardPage() {
   // The lettered set whose sheet is open (raffles sold in sets).
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [publicLinkOpen, setPublicLinkOpen] = useState(false);
+  // "Mensaje a compradores": one message for everyone, sent from the organizer's WhatsApp.
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   // Billing: a raffle sells only once activated (lib/billing.ts).
   const [activationOpen, setActivationOpen] = useState(false);
   const [settingDrawDate, setSettingDrawDate] = useState(false);
@@ -1033,6 +1036,16 @@ export default function RaffleDashboardPage() {
                       </button>
                     )}
                   </div>
+                  {people === "buyers" && isOrganizer && raffle.numbers.some((n) => n.status !== "available") && (
+                    <button
+                      type="button"
+                      onClick={() => setBroadcastOpen(true)}
+                      className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#25d366]/40 bg-[#25d366]/10 px-4 text-sm font-semibold text-[#25d366] transition active:scale-[0.98]"
+                    >
+                      <ChatIcon className="h-4 w-4" />
+                      Mensaje a compradores
+                    </button>
+                  )}
                   {people === "buyers" ? (
                     <ParticipantsList
                       numbers={raffle.numbers}
@@ -1118,6 +1131,10 @@ export default function RaffleDashboardPage() {
           onClose={() => setActivationOpen(false)}
           onActivated={() => setRaffle((current) => (current && !current.active ? { ...current, active: true } : current))}
         />
+      )}
+
+      {broadcastOpen && raffle && (
+        <BroadcastSheet raffle={raffle} priceOf={pricer} stageSettings={stageSettings} onClose={() => setBroadcastOpen(false)} />
       )}
 
       {publicLinkOpen && raffle && (
@@ -1304,6 +1321,14 @@ function FullScreenSpinner() {
     <div className="flex flex-1 items-center justify-center py-24">
       <Spinner size={32} className="text-gold-400" />
     </div>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20l1.1-4.6A8.3 8.3 0 0 1 3 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5Z" />
+    </svg>
   );
 }
 

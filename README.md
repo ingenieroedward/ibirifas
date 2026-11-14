@@ -140,6 +140,17 @@ producción. El superadmin entra **sin** código de organización.
   dígitos recibe el `57` solo; uno con código de país se respeta; sin teléfono se
   abre el selector de contactos de WhatsApp. No hay integración ni costo: el
   mensaje sale del WhatsApp del propio vendedor.
+- **Mensaje a compradores** (organizador, en Participantes → Compradores): un
+  mensaje para todos, armado con las etapas de la rifa ("ya tenemos nuestro
+  primer ganador… este 30 de noviembre vamos por otros $500.000 con Sinuano
+  Noche… seguimos hasta diciembre por el gran premio"), o con el premio, la
+  fecha y la lotería en una rifa sin etapas. Se puede editar; `{nombre}` se
+  cambia por el primer nombre de cada uno. "Compartir"/"Copiar" lo dejan sin
+  nombre para un grupo o el estado; "Uno por uno" lista a los compradores
+  (Todos / Al día / Deben) con "Enviar" a su WhatsApp y marca los enviados del
+  día (en el dispositivo). Opcional: agregar a quien debe lo que le falta pagar
+  para jugar el próximo sorteo y hasta cuándo, e incluir el enlace público
+  (`buildBroadcastMessage` en `lib/whatsapp.ts`, `components/BroadcastSheet.tsx`).
 - **Agregar o corregir el teléfono** de un comprador ya registrado: en su tarjeta
   de Participantes ("+ Agregar teléfono" / "Editar") se guarda en todos sus
   números de esa rifa; en la hoja de un número, solo en ese número (en un
