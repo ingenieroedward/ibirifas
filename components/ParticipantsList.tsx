@@ -61,7 +61,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 type Filter = "all" | "pending" | "paid";
 
-interface Participant {
+export interface Participant {
   key: string;
   name: string;
   phone: string | null;
@@ -80,7 +80,7 @@ function normalizeName(name: string): string {
     .trim();
 }
 
-function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
+export function groupByBuyer(numbers: RaffleNumberDTO[]): Participant[] {
   const groups = new Map<string, Participant>();
 
   for (const number of numbers) {

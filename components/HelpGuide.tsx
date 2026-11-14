@@ -45,6 +45,7 @@ const GUIDES: Record<HelpRole, Guide> = {
           <><B>Activar</B>: tu primera rifa de hasta 100 números es gratis. Después compras un paquete de rifas: transfieres a la llave Bre-B que aparece y subes el comprobante.</>,
           <><B>Compartir</B>: copia el enlace de la rifa y descarga la imagen para tus estados y grupos de WhatsApp. Ahí la gente aparta sus números sola.</>,
           <>Vende desde el tablero (o deja que vendan tus vendedores). Los pagos que no se cruzan solos los revisas en <B>Menú → Pagos</B>; también puedes aprobar comprobantes desde cada número.</>,
+          <>Para animar a todos (o recordar el próximo sorteo), en <B>Participantes → Mensaje a compradores</B> tienes un mensaje listo que puedes editar y mandar a cada uno por WhatsApp con su nombre, o compartir en un grupo.</>,
           <>El día del sorteo, a la hora que pusiste, se cierran las reservas en línea. Toca <B>Cerrar</B>, escribe el número ganador y usa <B>Avisar por WhatsApp</B> e <B>Imagen para el estado</B>.</>,
         ],
         note: <>¿Borraste una rifa por error? Queda 30 días en <B>Menú → Papelera</B> y la puedes restaurar.</>,

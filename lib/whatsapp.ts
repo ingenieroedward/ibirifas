@@ -143,3 +143,104 @@ export function buildWinnerMessage(c: WinnerContext): string {
     "Escríbeme para coordinar la entrega del premio.",
   ].join("\n");
 }
+
+// --- Messages to everyone at once (the organizer's broadcast) -------------------------------------------------
+
+/** Replaced by each buyer's first name; dropped (with its space) when the message goes to a group. */
+export const NAME_TOKEN = "{nombre}";
+
+const dayMonth = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", timeZone: "UTC" });
+const monthOnly = new Intl.DateTimeFormat("es-CO", { month: "long", timeZone: "UTC" });
+
+const ORDINAL = ["primer", "segundo", "tercer", "cuarto", "quinto", "sexto", "séptimo", "octavo", "noveno", "décimo"];
+
+interface BroadcastStage {
+  position: number;
+  prize: string;
+  bonus: boolean;
+  lottery: string | null;
+  drawDate: string | null;
+  outcome: "won" | "house" | null;
+}
+
+export interface BroadcastContext {
+  raffleName: string;
+  /** The raffle's own prize and draw (raffles without stages). */
+  prize: string | null;
+  drawDate: string | null;
+  lottery: string | null;
+  stages: BroadcastStage[];
+  /** The public page, so whoever reads it can see the board. */
+  link?: string | null;
+}
+
+/**
+ * The organizer's message to every buyer — "ya tenemos nuestro primer ganador… este 30 de noviembre vamos por
+ * otros $500.000… seguimos hasta diciembre por el gran premio" — built from the raffle's stages. It is only a
+ * starting point: the organizer edits it before sending. {nombre} becomes each buyer's first name.
+ */
+export function buildBroadcastMessage(c: BroadcastContext): string {
+  const lines = [`🎉 ¡Hola ${NAME_TOKEN}! Te escribimos de *${c.raffleName}*.`, ""];
+  const stages = [...c.stages].sort((a, b) => a.position - b.position);
+
+  if (stages.length > 0) {
+    const winners = stages.filter((s) => s.outcome === "won").length;
+    const played = stages.filter((s) => s.outcome !== null).length;
+    const open = stages.filter((s) => s.outcome === null);
+    const next = open[0] ?? null;
+    // The big one: the last draw that isn't the bonus for numbers paid up front.
+    const final = [...stages].reverse().find((s) => !s.bonus) ?? stages[stages.length - 1]!;
+
+    if (winners > 0) {
+      lines.push(
+        winners === 1
+          ? "¡Recuerda que ya tenemos nuestro primer ganador y tú puedes ser el próximo! 🏆"
+          : `¡Recuerda que ya tenemos ${winners} ganadores y tú puedes ser el próximo! 🏆`,
+      );
+    } else if (played > 0) {
+      lines.push("¡El premio sigue en juego y tú puedes ser el ganador! 🏆");
+    }
+
+    if (next) {
+      const lottery = next.lottery || c.lottery;
+      const when = next.drawDate ? `Este ${dayMonth.format(new Date(next.drawDate))}` : `En el ${ORDINAL[played] ?? "próximo"} sorteo`;
+      const isFinal = next === final;
+      lines.push(
+        isFinal
+          ? `${when} jugamos el gran premio de *${next.prize}*${lottery ? `, con el resultado de *${lottery}*` : ""}. 💰`
+          : `${when} vamos por ${played > 0 ? "otros " : ""}*${next.prize}*${lottery ? `, jugando con el resultado de *${lottery}*` : ""}. 💰`,
+      );
+      if (!isFinal && final.outcome === null) {
+        const month = final.drawDate ? ` hasta ${monthOnly.format(new Date(final.drawDate))}` : "";
+        lines.push(`Y esto no termina aquí… ¡Seguimos${month} por el gran premio de *${final.prize}*! 🔥`);
+      }
+      lines.push("", "¡Mantente activo, conserva tu número y prepárate para ser el próximo ganador! 🍀");
+    } else {
+      lines.push("¡Gracias por participar con nosotros! Muy pronto te contamos de la próxima rifa. 🙌");
+    }
+  } else {
+    const when = c.drawDate ? `Este ${dayMonth.format(new Date(c.drawDate))}` : "Muy pronto";
+    lines.push(
+      `${when} jugamos${c.prize ? ` *${c.prize}*` : " el premio"}${c.lottery ? ` con el resultado de *${c.lottery}*` : ""}. 💰`,
+      "",
+      "¡Conserva tu número y prepárate para ganar! 🍀",
+    );
+  }
+
+  lines.push("¡La suerte puede estar de tu lado!");
+  if (c.link) lines.push("", `Mira los números aquí: ${c.link}`);
+  return lines.join("\n");
+}
+
+/** The broadcast for one buyer (their first name) or for a group (name dropped), plus an optional personal line. */
+export function personalizeBroadcast(text: string, buyerName: string | null, extra?: string | null): string {
+  const body = buyerName
+    ? text.split(NAME_TOKEN).join(firstName(buyerName))
+    : text.replace(new RegExp(`\\s?${NAME_TOKEN.replace(/[{}]/g, "\\$&")}`, "g"), "");
+  return extra ? `${body.trimEnd()}\n\n${extra}` : body;
+}
+
+/** The line added to a buyer's copy when they owe: what, how much and by when. */
+export function broadcastDueLine(c: { sets: string[]; looseValues: number[]; amount: number; lastDay?: string | null }): string {
+  return `Recuerda: para jugar con ${describeHoldings(c.sets, c.looseValues)} te falta pagar *${money(c.amount)}*${c.lastDay ? ` antes de terminar el ${c.lastDay}` : ""}.`;
+}
